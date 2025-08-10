@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>StoneClipboarderTool</title>
+        <link>https://foxfollow.github.io/StoneClipboarderTool/</link>
+        <description>Updates for StoneClipboarderTool</description>
+        <language>en</language>
+
+        <item>
+            <title>Version 1.0.0</title>
+            <link>https://foxfollow.github.io/StoneClipboarderTool/</link>
+            <sparkle:version>1.0.0</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <description><![CDATA[
+                <h2>StoneClipboarderTool 1.0.0</h2>
+                <ul>
+                    <li>Initial release</li>
+                    <li>Clipboard history tracking</li>
+                    <li>Menu bar integration</li>
+                </ul>
+            ]]></description>
+            <pubDate>Mon, 08 Aug 2025 12:00:00 +0000</pubDate>
+            <enclosure
+                url="https://github.com/foxfollow/StoneClipboarderTool/releases/download/v1.0.0/StoneClipboarderTool.zip"
+                sparkle:version="1.0.0"
+                sparkle:shortVersionString="1.0.0"
+                sparkle:edSignature="SIGNATURE_WILL_BE_GENERATED"
+                length="0"
+                type="application/octet-stream" />
+        </item>
+    </channel>
+</rss>

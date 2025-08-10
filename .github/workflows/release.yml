@@ -1,0 +1,138 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    environment: release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Sparkle tools
+        run: |
+          brew install --cask sparkle
+
+      - name: Verify Sparkle installation
+        run: |
+          SPARKLE_PATH="/opt/homebrew/Caskroom/sparkle"
+          if [ ! -d "$SPARKLE_PATH" ]; then
+            echo "Sparkle not found, trying alternative installation..."
+            brew install sparkle
+          fi
+          find /opt/homebrew -name "sign_update" -type f 2>/dev/null | head -1
+
+      - name: Build app
+        run: |
+          xcodebuild -project StoneClipboarderTool.xcodeproj \
+            -scheme StoneClipboarderTool \
+            -configuration Release \
+            -derivedDataPath build \
+            -allowProvisioningUpdates \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Verify build
+        run: |
+          if [ ! -d "build/Build/Products/Release/StoneClipboarderTool.app" ]; then
+            echo "Build failed - app not found"
+            exit 1
+          fi
+          echo "App built successfully"
+
+      - name: Create app bundle
+        run: |
+          mkdir -p release
+          cp -r build/Build/Products/Release/StoneClipboarderTool.app release/
+          ls -la release/
+
+      - name: Sign update
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "SPARKLE_PRIVATE_KEY secret not found"
+            exit 1
+          fi
+
+          echo "$SPARKLE_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+
+          cd release
+          zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
+
+          SIGN_UPDATE_PATH=$(find /opt/homebrew -name "sign_update" -type f 2>/dev/null | head -1)
+          if [ -z "$SIGN_UPDATE_PATH" ]; then
+            echo "sign_update tool not found"
+            exit 1
+          fi
+
+          SIGNATURE=$("$SIGN_UPDATE_PATH" StoneClipboarderTool.zip ../private_key.pem)
+          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
+          echo "Generated signature: $SIGNATURE"
+
+          rm ../private_key.pem
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Processing version: $VERSION"
+
+      - name: Update appcast
+        run: |
+          SIZE=$(stat -f%z release/StoneClipboarderTool.zip)
+          DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+
+          echo "File size: $SIZE bytes"
+          echo "Date: $DATE"
+          echo "Signature: $SPARKLE_SIGNATURE"
+
+          cp docs/appcast.xml docs/appcast.xml.backup
+
+          sed -i '' "s/SIGNATURE_WILL_BE_GENERATED/$SPARKLE_SIGNATURE/g" docs/appcast.xml
+          sed -i '' "s/foxfollow/${{ github.repository_owner }}/g" docs/appcast.xml
+          sed -i '' "s/1\.0\.0/$VERSION/g" docs/appcast.xml
+          sed -i '' "s/length=\"0\"/length=\"$SIZE\"/g" docs/appcast.xml
+          sed -i '' "s/Mon, 08 Aug 2025 12:00:00 +0000/$DATE/g" docs/appcast.xml
+
+          echo "Updated appcast.xml:"
+          cat docs/appcast.xml
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/StoneClipboarderTool.zip
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          force_orphan: true
