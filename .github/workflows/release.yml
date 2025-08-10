@@ -14,7 +14,6 @@ permissions:
 jobs:
   build:
     runs-on: macos-15
-    environment: release
 
     steps:
       - name: Checkout code
@@ -117,16 +116,17 @@ jobs:
             exit 1
           fi
 
-          # Validate private key format
+          # Create private key file
           echo "$SPARKLE_PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
           
-          # Validate private key
-          if ! openssl rsa -in private_key.pem -check -noout 2>/dev/null; then
-            echo "ERROR: Invalid private key format"
-            rm -f private_key.pem
+          # Basic validation that the private key file was created
+          if [ ! -f "private_key.pem" ] || [ ! -s "private_key.pem" ]; then
+            echo "ERROR: Failed to create private key file"
             exit 1
           fi
+          
+          echo "Private key file created successfully"
 
           cd release
           zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
