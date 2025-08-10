@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-15
     environment: release
 
     steps:
@@ -23,39 +23,63 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: "16.0"
 
       - name: Install Sparkle tools
         run: |
           brew install --cask sparkle
+          echo "Sparkle installation completed"
 
       - name: Verify Sparkle installation
         run: |
           SPARKLE_PATH="/opt/homebrew/Caskroom/sparkle"
-          if [ ! -d "$SPARKLE_PATH" ]; then
-            echo "Sparkle not found, trying alternative installation..."
-            brew install sparkle
+          echo "Checking Sparkle installation at: $SPARKLE_PATH"
+          ls -la "$SPARKLE_PATH" || echo "Sparkle not found at expected path"
+
+          SIGN_UPDATE_PATH=$(find /opt/homebrew -name "sign_update" -type f 2>/dev/null | head -1)
+          if [ -n "$SIGN_UPDATE_PATH" ]; then
+            echo "Found sign_update at: $SIGN_UPDATE_PATH"
+          else
+            echo "sign_update not found, checking alternative locations..."
+            find /usr/local -name "sign_update" -type f 2>/dev/null | head -1 || echo "sign_update not found anywhere"
           fi
-          find /opt/homebrew -name "sign_update" -type f 2>/dev/null | head -1
+
+      - name: List schemes
+        run: |
+          xcodebuild -project StoneClipboarderTool.xcodeproj -list
 
       - name: Build app
         run: |
+          echo "Starting build process..."
           xcodebuild -project StoneClipboarderTool.xcodeproj \
             -scheme StoneClipboarderTool \
             -configuration Release \
             -derivedDataPath build \
+            -destination "platform=macOS" \
             -allowProvisioningUpdates \
+            MACOSX_DEPLOYMENT_TARGET=15.0 \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            | tee build.log
+          echo "Build completed"
 
       - name: Verify build
         run: |
+          echo "Checking build output..."
+          ls -la build/Build/Products/Release/ || echo "Release folder not found"
+
           if [ ! -d "build/Build/Products/Release/StoneClipboarderTool.app" ]; then
             echo "Build failed - app not found"
+            echo "Build log:"
+            cat build.log || echo "No build log found"
+            echo "Checking all build products:"
+            find build/ -name "*.app" -type d 2>/dev/null || echo "No .app bundles found"
             exit 1
           fi
-          echo "App built successfully"
+          echo "App built successfully at: build/Build/Products/Release/StoneClipboarderTool.app"
+          ls -la "build/Build/Products/Release/StoneClipboarderTool.app"
 
       - name: Create app bundle
         run: |
