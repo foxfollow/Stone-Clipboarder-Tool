@@ -155,17 +155,32 @@ jobs:
           echo "Testing sign_update executable:"
           "$SIGN_UPDATE_PATH" --help 2>&1 || true
 
-          echo "Signing update..."
-          SIGNATURE=$("$SIGN_UPDATE_PATH" StoneClipboarderTool.zip ../private_key.pem 2>&1)
+          echo "Signing update (method 1: --ed-key-file)..."
+          SIGNATURE=$("$SIGN_UPDATE_PATH" --ed-key-file ../private_key.pem StoneClipboarderTool.zip 2>&1)
           SIGN_EXIT_CODE=$?
 
           if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "ERROR: Signing failed with exit code: $SIGN_EXIT_CODE"
-            echo "Sign output: $SIGNATURE"
+            echo "Method 1 failed, trying method 2 (positional arguments)..."
+            SIGNATURE=$("$SIGN_UPDATE_PATH" StoneClipboarderTool.zip ../private_key.pem 2>&1)
+            SIGN_EXIT_CODE=$?
+          fi
+
+          if [ $SIGN_EXIT_CODE -ne 0 ]; then
+            echo "Method 2 failed, trying method 3 (-s flag)..."
+            PRIVATE_KEY_CONTENT=$(cat ../private_key.pem)
+            SIGNATURE=$("$SIGN_UPDATE_PATH" -s "$PRIVATE_KEY_CONTENT" StoneClipboarderTool.zip 2>&1)
+            SIGN_EXIT_CODE=$?
+          fi
+
+          if [ $SIGN_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: All signing methods failed with exit code: $SIGN_EXIT_CODE"
+            echo "Final sign output: $SIGNATURE"
             echo "Zip file info:"
             ls -la StoneClipboarderTool.zip
             echo "Private key info:"
             ls -la ../private_key.pem
+            echo "Private key content (first line):"
+            head -1 ../private_key.pem
             exit 1
           fi
 
