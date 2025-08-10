@@ -1,0 +1,315 @@
+//
+//  MenuBarView.swift
+//  StoneClipboarderTool
+//
+//  Created by Heorhii Savoiskyi on 08.08.2025.
+//
+
+import SwiftUI
+
+struct MenuBarView: View {
+    @EnvironmentObject var cbViewModel: CBViewModel
+    @EnvironmentObject var settingsManager: SettingsManager
+    
+    private var recentItems: [CBItem] {
+        Array(cbViewModel.items.prefix(10))
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "doc.on.clipboard")
+                    .foregroundStyle(.blue)
+                Text("Clipboard History")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button(action: {
+                    NSApp.terminate(nil)
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            
+            Divider()
+            
+            if recentItems.isEmpty {
+                Text("No clipboard history")
+                    .foregroundStyle(.secondary)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(recentItems) { item in
+                            SwipeableRow(
+                                item: item,
+                                onDelete: {
+                                    withAnimation {
+                                        cbViewModel.deleteItem(item)
+                                    }
+                                },
+                                onPreview: { item in
+                                    // Open image in Preview app
+                                    openInPreview(item: item)
+                                },
+                                onOpenMain: { item in
+                                    // Show main window and select this item
+                                    showMainWindowAndSelectItem(item)
+                                }
+                            ) {
+                                Button {
+                                    cbViewModel.copyAndUpdateItem(item)
+                                } label: {
+                                    MenuBarItemView(item: item)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 300)
+            }
+            
+            Divider()
+            
+            // Footer with settings
+            HStack {
+                Button("Show Main Window") {
+                    showMainWindow()
+                }
+                .buttonStyle(.borderless)
+                
+                Spacer()
+                
+                Menu("Settings") {
+                    Toggle("Show in Menu Bar", isOn: $settingsManager.showInMenubar)
+                    Toggle("Show Main Window", isOn: $settingsManager.showMainWindow)
+                    Divider()
+                    Button("Quit") {
+                        NSApp.terminate(nil)
+                    }
+                }
+                .menuStyle(.borderlessButton)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .frame(width: 350)
+        .background(Color(NSColor.controlBackgroundColor))
+    }
+    
+    private func deleteItems(offsets: IndexSet) {
+        withAnimation {
+            cbViewModel.deleteItems(at: offsets, from: cbViewModel.items)
+        }
+    }
+    
+    private func openInPreview(item: CBItem) {
+        Task {
+            do {
+                try await cbViewModel.openInPreview(item: item)
+            } catch {
+                print("Failed to open in Preview: \(error)")
+            }
+        }
+    }
+    
+    private func showMainWindow() {
+        settingsManager.showMainWindow = true
+        
+        // First activate the app
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Find the main window
+        var foundWindow: NSWindow?
+        for window in NSApp.windows {
+            if window.title == "Clipboard History" || window.contentView?.subviews.first is NSHostingView<ContentView> {
+                foundWindow = window
+                break
+            }
+        }
+        
+        guard let window = foundWindow else { return }
+        
+        // Force the window to appear on current space
+        window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
+        
+        // If window is minimized, restore it
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        
+        // Multiple strategies to ensure window appears
+        
+        // Strategy 1: Use very high window level temporarily to appear above everything
+        let originalLevel = window.level
+        window.level = .screenSaver
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        
+        // Strategy 2: Force window center and visibility
+        DispatchQueue.main.async {
+            // Center window on current screen
+            if let screen = NSScreen.main {
+                let screenFrame = screen.visibleFrame
+                let windowFrame = window.frame
+                let x = screenFrame.midX - windowFrame.width / 2
+                let y = screenFrame.midY - windowFrame.height / 2
+                window.setFrameOrigin(NSPoint(x: x, y: y))
+            }
+            
+            // Make sure it's visible
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        }
+        
+        // Strategy 3: Reset window level after a delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            window.level = originalLevel
+            window.makeKeyAndOrderFront(nil)
+            
+            // Final activation to ensure focus
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+    
+    private func showMainWindowAndSelectItem(_ item: CBItem) {
+        settingsManager.showMainWindow = true
+        
+        // First activate the app
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Find the main window
+        var foundWindow: NSWindow?
+        for window in NSApp.windows {
+            if window.title == "Clipboard History" || window.contentView?.subviews.first is NSHostingView<ContentView> {
+                foundWindow = window
+                break
+            }
+        }
+        
+        guard let window = foundWindow else { return }
+        
+        // Force the window to appear on current space
+        window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
+        
+        // If window is minimized, restore it
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        
+        // Multiple strategies to ensure window appears
+        
+        // Strategy 1: Use very high window level temporarily to appear above everything
+        let originalLevel = window.level
+        window.level = .screenSaver
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        
+        // Strategy 2: Force window center and visibility
+        DispatchQueue.main.async {
+            // Center window on current screen
+            if let screen = NSScreen.main {
+                let screenFrame = screen.visibleFrame
+                let windowFrame = window.frame
+                let x = screenFrame.midX - windowFrame.width / 2
+                let y = screenFrame.midY - windowFrame.height / 2
+                window.setFrameOrigin(NSPoint(x: x, y: y))
+            }
+            
+            // Make sure it's visible
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        }
+        
+        // Strategy 3: Reset window level after a delay and select item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            window.level = originalLevel
+            window.makeKeyAndOrderFront(nil)
+            
+            // Final activation to ensure focus
+            NSApp.activate(ignoringOtherApps: true)
+            
+            // Select the item after window is properly shown
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("SelectClipboardItem"),
+                    object: "\(item.id)"
+                )
+            }
+        }
+    }
+}
+
+struct MenuBarItemView: View {
+    let item: CBItem
+    
+    private var contentPreview: String {
+        let display = item.displayContent
+        return display.count > 50 ? String(display.prefix(50)) + "..." : display
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(contentPreview)
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(2)
+                    .foregroundStyle(.primary)
+                if let image = item.image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 100)
+                        .cornerRadius(4)
+                } else if let fileImage = item.filePreviewImage, item.fileData != nil {
+                    Image(nsImage: fileImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: item.isImageFile ? 100 : 36)
+                        .cornerRadius(4)
+                }
+                
+                Text(item.timestamp, format: Date.FormatStyle(date: .omitted, time: .shortened))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            Image(systemName: item.itemType == .image ? "photo" : "doc.on.doc")
+                .foregroundStyle(item.itemType == .image ? .orange : .blue)
+                .imageScale(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .onHover { isHovering in
+            if isHovering {
+                NSCursor.pointingHand.set()
+            } else {
+                NSCursor.arrow.set()
+            }
+        }
+        .background(
+            Rectangle()
+                .fill(Color.blue.opacity(0.1))
+                .opacity(0)
+        )
+        .onHover { isHovering in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                // Visual feedback handled by system
+            }
+        }
+    }
+}
+

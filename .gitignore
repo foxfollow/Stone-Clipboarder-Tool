@@ -1,0 +1,56 @@
+# Xcode user-specific settings
+xcuserdata/
+*.xcuserstate
+
+# Build products
+build/
+DerivedData/
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/Build/
+
+# Accio dependency manager
+Dependencies/
+.accio/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# iOS specific
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# macOS specific
+*.app
+
+# Archives
+*.xcarchive
+
+# Build server
+buildServer.json
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Other
+*.moved-aside
+*.hmap
+*.ipa

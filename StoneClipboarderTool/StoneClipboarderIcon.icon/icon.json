@@ -1,0 +1,60 @@
+{
+  "fill" : {
+    "automatic-gradient" : "display-p3:0.88627,0.77255,0.64314,1.00000"
+  },
+  "groups" : [
+    {
+      "blur-material" : null,
+      "layers" : [
+        {
+          "image-name" : "bottomStoneIcon.svg",
+          "name" : "bottomStoneIcon"
+        }
+      ],
+      "position" : {
+        "scale" : 1.25,
+        "translation-in-points" : [
+          0,
+          0
+        ]
+      },
+      "shadow" : {
+        "kind" : "layer-color",
+        "opacity" : 1
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.37
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "topStoneIcon.svg",
+          "name" : "topStoneIcon"
+        }
+      ],
+      "position" : {
+        "scale" : 1.25,
+        "translation-in-points" : [
+          0,
+          0
+        ]
+      },
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
