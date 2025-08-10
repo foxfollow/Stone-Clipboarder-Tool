@@ -20,14 +20,17 @@
         .app-icon {
             width: 128px;
             height: 128px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-image: url('StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png');
+            background-size: cover;
+            background-position: center;
             border-radius: 22px;
             margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            color: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        @media (-webkit-min-device-pixel-ratio: 2) {
+            .app-icon {
+                background-image: url('StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png');
+            }
         }
         .download-btn {
             background: #007AFF;
@@ -71,7 +74,7 @@
 </head>
 <body>
     <div class="header">
-        <div class="app-icon">📋</div>
+        <div class="app-icon"></div>
         <h1>StoneClipboarderTool</h1>
         <p>Advanced clipboard manager for macOS</p>
 

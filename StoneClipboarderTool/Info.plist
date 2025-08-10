@@ -21,7 +21,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
 	<key>SUFeedURL</key>
-	<string>https://foxfollow.github.io/StoneClipboarderTool/appcast.xml</string>
+	<string>https://foxfollow.github.io/Stone-Clipboarder-Tool/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>yJrsF5A8PAUhQBx9s4M89LH6VhiCpKS+FlHr2xUIa84=</string>
 	<key>SUEnableAutomaticChecks</key>
