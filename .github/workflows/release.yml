@@ -19,6 +19,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        
+      - name: Validate secrets
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "ERROR: SPARKLE_PRIVATE_KEY secret is required but not set"
+            echo "Please add your Sparkle private key as a repository secret"
+            exit 1
+          fi
+          echo "All required secrets are present"
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -30,27 +41,29 @@ jobs:
           brew install --cask sparkle
           echo "Sparkle installation completed"
 
-          # List all Sparkle installations
-          find /opt/homebrew/Caskroom -name "*sparkle*" -type d 2>/dev/null || true
-          find /usr/local/Caskroom -name "*sparkle*" -type d 2>/dev/null || true
-
-      - name: Verify Sparkle installation
+      - name: Find and setup Sparkle
+        id: sparkle
         run: |
-          SPARKLE_PATH="/opt/homebrew/Caskroom/sparkle"
-          echo "Checking Sparkle installation at: $SPARKLE_PATH"
-          ls -la "$SPARKLE_PATH" || echo "Sparkle not found at expected path"
-
-          # Check multiple possible locations
+          # Find Sparkle installation
+          SIGN_UPDATE_PATH=""
+          
+          # Check common locations
           for sparkle_dir in /opt/homebrew/Caskroom/sparkle/*/bin /usr/local/Caskroom/sparkle/*/bin; do
-            if [ -d "$sparkle_dir" ]; then
-              echo "Found Sparkle bin directory: $sparkle_dir"
-              ls -la "$sparkle_dir"
-              if [ -f "$sparkle_dir/sign_update" ]; then
-                echo "Found sign_update at: $sparkle_dir/sign_update"
-                chmod +x "$sparkle_dir/sign_update"
-              fi
+            if [ -f "$sparkle_dir/sign_update" ]; then
+              SIGN_UPDATE_PATH="$sparkle_dir/sign_update"
+              echo "Found sign_update at: $SIGN_UPDATE_PATH"
+              chmod +x "$SIGN_UPDATE_PATH"
+              break
             fi
           done
+          
+          if [ -z "$SIGN_UPDATE_PATH" ]; then
+            echo "ERROR: sign_update tool not found"
+            exit 1
+          fi
+          
+          echo "SIGN_UPDATE_PATH=$SIGN_UPDATE_PATH" >> $GITHUB_OUTPUT
+          echo "sign_update_path=$SIGN_UPDATE_PATH" >> $GITHUB_ENV
 
       - name: List schemes
         run: |
@@ -104,50 +117,59 @@ jobs:
             exit 1
           fi
 
+          # Validate private key format
           echo "$SPARKLE_PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
+          
+          # Validate private key
+          if ! openssl rsa -in private_key.pem -check -noout 2>/dev/null; then
+            echo "ERROR: Invalid private key format"
+            rm -f private_key.pem
+            exit 1
+          fi
 
           cd release
           zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
 
-          # Use full path to sign_update
-          SIGN_UPDATE="/opt/homebrew/Caskroom/sparkle/2.7.1/bin/sign_update"
+          # Use the dynamically found path
+          SIGN_UPDATE="${{ env.sign_update_path }}"
+          echo "Using sign_update at: $SIGN_UPDATE"
+          
+          # Validate sign_update exists and is executable
+          if [ ! -f "$SIGN_UPDATE" ]; then
+            echo "ERROR: sign_update not found at $SIGN_UPDATE"
+            exit 1
+          fi
+          
+          if [ ! -x "$SIGN_UPDATE" ]; then
+            echo "Making sign_update executable"
+            chmod +x "$SIGN_UPDATE"
+          fi
 
-          echo "Signing with command: $SIGN_UPDATE -f ../private_key.pem StoneClipboarderTool.zip"
-
-          # Try different approaches
-          echo "=== Method 1: Direct file path ==="
-          SIGNATURE=$("$SIGN_UPDATE" -f ../private_key.pem StoneClipboarderTool.zip 2>&1) && SIGN_EXIT_CODE=0 || SIGN_EXIT_CODE=$?
+          # Sign the update
+          echo "Signing StoneClipboarderTool.zip..."
+          SIGNATURE=$("$SIGN_UPDATE" ../private_key.pem StoneClipboarderTool.zip)
+          SIGN_EXIT_CODE=$?
+          
           echo "Exit code: $SIGN_EXIT_CODE"
-          echo "Output: $SIGNATURE"
+          echo "Signature: $SIGNATURE"
 
-          if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "=== Method 2: Print only signature ==="
-            SIGNATURE=$("$SIGN_UPDATE" -f ../private_key.pem -p StoneClipboarderTool.zip 2>&1) && SIGN_EXIT_CODE=0 || SIGN_EXIT_CODE=$?
-            echo "Exit code: $SIGN_EXIT_CODE"
-            echo "Output: $SIGNATURE"
-          fi
-
-          if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "=== Method 3: Via stdin ==="
-            SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE" -f - StoneClipboarderTool.zip 2>&1) && SIGN_EXIT_CODE=0 || SIGN_EXIT_CODE=$?
-            echo "Exit code: $SIGN_EXIT_CODE"
-            echo "Output: $SIGNATURE"
-          fi
-
-          if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "ERROR: All signing methods failed"
+          if [ $SIGN_EXIT_CODE -ne 0 ] || [ -z "$SIGNATURE" ]; then
+            echo "ERROR: Failed to generate signature"
             echo "Private key info:"
             ls -la ../private_key.pem
-            file ../private_key.pem
             echo "ZIP file info:"
             ls -la StoneClipboarderTool.zip
+            echo "sign_update version:"
+            "$SIGN_UPDATE" --version || echo "No version info available"
+            rm -f ../private_key.pem
             exit 1
           fi
 
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
           echo "Successfully generated signature: $SIGNATURE"
 
+          # Clean up private key
           rm -f ../private_key.pem
 
       - name: Get version
@@ -162,18 +184,24 @@ jobs:
         run: |
           SIZE=$(stat -f%z release/StoneClipboarderTool.zip)
           DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/StoneClipboarderTool.zip"
 
           echo "File size: $SIZE bytes"
           echo "Date: $DATE"
           echo "Signature: $SPARKLE_SIGNATURE"
+          echo "Download URL: $DOWNLOAD_URL"
 
+          # Backup original appcast
           cp docs/appcast.xml docs/appcast.xml.backup
 
-          sed -i '' "s/SIGNATURE_WILL_BE_GENERATED/$SPARKLE_SIGNATURE/g" docs/appcast.xml
-          sed -i '' "s/foxfollow/${{ github.repository_owner }}/g" docs/appcast.xml
-          sed -i '' "s/1\.0\.0/$VERSION/g" docs/appcast.xml
-          sed -i '' "s/length=\"0\"/length=\"$SIZE\"/g" docs/appcast.xml
-          sed -i '' "s/Mon, 08 Aug 2025 12:00:00 +0000/$DATE/g" docs/appcast.xml
+          # Update appcast with new values
+          sed -i '' "s|SIGNATURE_WILL_BE_GENERATED|$SPARKLE_SIGNATURE|g" docs/appcast.xml
+          sed -i '' "s|foxfollow|${{ github.repository_owner }}|g" docs/appcast.xml
+          sed -i '' "s|1\.0\.0|$VERSION|g" docs/appcast.xml
+          sed -i '' "s|length=\"0\"|length=\"$SIZE\"|g" docs/appcast.xml
+          sed -i '' "s|Mon, 08 Aug 2025 12:00:00 +0000|$DATE|g" docs/appcast.xml
+          sed -i '' "s|Stone-Clipboarder-Tool|${{ github.event.repository.name }}|g" docs/appcast.xml
+          sed -i '' "s|download/v1.0.0/|download/v$VERSION/|g" docs/appcast.xml
 
           echo "Updated appcast.xml:"
           cat docs/appcast.xml
