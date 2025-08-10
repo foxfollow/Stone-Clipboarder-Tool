@@ -107,126 +107,48 @@ jobs:
           echo "$SPARKLE_PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
 
-          echo "Debugging private key..."
-          echo "Key file size: $(wc -c < private_key.pem) bytes"
-          echo "Key first line: $(head -1 private_key.pem)"
-          echo "Key last line: $(tail -1 private_key.pem)"
-
-          echo "Validating private key format..."
-          if ! openssl pkey -in private_key.pem -noout 2>/dev/null; then
-            echo "OpenSSL validation failed, trying to regenerate key in correct format..."
-            # Try to convert the key to the right format
-            if openssl pkey -in private_key.pem -out private_key_fixed.pem 2>/dev/null; then
-              mv private_key_fixed.pem private_key.pem
-              echo "Key format fixed"
-            else
-              echo "Key format cannot be fixed"
-              echo "Raw key content:"
-              cat private_key.pem
-              exit 1
-            fi
-          else
-            echo "Private key validation successful"
-          fi
-
           cd release
           zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
 
-          # Find sign_update tool with expanded search
-          SIGN_UPDATE_PATH=""
+          # Use full path to sign_update
+          SIGN_UPDATE="/opt/homebrew/Caskroom/sparkle/2.7.1/bin/sign_update"
 
-          # Try multiple locations
-          for base_path in /opt/homebrew /usr/local; do
-            for sparkle_path in "$base_path"/Caskroom/sparkle/*/bin/sign_update "$base_path"/bin/sign_update; do
-              if [ -f "$sparkle_path" ] && [ -x "$sparkle_path" ]; then
-                SIGN_UPDATE_PATH="$sparkle_path"
-                echo "Found sign_update at: $SIGN_UPDATE_PATH"
-                break 2
-              fi
-            done
-          done
+          echo "Signing with command: $SIGN_UPDATE -f ../private_key.pem StoneClipboarderTool.zip"
 
-          # Also try which command
-          if [ -z "$SIGN_UPDATE_PATH" ]; then
-            WHICH_RESULT=$(which sign_update 2>/dev/null || true)
-            if [ -n "$WHICH_RESULT" ] && [ -f "$WHICH_RESULT" ]; then
-              SIGN_UPDATE_PATH="$WHICH_RESULT"
-              echo "Found sign_update via which: $SIGN_UPDATE_PATH"
-            fi
-          fi
-
-          if [ -z "$SIGN_UPDATE_PATH" ]; then
-            echo "ERROR: sign_update tool not found!"
-            echo "Checking all possible locations:"
-            find /opt/homebrew -name "sign_update" -type f 2>/dev/null || true
-            find /usr/local -name "sign_update" -type f 2>/dev/null || true
-            echo "Available Sparkle directories:"
-            find /opt/homebrew/Caskroom -name "*sparkle*" -type d 2>/dev/null || true
-            exit 1
-          fi
-
-          echo "Using sign_update: $SIGN_UPDATE_PATH"
-          echo "Testing sign_update executable:"
-          "$SIGN_UPDATE_PATH" --help 2>&1 || true
-
-          # Try to generate keys with Sparkle tools if our key doesn't work
-          SPARKLE_GENERATE_KEYS=$(dirname "$SIGN_UPDATE_PATH")/generate_keys
-          if [ -x "$SPARKLE_GENERATE_KEYS" ]; then
-            echo "Found Sparkle generate_keys tool: $SPARKLE_GENERATE_KEYS"
-          fi
-
-          echo "Signing update (method 1: stdin with -f -)..."
-          SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE_PATH" -f - StoneClipboarderTool.zip 2>&1)
-          SIGN_EXIT_CODE=$?
+          # Try different approaches
+          echo "=== Method 1: Direct file path ==="
+          SIGNATURE=$("$SIGN_UPDATE" -f ../private_key.pem StoneClipboarderTool.zip 2>&1) && SIGN_EXIT_CODE=0 || SIGN_EXIT_CODE=$?
+          echo "Exit code: $SIGN_EXIT_CODE"
+          echo "Output: $SIGNATURE"
 
           if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "Method 1 failed with output: $SIGNATURE"
-            if [ -x "$SPARKLE_GENERATE_KEYS" ]; then
-              echo "Regenerating keys with Sparkle tools..."
-              cd ..
-              rm -f sparkle_new_private.pem sparkle_new_public.pem
-              "$SPARKLE_GENERATE_KEYS" -p sparkle_new_public.pem -f sparkle_new_private.pem 2>&1 || true
-              if [ -f sparkle_new_private.pem ]; then
-                echo "Using newly generated Sparkle key"
-                cp sparkle_new_private.pem private_key.pem
-                cd release
-                SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE_PATH" -f - StoneClipboarderTool.zip 2>&1)
-                SIGN_EXIT_CODE=$?
-              else
-                cd release
-                echo "Sparkle key generation failed, trying method 2..."
-                SIGNATURE=$("$SIGN_UPDATE_PATH" -f ../private_key.pem StoneClipboarderTool.zip 2>&1)
-                SIGN_EXIT_CODE=$?
-              fi
-            else
-              echo "Method 1 failed, trying method 2 (--ed-key-file)..."
-              SIGNATURE=$("$SIGN_UPDATE_PATH" -f ../private_key.pem StoneClipboarderTool.zip 2>&1)
-              SIGN_EXIT_CODE=$?
-            fi
+            echo "=== Method 2: Print only signature ==="
+            SIGNATURE=$("$SIGN_UPDATE" -f ../private_key.pem -p StoneClipboarderTool.zip 2>&1) && SIGN_EXIT_CODE=0 || SIGN_EXIT_CODE=$?
+            echo "Exit code: $SIGN_EXIT_CODE"
+            echo "Output: $SIGNATURE"
           fi
 
           if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "Method 2 failed, trying method 3 (print signature only)..."
-            SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE_PATH" -f - -p StoneClipboarderTool.zip 2>&1)
-            SIGN_EXIT_CODE=$?
+            echo "=== Method 3: Via stdin ==="
+            SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE" -f - StoneClipboarderTool.zip 2>&1) && SIGN_EXIT_CODE=0 || SIGN_EXIT_CODE=$?
+            echo "Exit code: $SIGN_EXIT_CODE"
+            echo "Output: $SIGNATURE"
           fi
 
           if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "ERROR: All signing methods failed with exit code: $SIGN_EXIT_CODE"
-            echo "Final sign output: $SIGNATURE"
-            echo "Zip file info:"
-            ls -la StoneClipboarderTool.zip
+            echo "ERROR: All signing methods failed"
             echo "Private key info:"
             ls -la ../private_key.pem
-            echo "Private key content (first line):"
-            head -1 ../private_key.pem
+            file ../private_key.pem
+            echo "ZIP file info:"
+            ls -la StoneClipboarderTool.zip
             exit 1
           fi
 
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
-          echo "Generated signature: $SIGNATURE"
+          echo "Successfully generated signature: $SIGNATURE"
 
-          rm ../private_key.pem
+          rm -f ../private_key.pem
 
       - name: Get version
         id: version
