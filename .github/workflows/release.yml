@@ -30,19 +30,27 @@ jobs:
           brew install --cask sparkle
           echo "Sparkle installation completed"
 
+          # List all Sparkle installations
+          find /opt/homebrew/Caskroom -name "*sparkle*" -type d 2>/dev/null || true
+          find /usr/local/Caskroom -name "*sparkle*" -type d 2>/dev/null || true
+
       - name: Verify Sparkle installation
         run: |
           SPARKLE_PATH="/opt/homebrew/Caskroom/sparkle"
           echo "Checking Sparkle installation at: $SPARKLE_PATH"
           ls -la "$SPARKLE_PATH" || echo "Sparkle not found at expected path"
 
-          SIGN_UPDATE_PATH=$(find /opt/homebrew -name "sign_update" -type f 2>/dev/null | head -1)
-          if [ -n "$SIGN_UPDATE_PATH" ]; then
-            echo "Found sign_update at: $SIGN_UPDATE_PATH"
-          else
-            echo "sign_update not found, checking alternative locations..."
-            find /usr/local -name "sign_update" -type f 2>/dev/null | head -1 || echo "sign_update not found anywhere"
-          fi
+          # Check multiple possible locations
+          for sparkle_dir in /opt/homebrew/Caskroom/sparkle/*/bin /usr/local/Caskroom/sparkle/*/bin; do
+            if [ -d "$sparkle_dir" ]; then
+              echo "Found Sparkle bin directory: $sparkle_dir"
+              ls -la "$sparkle_dir"
+              if [ -f "$sparkle_dir/sign_update" ]; then
+                echo "Found sign_update at: $sparkle_dir/sign_update"
+                chmod +x "$sparkle_dir/sign_update"
+              fi
+            fi
+          done
 
       - name: List schemes
         run: |
@@ -99,16 +107,68 @@ jobs:
           echo "$SPARKLE_PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
 
+          echo "Validating private key format..."
+          if ! openssl pkey -in private_key.pem -noout 2>/dev/null; then
+            echo "Private key validation failed"
+            echo "Key content (first 50 chars): $(head -c 50 private_key.pem)"
+            exit 1
+          fi
+          echo "Private key validation successful"
+
           cd release
           zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
 
-          SIGN_UPDATE_PATH=$(find /opt/homebrew -name "sign_update" -type f 2>/dev/null | head -1)
+          # Find sign_update tool with expanded search
+          SIGN_UPDATE_PATH=""
+
+          # Try multiple locations
+          for base_path in /opt/homebrew /usr/local; do
+            for sparkle_path in "$base_path"/Caskroom/sparkle/*/bin/sign_update "$base_path"/bin/sign_update; do
+              if [ -f "$sparkle_path" ] && [ -x "$sparkle_path" ]; then
+                SIGN_UPDATE_PATH="$sparkle_path"
+                echo "Found sign_update at: $SIGN_UPDATE_PATH"
+                break 2
+              fi
+            done
+          done
+
+          # Also try which command
           if [ -z "$SIGN_UPDATE_PATH" ]; then
-            echo "sign_update tool not found"
+            WHICH_RESULT=$(which sign_update 2>/dev/null || true)
+            if [ -n "$WHICH_RESULT" ] && [ -f "$WHICH_RESULT" ]; then
+              SIGN_UPDATE_PATH="$WHICH_RESULT"
+              echo "Found sign_update via which: $SIGN_UPDATE_PATH"
+            fi
+          fi
+
+          if [ -z "$SIGN_UPDATE_PATH" ]; then
+            echo "ERROR: sign_update tool not found!"
+            echo "Checking all possible locations:"
+            find /opt/homebrew -name "sign_update" -type f 2>/dev/null || true
+            find /usr/local -name "sign_update" -type f 2>/dev/null || true
+            echo "Available Sparkle directories:"
+            find /opt/homebrew/Caskroom -name "*sparkle*" -type d 2>/dev/null || true
             exit 1
           fi
 
-          SIGNATURE=$("$SIGN_UPDATE_PATH" StoneClipboarderTool.zip ../private_key.pem)
+          echo "Using sign_update: $SIGN_UPDATE_PATH"
+          echo "Testing sign_update executable:"
+          "$SIGN_UPDATE_PATH" --help 2>&1 || true
+
+          echo "Signing update..."
+          SIGNATURE=$("$SIGN_UPDATE_PATH" StoneClipboarderTool.zip ../private_key.pem 2>&1)
+          SIGN_EXIT_CODE=$?
+
+          if [ $SIGN_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Signing failed with exit code: $SIGN_EXIT_CODE"
+            echo "Sign output: $SIGNATURE"
+            echo "Zip file info:"
+            ls -la StoneClipboarderTool.zip
+            echo "Private key info:"
+            ls -la ../private_key.pem
+            exit 1
+          fi
+
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
           echo "Generated signature: $SIGNATURE"
 
