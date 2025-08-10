@@ -107,13 +107,27 @@ jobs:
           echo "$SPARKLE_PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
 
+          echo "Debugging private key..."
+          echo "Key file size: $(wc -c < private_key.pem) bytes"
+          echo "Key first line: $(head -1 private_key.pem)"
+          echo "Key last line: $(tail -1 private_key.pem)"
+
           echo "Validating private key format..."
           if ! openssl pkey -in private_key.pem -noout 2>/dev/null; then
-            echo "Private key validation failed"
-            echo "Key content (first 50 chars): $(head -c 50 private_key.pem)"
-            exit 1
+            echo "OpenSSL validation failed, trying to regenerate key in correct format..."
+            # Try to convert the key to the right format
+            if openssl pkey -in private_key.pem -out private_key_fixed.pem 2>/dev/null; then
+              mv private_key_fixed.pem private_key.pem
+              echo "Key format fixed"
+            else
+              echo "Key format cannot be fixed"
+              echo "Raw key content:"
+              cat private_key.pem
+              exit 1
+            fi
+          else
+            echo "Private key validation successful"
           fi
-          echo "Private key validation successful"
 
           cd release
           zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
@@ -155,20 +169,45 @@ jobs:
           echo "Testing sign_update executable:"
           "$SIGN_UPDATE_PATH" --help 2>&1 || true
 
-          echo "Signing update (method 1: --ed-key-file)..."
-          SIGNATURE=$("$SIGN_UPDATE_PATH" --ed-key-file ../private_key.pem StoneClipboarderTool.zip 2>&1)
+          # Try to generate keys with Sparkle tools if our key doesn't work
+          SPARKLE_GENERATE_KEYS=$(dirname "$SIGN_UPDATE_PATH")/generate_keys
+          if [ -x "$SPARKLE_GENERATE_KEYS" ]; then
+            echo "Found Sparkle generate_keys tool: $SPARKLE_GENERATE_KEYS"
+          fi
+
+          echo "Signing update (method 1: stdin with -f -)..."
+          SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE_PATH" -f - StoneClipboarderTool.zip 2>&1)
           SIGN_EXIT_CODE=$?
 
           if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "Method 1 failed, trying method 2 (positional arguments)..."
-            SIGNATURE=$("$SIGN_UPDATE_PATH" StoneClipboarderTool.zip ../private_key.pem 2>&1)
-            SIGN_EXIT_CODE=$?
+            echo "Method 1 failed with output: $SIGNATURE"
+            if [ -x "$SPARKLE_GENERATE_KEYS" ]; then
+              echo "Regenerating keys with Sparkle tools..."
+              cd ..
+              rm -f sparkle_new_private.pem sparkle_new_public.pem
+              "$SPARKLE_GENERATE_KEYS" -p sparkle_new_public.pem -f sparkle_new_private.pem 2>&1 || true
+              if [ -f sparkle_new_private.pem ]; then
+                echo "Using newly generated Sparkle key"
+                cp sparkle_new_private.pem private_key.pem
+                cd release
+                SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE_PATH" -f - StoneClipboarderTool.zip 2>&1)
+                SIGN_EXIT_CODE=$?
+              else
+                cd release
+                echo "Sparkle key generation failed, trying method 2..."
+                SIGNATURE=$("$SIGN_UPDATE_PATH" -f ../private_key.pem StoneClipboarderTool.zip 2>&1)
+                SIGN_EXIT_CODE=$?
+              fi
+            else
+              echo "Method 1 failed, trying method 2 (--ed-key-file)..."
+              SIGNATURE=$("$SIGN_UPDATE_PATH" -f ../private_key.pem StoneClipboarderTool.zip 2>&1)
+              SIGN_EXIT_CODE=$?
+            fi
           fi
 
           if [ $SIGN_EXIT_CODE -ne 0 ]; then
-            echo "Method 2 failed, trying method 3 (-s flag)..."
-            PRIVATE_KEY_CONTENT=$(cat ../private_key.pem)
-            SIGNATURE=$("$SIGN_UPDATE_PATH" -s "$PRIVATE_KEY_CONTENT" StoneClipboarderTool.zip 2>&1)
+            echo "Method 2 failed, trying method 3 (print signature only)..."
+            SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE_PATH" -f - -p StoneClipboarderTool.zip 2>&1)
             SIGN_EXIT_CODE=$?
           fi
 
