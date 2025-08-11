@@ -54,3 +54,65 @@ Thumbs.db
 *.moved-aside
 *.hmap
 *.ipa
+
+# Sparkle security files
+sparkle_private_key.pem
+sparkle_public_key.pem
+sparkle-keys/
+*.p12
+*.cer
+*.mobileprovision
+
+# Environment and secrets
+.env
+.env.local
+.env.production
+.env.development
+secrets/
+keys/
+config.local.json
+
+# Signing certificates
+Developer_ID_*.p12
+Developer_ID_*.cer
+distribution_certificate.p12
+
+# Appcast example file
+appcast.xml.example
+
+# Temporary and backup files
+*~
+*.tmp
+*.bak
+*.backup
+*.orig
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+*.swp
+*.swo
+
+# Log files
+*.log
+logs/
+
+# Generated documentation
+docs/api/
+*.docset
+
+# Test coverage
+*.gcno
+*.gcda
+coverage/
+
+# Xcode user-specific additional files
+*.xcuserstate
+*.perspectivev3
+UserInterfaceState.xcuserstate
+
+SPARKLE_SETUP.md
+ACTIONS_SETUP.md
+
+test*

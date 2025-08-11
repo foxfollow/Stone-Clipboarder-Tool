@@ -8,6 +8,7 @@
 import SwiftData
 import SwiftUI
 import Combine
+import Sparkle
 
 struct ContentView: View {
     @EnvironmentObject var cbViewModel: CBViewModel
@@ -16,6 +17,8 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var showingDeleteAllAlert = false
     @State private var selectedItem: CBItem? = nil
+    
+    let updater: SPUUpdater?
 
     var body: some View {
         NavigationSplitView {
@@ -71,7 +74,7 @@ struct ContentView: View {
                 }
             }
             .sheet(isPresented: $showingSettings) {
-                SettingsView()
+                SettingsView(updater: updater)
                     .environmentObject(settingsManager)
             }
             .alert("Delete All Clipboard History", isPresented: $showingDeleteAllAlert) {
@@ -153,7 +156,7 @@ struct ContentView: View {
     let viewModel = CBViewModel()
     let settingsManager = SettingsManager()
 
-    return ContentView()
+    return ContentView(updater: nil)
         .environmentObject(viewModel)
         .environmentObject(settingsManager)
         .modelContainer(container)

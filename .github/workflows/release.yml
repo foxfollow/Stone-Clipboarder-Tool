@@ -1,0 +1,261 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate secrets
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "ERROR: SPARKLE_PRIVATE_KEY secret is required but not set"
+            echo "Please add your Sparkle private key as a repository secret"
+            exit 1
+          fi
+          echo "All required secrets are present"
+
+      - name: Setup Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26_beta.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install Sparkle tools
+        run: |
+          brew install --cask sparkle
+          echo "Sparkle installation completed"
+
+      - name: Find and setup Sparkle
+        id: sparkle
+        run: |
+          # Find Sparkle installation
+          SIGN_UPDATE_PATH=""
+
+          # Check common locations
+          for sparkle_dir in /opt/homebrew/Caskroom/sparkle/*/bin /usr/local/Caskroom/sparkle/*/bin; do
+            if [ -f "$sparkle_dir/sign_update" ]; then
+              SIGN_UPDATE_PATH="$sparkle_dir/sign_update"
+              echo "Found sign_update at: $SIGN_UPDATE_PATH"
+
+              # Remove macOS quarantine attribute to avoid Gatekeeper issues
+              xattr -d com.apple.quarantine "$SIGN_UPDATE_PATH" 2>/dev/null || echo "No quarantine attribute to remove"
+              chmod +x "$SIGN_UPDATE_PATH"
+              break
+            fi
+          done
+
+          if [ -z "$SIGN_UPDATE_PATH" ]; then
+            echo "ERROR: sign_update tool not found"
+            exit 1
+          fi
+
+          echo "SIGN_UPDATE_PATH=$SIGN_UPDATE_PATH" >> $GITHUB_OUTPUT
+          echo "sign_update_path=$SIGN_UPDATE_PATH" >> $GITHUB_ENV
+
+      - name: List schemes
+        run: |
+          xcodebuild -project StoneClipboarderTool.xcodeproj -list
+
+      - name: Build app
+        run: |
+          echo "Starting build process..."
+          xcodebuild -project StoneClipboarderTool.xcodeproj \
+            -scheme StoneClipboarderTool \
+            -configuration Release \
+            -derivedDataPath build \
+            -destination "platform=macOS" \
+            -allowProvisioningUpdates \
+            MACOSX_DEPLOYMENT_TARGET=15.0 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            | tee build.log
+          echo "Build completed"
+
+      - name: Verify build
+        run: |
+          echo "Checking build output..."
+          ls -la build/Build/Products/Release/ || echo "Release folder not found"
+
+          if [ ! -d "build/Build/Products/Release/StoneClipboarderTool.app" ]; then
+            echo "Build failed - app not found"
+            echo "Build log:"
+            cat build.log || echo "No build log found"
+            echo "Checking all build products:"
+            find build/ -name "*.app" -type d 2>/dev/null || echo "No .app bundles found"
+            exit 1
+          fi
+          echo "App built successfully at: build/Build/Products/Release/StoneClipboarderTool.app"
+          ls -la "build/Build/Products/Release/StoneClipboarderTool.app"
+
+      - name: Create app bundle
+        run: |
+          mkdir -p release
+          cp -r build/Build/Products/Release/StoneClipboarderTool.app release/
+          ls -la release/
+
+      - name: Create ZIP and handle signing
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          cd release
+          zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
+
+          echo "ZIP created successfully"
+          ls -la StoneClipboarderTool.zip
+
+          # Initialize signature
+          SIGNATURE="UNSIGNED_BUILD"
+
+          # Try to sign if private key is available
+          if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "Attempting to sign update..."
+
+            # Create raw key file (base64 format expected by Sparkle)
+            echo "$SPARKLE_PRIVATE_KEY" > ../sparkle_raw_key.txt
+            chmod 600 ../sparkle_raw_key.txt
+
+            # Validate raw key format
+            echo "Validating raw key format..."
+            if echo "$SPARKLE_PRIVATE_KEY" | grep -qE '^[A-Za-z0-9+/]+=*$'; then
+              echo "Raw key format is valid"
+            else
+              echo "ERROR: Invalid raw key format (should be base64)"
+              rm -f ../sparkle_raw_key.txt
+              echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
+              exit 0
+            fi
+
+            # Use the dynamically found path
+            SIGN_UPDATE="${{ env.sign_update_path }}"
+            echo "Using sign_update at: $SIGN_UPDATE"
+
+            if [ -f "$SIGN_UPDATE" ] && [ -x "$SIGN_UPDATE" ]; then
+              echo "Attempting to sign with: $SIGN_UPDATE -f ../sparkle_raw_key.txt StoneClipboarderTool.zip"
+
+              # Try simple signing with raw key
+              SIGN_OUTPUT=$("$SIGN_UPDATE" -f ../sparkle_raw_key.txt StoneClipboarderTool.zip 2>&1)
+              SIGN_EXIT_CODE=$?
+
+              echo "Sign exit code: $SIGN_EXIT_CODE"
+              echo "Sign output: $SIGN_OUTPUT"
+
+              if [ $SIGN_EXIT_CODE -eq 0 ]; then
+                # Extract signature from output
+                if echo "$SIGN_OUTPUT" | grep -q "sparkle:edSignature="; then
+                  SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -o 'sparkle:edSignature="[^"]*"' | cut -d'"' -f2)
+                  echo "Extracted signature from sparkle format: $SIGNATURE"
+                elif echo "$SIGN_OUTPUT" | grep -qE '[A-Za-z0-9+/]+=*$'; then
+                  SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -oE '[A-Za-z0-9+/]+=*$' | head -1)
+                  echo "Extracted signature from base64 format: $SIGNATURE"
+                else
+                  echo "Could not extract signature from output"
+                  SIGNATURE="UNSIGNED_BUILD"
+                fi
+              else
+                echo "Signing failed with exit code $SIGN_EXIT_CODE"
+                SIGNATURE="UNSIGNED_BUILD"
+              fi
+            else
+              echo "sign_update tool not found or not executable at: $SIGN_UPDATE"
+              SIGNATURE="UNSIGNED_BUILD"
+            fi
+
+            # Clean up raw key
+            rm -f ../sparkle_raw_key.txt
+          else
+            echo "No private key provided - creating unsigned build"
+          fi
+
+          echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
+          echo "Final signature: $SIGNATURE"
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Processing version: $VERSION"
+
+      - name: Update appcast
+        run: |
+          SIZE=$(stat -f%z release/StoneClipboarderTool.zip)
+          DATE=$(date -u "+%a, %d %b %Y %H:%M:%S %z")
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+
+          echo "File size: $SIZE bytes"
+          echo "Date: $DATE"
+          echo "Version: $VERSION"
+          echo "Signature: $SPARKLE_SIGNATURE"
+          echo "Repository: $REPO_OWNER/$REPO_NAME"
+
+          # Only update if we have items to update
+          if [ -f docs/appcast.xml ]; then
+            # Backup original appcast
+            cp docs/appcast.xml docs/appcast.xml.backup
+
+            # Check if placeholders exist before replacement
+            if grep -q "VERSION_NUMBER" docs/appcast.xml; then
+              echo "Updating appcast.xml with new release info..."
+
+              # Replace placeholders directly in the appcast
+              sed -i '' "s|REPO_OWNER|$REPO_OWNER|g" docs/appcast.xml
+              sed -i '' "s|REPO_NAME|$REPO_NAME|g" docs/appcast.xml
+              sed -i '' "s|VERSION_NUMBER|$VERSION|g" docs/appcast.xml
+              sed -i '' "s|SIGNATURE_PLACEHOLDER|$SPARKLE_SIGNATURE|g" docs/appcast.xml
+              sed -i '' "s|FILE_SIZE|$SIZE|g" docs/appcast.xml
+              sed -i '' "s|RELEASE_DATE|$DATE|g" docs/appcast.xml
+
+              echo "Updated appcast.xml:"
+              cat docs/appcast.xml
+            else
+              echo "No placeholders found in appcast.xml - file may already be updated"
+            fi
+          else
+            echo "Warning: appcast.xml not found"
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/StoneClipboarderTool.zip
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit updated appcast to repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes to commit
+          if git diff --quiet docs/appcast.xml; then
+            echo "No changes to appcast.xml"
+          else
+            git add docs/appcast.xml
+            git commit -m "Auto-update appcast.xml for release $VERSION [skip ci]"
+            git push origin HEAD:dev02
+            echo "Appcast updated and pushed to dev02 branch"
+          fi

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<rss
+    version="2.0"
+    xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+>
+    <channel>
+        <title>StoneClipboarderTool</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <description>Updates for StoneClipboarderTool</description>
+        <language>en</language>
+
+        <item>
+            <title>Version 1.0.7</title>
+            <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+            <sparkle:version>1.0.7</sparkle:version>
+            <sparkle:shortVersionString
+            >1.0.7</sparkle:shortVersionString>
+            <description
+            ><![CDATA[
+                <h2>StoneClipboarderTool 1.0.7</h2>
+                <ul>
+                    <li>1.0.7 testing updating </li>
+                    <li>🔧 Fixed update checking functionality in Settings</li>
+                    <li>📧 Enhanced feedback email with system information</li>
+                    <li>⚡ Improved Sparkle updater integration</li>
+                    <li>🐛 Bug fixes and stability improvements</li>
+                </ul>
+            ]]></description>
+            <pubDate>Mon, 11 Aug 2025 13:28:08 +0000</pubDate>
+            <enclosure
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.0.7/StoneClipboarderTool.zip"
+                sparkle:version="1.0.7"
+                sparkle:shortVersionString="1.0.7"
+                sparkle:edSignature="FQSsHpEgtaVgWdp8YwesuIS8N/LejITSCKPW4u/hF7ew6swlUmDc9CJVZi/ogJfiOnen9ZuQb6Jir+tRdMSiBg=="
+                length="3578086"
+                type="application/octet-stream"
+            />
+        </item>
+
+        <item>
+            <title>Version 1.0.0</title>
+            <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+            <sparkle:version>1.0.0</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <description
+            ><![CDATA[
+                <h2>StoneClipboarderTool 1.0.0</h2>
+                <ul>
+                    <li>🎉 Initial release of StoneClipboarderTool</li>
+                    <li>📊 Full clipboard history tracking with Swift Data</li>
+                    <li>🖥️ Menu bar integration for quick access</li>
+                    <li>🔄 Automatic updates using Sparkle framework</li>
+                    <li>🔒 Privacy-focused - all data stays on your device</li>
+                    <li>✨ Modern SwiftUI interface</li>
+                </ul>
+            ]]></description>
+            <pubDate>Sun, 10 Aug 2025 20:00:00 +0000</pubDate>
+            <enclosure
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.0.0/StoneClipboarderTool.zip"
+                sparkle:version="1.0.0"
+                sparkle:shortVersionString="1.0.0"
+                sparkle:edSignature="UNSIGNED_BUILD"
+                length="5553984"
+                type="application/octet-stream"
+            />
+        </item>
+    </channel>
+</rss>
