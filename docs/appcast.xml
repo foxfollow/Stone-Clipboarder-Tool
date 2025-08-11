@@ -11,19 +11,19 @@
         <language>en</language>
 
         <title>StoneClipboarderTool</title>
-        <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
         <item>
-            <title>Version VERSION_NUMBER</title>
-            <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
-            <sparkle:version>VERSION_NUMBER</sparkle:version>
+            <title>Version 1.0.3</title>
+            <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+            <sparkle:version>1.0.3</sparkle:version>
             <sparkle:shortVersionString
-            >VERSION_NUMBER</sparkle:shortVersionString>
+            >1.0.3</sparkle:shortVersionString>
             <description
             ><![CDATA[
-                <h2>StoneClipboarderTool VERSION_NUMBER</h2>
+                <h2>StoneClipboarderTool 1.0.3</h2>
                 <ul>
                     <li>🔧 Fixed update checking functionality in Settings</li>
                     <li>📧 Enhanced feedback email with system information</li>
@@ -31,13 +31,13 @@
                     <li>🐛 Bug fixes and stability improvements</li>
                 </ul>
             ]]></description>
-            <pubDate>RELEASE_DATE</pubDate>
+            <pubDate>Mon, 11 Aug 2025 10:52:05 +0000</pubDate>
             <enclosure
-                url="https://github.com/REPO_OWNER/REPO_NAME/releases/download/vVERSION_NUMBER/StoneClipboarderTool.zip"
-                sparkle:version="VERSION_NUMBER"
-                sparkle:shortVersionString="VERSION_NUMBER"
-                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
-                length="FILE_SIZE"
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.0.3/StoneClipboarderTool.zip"
+                sparkle:version="1.0.3"
+                sparkle:shortVersionString="1.0.3"
+                sparkle:edSignature="TTqZmwNOJK0f2+IybxKZ0F1G7B3hitzJoTYw+lEq/KK9hMUz8FC3D+pwN4kPGzelN8vfiVQg4tS7SfI9s7UnBw=="
+                length="5553984"
                 type="application/octet-stream"
             />
         </item>
