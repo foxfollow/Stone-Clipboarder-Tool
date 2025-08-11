@@ -2,26 +2,31 @@
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
     <channel>
         <title>StoneClipboarderTool</title>
-        <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
         <item>
-            <title>Version VERSION_NUMBER</title>
-            <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
-            <sparkle:version>VERSION_NUMBER</sparkle:version>
-            <sparkle:shortVersionString>VERSION_NUMBER</sparkle:shortVersionString>
+            <title>Version 1.0.0</title>
+            <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+            <sparkle:version>1.0.0</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
             <description><![CDATA[
-                <h2>StoneClipboarderTool VERSION_NUMBER</h2>
+                <h2>StoneClipboarderTool 1.0.0</h2>
                 <ul>
-                    <li>Release notes will be generated automatically</li>
+                    <li>🎉 Initial release of StoneClipboarderTool</li>
+                    <li>📊 Full clipboard history tracking with Swift Data</li>
+                    <li>🖥️ Menu bar integration for quick access</li>
+                    <li>🔄 Automatic updates using Sparkle framework</li>
+                    <li>🔒 Privacy-focused - all data stays on your device</li>
+                    <li>✨ Modern SwiftUI interface</li>
                 </ul>
             ]]></description>
-            <pubDate>RELEASE_DATE</pubDate>
+            <pubDate>Sun, 10 Aug 2025 20:00:00 +0000</pubDate>
             <enclosure
-                url="https://github.com/REPO_OWNER/REPO_NAME/releases/download/vVERSION_NUMBER/StoneClipboarderTool.zip"
-                sparkle:version="VERSION_NUMBER"
-                sparkle:shortVersionString="VERSION_NUMBER"
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.0.0/StoneClipboarderTool.zip"
+                sparkle:version="1.0.0"
+                sparkle:shortVersionString="1.0.0"
                 sparkle:edSignature="SIGNATURE_PLACEHOLDER"
                 length="FILE_SIZE"
                 type="application/octet-stream" />
