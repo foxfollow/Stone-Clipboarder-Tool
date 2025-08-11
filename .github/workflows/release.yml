@@ -241,9 +241,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          force_orphan: true
+      - name: Commit updated appcast to repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes to commit
+          if git diff --quiet docs/appcast.xml; then
+            echo "No changes to appcast.xml"
+          else
+            git add docs/appcast.xml
+            git commit -m "Auto-update appcast.xml for release $VERSION [skip ci]"
+            git push origin HEAD:dev01
+            echo "Appcast updated and pushed to dev01 branch"
+          fi
