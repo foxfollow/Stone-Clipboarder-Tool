@@ -11,29 +11,29 @@
         <language>en</language>
 
         <item>
-            <title>Version VERSION_NUMBER</title>
-            <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
-            <sparkle:version>VERSION_NUMBER</sparkle:version>
+            <title>Version 1.0.6</title>
+            <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+            <sparkle:version>1.0.6</sparkle:version>
             <sparkle:shortVersionString
-            >VERSION_NUMBER</sparkle:shortVersionString>
+            >1.0.6</sparkle:shortVersionString>
             <description
             ><![CDATA[
-                <h2>StoneClipboarderTool VERSION_NUMBER</h2>
+                <h2>StoneClipboarderTool 1.0.6</h2>
                 <ul>
-                    <li>VERSION_NUMBER testing updaing </li>
+                    <li>1.0.6 testing updaing </li>
                     <li>🔧 Fixed update checking functionality in Settings</li>
                     <li>📧 Enhanced feedback email with system information</li>
                     <li>⚡ Improved Sparkle updater integration</li>
                     <li>🐛 Bug fixes and stability improvements</li>
                 </ul>
             ]]></description>
-            <pubDate>RELEASE_DATE</pubDate>
+            <pubDate>Mon, 11 Aug 2025 13:19:10 +0000</pubDate>
             <enclosure
-                url="https://github.com/REPO_OWNER/REPO_NAME/releases/download/vVERSION_NUMBER/StoneClipboarderTool.zip"
-                sparkle:version="VERSION_NUMBER"
-                sparkle:shortVersionString="VERSION_NUMBER"
-                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
-                length="FILE_SIZE"
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.0.6/StoneClipboarderTool.zip"
+                sparkle:version="1.0.6"
+                sparkle:shortVersionString="1.0.6"
+                sparkle:edSignature="ZRAfxnDLfBLvntiFPlcEcK3AdUiEFg/CnSF7Ki7tWFGUHu867gYOiYz/bgr1EWTihnNf1gzPnMuh6BnW0SZqCA=="
+                length="3578083"
                 type="application/octet-stream"
             />
         </item>
