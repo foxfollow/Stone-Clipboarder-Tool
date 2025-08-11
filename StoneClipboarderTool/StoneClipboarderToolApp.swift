@@ -37,7 +37,7 @@ struct StoneClipboarderToolApp: App {
 
     var body: some Scene {
         WindowGroup("Clipboard History") {
-            ContentView()
+            ContentView(updater: updaterController.updater)
                 .environmentObject(cbViewModel)
                 .environmentObject(settingsManager)
                 .onAppear {
@@ -60,7 +60,7 @@ struct StoneClipboarderToolApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(updater: updaterController.updater)
                 .environmentObject(settingsManager)
         }
     }

@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Validate secrets
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
@@ -45,25 +45,25 @@ jobs:
         run: |
           # Find Sparkle installation
           SIGN_UPDATE_PATH=""
-          
+
           # Check common locations
           for sparkle_dir in /opt/homebrew/Caskroom/sparkle/*/bin /usr/local/Caskroom/sparkle/*/bin; do
             if [ -f "$sparkle_dir/sign_update" ]; then
               SIGN_UPDATE_PATH="$sparkle_dir/sign_update"
               echo "Found sign_update at: $SIGN_UPDATE_PATH"
-              
+
               # Remove macOS quarantine attribute to avoid Gatekeeper issues
               xattr -d com.apple.quarantine "$SIGN_UPDATE_PATH" 2>/dev/null || echo "No quarantine attribute to remove"
               chmod +x "$SIGN_UPDATE_PATH"
               break
             fi
           done
-          
+
           if [ -z "$SIGN_UPDATE_PATH" ]; then
             echo "ERROR: sign_update tool not found"
             exit 1
           fi
-          
+
           echo "SIGN_UPDATE_PATH=$SIGN_UPDATE_PATH" >> $GITHUB_OUTPUT
           echo "sign_update_path=$SIGN_UPDATE_PATH" >> $GITHUB_ENV
 
@@ -116,40 +116,40 @@ jobs:
         run: |
           cd release
           zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
-          
+
           echo "ZIP created successfully"
           ls -la StoneClipboarderTool.zip
-          
+
           # Try to sign if private key is available
           if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
             echo "Attempting to sign update..."
-            
+
             # Create private key file
             echo "$SPARKLE_PRIVATE_KEY" > ../private_key.pem
             chmod 600 ../private_key.pem
-            
+
             # Use the dynamically found path
             SIGN_UPDATE="${{ env.sign_update_path }}"
             echo "Using sign_update at: $SIGN_UPDATE"
-            
+
             if [ -f "$SIGN_UPDATE" ] && [ -x "$SIGN_UPDATE" ]; then
               # Try signing with different approaches
               echo "Method 1: --ed-key-file with file"
               SIGNATURE=$("$SIGN_UPDATE" --ed-key-file ../private_key.pem StoneClipboarderTool.zip 2>&1) || true
-              
+
               if echo "$SIGNATURE" | grep -q "ERROR"; then
                 echo "Method 1 failed: $SIGNATURE"
-                
+
                 echo "Method 2: --ed-key-file with stdin"
                 SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE" --ed-key-file - StoneClipboarderTool.zip 2>&1) || true
-                
+
                 if echo "$SIGNATURE" | grep -q "ERROR"; then
                   echo "Method 2 failed: $SIGNATURE"
-                  
+
                   echo "Method 3: Raw key from PKCS8"
                   RAW_KEY=$(grep -v "PRIVATE KEY" ../private_key.pem | tr -d '\n')
                   SIGNATURE=$(echo "$RAW_KEY" | "$SIGN_UPDATE" --ed-key-file - StoneClipboarderTool.zip 2>&1) || true
-                  
+
                   if echo "$SIGNATURE" | grep -q "ERROR"; then
                     echo "All signing methods failed. Proceeding without signature."
                     echo "Error: $SIGNATURE"
@@ -157,7 +157,7 @@ jobs:
                   fi
                 fi
               fi
-              
+
               # Extract signature if successful
               if ! echo "$SIGNATURE" | grep -q "ERROR" && ! echo "$SIGNATURE" | grep -q "UNSIGNED"; then
                 if echo "$SIGNATURE" | grep -q "sparkle:edSignature="; then
@@ -171,14 +171,14 @@ jobs:
               echo "sign_update tool not found or not executable"
               SIGNATURE="UNSIGNED_BUILD"
             fi
-            
+
             # Clean up private key
             rm -f ../private_key.pem
           else
             echo "No private key provided - creating unsigned build"
             SIGNATURE="UNSIGNED_BUILD"
           fi
-          
+
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
           echo "Final signature: $SIGNATURE"
 
@@ -193,7 +193,7 @@ jobs:
       - name: Update appcast
         run: |
           SIZE=$(stat -f%z release/StoneClipboarderTool.zip)
-          DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+          DATE=$(date -u "+%a, %d %b %Y %H:%M:%S %z")
           REPO_OWNER="${{ github.repository_owner }}"
           REPO_NAME="${{ github.event.repository.name }}"
 
@@ -203,19 +203,31 @@ jobs:
           echo "Signature: $SPARKLE_SIGNATURE"
           echo "Repository: $REPO_OWNER/$REPO_NAME"
 
-          # Backup original appcast
-          cp docs/appcast.xml docs/appcast.xml.backup
+          # Only update if we have items to update
+          if [ -f docs/appcast.xml ]; then
+            # Backup original appcast
+            cp docs/appcast.xml docs/appcast.xml.backup
 
-          # Update appcast with new values using our placeholders
-          sed -i '' "s|REPO_OWNER|$REPO_OWNER|g" docs/appcast.xml
-          sed -i '' "s|REPO_NAME|$REPO_NAME|g" docs/appcast.xml
-          sed -i '' "s|VERSION_NUMBER|$VERSION|g" docs/appcast.xml
-          sed -i '' "s|SIGNATURE_PLACEHOLDER|$SPARKLE_SIGNATURE|g" docs/appcast.xml
-          sed -i '' "s|FILE_SIZE|$SIZE|g" docs/appcast.xml
-          sed -i '' "s|RELEASE_DATE|$DATE|g" docs/appcast.xml
+            # Check if placeholders exist before replacement
+            if grep -q "VERSION_NUMBER" docs/appcast.xml; then
+              echo "Updating appcast.xml with new release info..."
 
-          echo "Updated appcast.xml:"
-          cat docs/appcast.xml
+              # Replace placeholders directly in the appcast
+              sed -i '' "s|REPO_OWNER|$REPO_OWNER|g" docs/appcast.xml
+              sed -i '' "s|REPO_NAME|$REPO_NAME|g" docs/appcast.xml
+              sed -i '' "s|VERSION_NUMBER|$VERSION|g" docs/appcast.xml
+              sed -i '' "s|SIGNATURE_PLACEHOLDER|$SPARKLE_SIGNATURE|g" docs/appcast.xml
+              sed -i '' "s|FILE_SIZE|$SIZE|g" docs/appcast.xml
+              sed -i '' "s|RELEASE_DATE|$DATE|g" docs/appcast.xml
+
+              echo "Updated appcast.xml:"
+              cat docs/appcast.xml
+            else
+              echo "No placeholders found in appcast.xml - file may already be updated"
+            fi
+          else
+            echo "Warning: appcast.xml not found"
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

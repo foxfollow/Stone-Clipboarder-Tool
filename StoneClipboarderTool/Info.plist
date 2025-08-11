@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
@@ -15,9 +16,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
+	<string>1.0.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
 	<key>SUFeedURL</key>
@@ -25,9 +26,9 @@
 	<key>SUPublicEDKey</key>
 	<string>yJrsF5A8PAUhQBx9s4M89LH6VhiCpKS+FlHr2xUIa84=</string>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
+	<true />
 	<key>SUAutomaticallyUpdate</key>
-	<false/>
+	<false />
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 </dict>
