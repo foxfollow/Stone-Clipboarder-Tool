@@ -127,17 +127,17 @@ jobs:
           if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
             echo "Attempting to sign update..."
 
-            # Create private key file
-            echo "$SPARKLE_PRIVATE_KEY" > ../private_key.pem
-            chmod 600 ../private_key.pem
+            # Create raw key file (base64 format expected by Sparkle)
+            echo "$SPARKLE_PRIVATE_KEY" > ../sparkle_raw_key.txt
+            chmod 600 ../sparkle_raw_key.txt
 
-            # Validate private key format
-            echo "Validating private key..."
-            if openssl pkey -in ../private_key.pem -noout 2>/dev/null; then
-              echo "Private key format is valid"
+            # Validate raw key format
+            echo "Validating raw key format..."
+            if echo "$SPARKLE_PRIVATE_KEY" | grep -qE '^[A-Za-z0-9+/]+=*$'; then
+              echo "Raw key format is valid"
             else
-              echo "ERROR: Invalid private key format"
-              rm -f ../private_key.pem
+              echo "ERROR: Invalid raw key format (should be base64)"
+              rm -f ../sparkle_raw_key.txt
               echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
               exit 0
             fi
@@ -147,10 +147,10 @@ jobs:
             echo "Using sign_update at: $SIGN_UPDATE"
 
             if [ -f "$SIGN_UPDATE" ] && [ -x "$SIGN_UPDATE" ]; then
-              echo "Attempting to sign with: $SIGN_UPDATE -f ../private_key.pem StoneClipboarderTool.zip"
+              echo "Attempting to sign with: $SIGN_UPDATE -f ../sparkle_raw_key.txt StoneClipboarderTool.zip"
 
-              # Try simple signing
-              SIGN_OUTPUT=$("$SIGN_UPDATE" -f ../private_key.pem StoneClipboarderTool.zip 2>&1)
+              # Try simple signing with raw key
+              SIGN_OUTPUT=$("$SIGN_UPDATE" -f ../sparkle_raw_key.txt StoneClipboarderTool.zip 2>&1)
               SIGN_EXIT_CODE=$?
 
               echo "Sign exit code: $SIGN_EXIT_CODE"
@@ -177,8 +177,8 @@ jobs:
               SIGNATURE="UNSIGNED_BUILD"
             fi
 
-            # Clean up private key
-            rm -f ../private_key.pem
+            # Clean up raw key
+            rm -f ../sparkle_raw_key.txt
           else
             echo "No private key provided - creating unsigned build"
           fi
