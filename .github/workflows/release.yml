@@ -120,6 +120,9 @@ jobs:
           echo "ZIP created successfully"
           ls -la StoneClipboarderTool.zip
 
+          # Initialize signature
+          SIGNATURE="UNSIGNED_BUILD"
+
           # Try to sign if private key is available
           if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
             echo "Attempting to sign update..."
@@ -128,47 +131,49 @@ jobs:
             echo "$SPARKLE_PRIVATE_KEY" > ../private_key.pem
             chmod 600 ../private_key.pem
 
+            # Validate private key format
+            echo "Validating private key..."
+            if openssl pkey -in ../private_key.pem -noout 2>/dev/null; then
+              echo "Private key format is valid"
+            else
+              echo "ERROR: Invalid private key format"
+              rm -f ../private_key.pem
+              echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
+              exit 0
+            fi
+
             # Use the dynamically found path
             SIGN_UPDATE="${{ env.sign_update_path }}"
             echo "Using sign_update at: $SIGN_UPDATE"
 
             if [ -f "$SIGN_UPDATE" ] && [ -x "$SIGN_UPDATE" ]; then
-              # Try signing with different approaches
-              echo "Method 1: --ed-key-file with file"
-              SIGNATURE=$("$SIGN_UPDATE" --ed-key-file ../private_key.pem StoneClipboarderTool.zip 2>&1) || true
+              echo "Attempting to sign with: $SIGN_UPDATE -f ../private_key.pem StoneClipboarderTool.zip"
 
-              if echo "$SIGNATURE" | grep -q "ERROR"; then
-                echo "Method 1 failed: $SIGNATURE"
+              # Try simple signing
+              SIGN_OUTPUT=$("$SIGN_UPDATE" -f ../private_key.pem StoneClipboarderTool.zip 2>&1)
+              SIGN_EXIT_CODE=$?
 
-                echo "Method 2: --ed-key-file with stdin"
-                SIGNATURE=$(cat ../private_key.pem | "$SIGN_UPDATE" --ed-key-file - StoneClipboarderTool.zip 2>&1) || true
+              echo "Sign exit code: $SIGN_EXIT_CODE"
+              echo "Sign output: $SIGN_OUTPUT"
 
-                if echo "$SIGNATURE" | grep -q "ERROR"; then
-                  echo "Method 2 failed: $SIGNATURE"
-
-                  echo "Method 3: Raw key from PKCS8"
-                  RAW_KEY=$(grep -v "PRIVATE KEY" ../private_key.pem | tr -d '\n')
-                  SIGNATURE=$(echo "$RAW_KEY" | "$SIGN_UPDATE" --ed-key-file - StoneClipboarderTool.zip 2>&1) || true
-
-                  if echo "$SIGNATURE" | grep -q "ERROR"; then
-                    echo "All signing methods failed. Proceeding without signature."
-                    echo "Error: $SIGNATURE"
-                    SIGNATURE="UNSIGNED_BUILD"
-                  fi
+              if [ $SIGN_EXIT_CODE -eq 0 ]; then
+                # Extract signature from output
+                if echo "$SIGN_OUTPUT" | grep -q "sparkle:edSignature="; then
+                  SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -o 'sparkle:edSignature="[^"]*"' | cut -d'"' -f2)
+                  echo "Extracted signature from sparkle format: $SIGNATURE"
+                elif echo "$SIGN_OUTPUT" | grep -qE '[A-Za-z0-9+/]+=*$'; then
+                  SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -oE '[A-Za-z0-9+/]+=*$' | head -1)
+                  echo "Extracted signature from base64 format: $SIGNATURE"
+                else
+                  echo "Could not extract signature from output"
+                  SIGNATURE="UNSIGNED_BUILD"
                 fi
-              fi
-
-              # Extract signature if successful
-              if ! echo "$SIGNATURE" | grep -q "ERROR" && ! echo "$SIGNATURE" | grep -q "UNSIGNED"; then
-                if echo "$SIGNATURE" | grep -q "sparkle:edSignature="; then
-                  SIGNATURE=$(echo "$SIGNATURE" | grep -o 'sparkle:edSignature="[^"]*"' | cut -d'"' -f2)
-                elif echo "$SIGNATURE" | grep -q "="; then
-                  SIGNATURE=$(echo "$SIGNATURE" | grep -o '[A-Za-z0-9+/]\+=' | head -1)
-                fi
-                echo "Successfully generated signature: $SIGNATURE"
+              else
+                echo "Signing failed with exit code $SIGN_EXIT_CODE"
+                SIGNATURE="UNSIGNED_BUILD"
               fi
             else
-              echo "sign_update tool not found or not executable"
+              echo "sign_update tool not found or not executable at: $SIGN_UPDATE"
               SIGNATURE="UNSIGNED_BUILD"
             fi
 
@@ -176,7 +181,6 @@ jobs:
             rm -f ../private_key.pem
           else
             echo "No private key provided - creating unsigned build"
-            SIGNATURE="UNSIGNED_BUILD"
           fi
 
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
