@@ -2,6 +2,15 @@
 
 A macOS clipboard history manager that automatically saves and organizes everything you copy.
 
+## 🔗 Links
+
+- **Live Preview**: [https://foxfollow.github.io/Stone-Clipboarder-Tool/](https://foxfollow.github.io/Stone-Clipboarder-Tool/)
+- **Latest Release**: [Download from GitHub](https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest)
+
+## Preview
+
+![StoneClipboarderTool Images View](docs/StoneClipboarder-Image-01.png)
+
 ## Features
 
 - **Automatic Clipboard Monitoring**: Captures everything you copy while the app is running
@@ -25,6 +34,31 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 5. **Manage items** - Delete unwanted items using the edit mode
 
 ## Interface
+
+### App Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/StoneClipboarder-Image-01.png" width="250" alt="Images View"><br>
+      <sub><b>Images View</b><br>How images look in the app with preview</sub>
+    </td>
+    <td align="center">
+      <img src="docs/StoneClipboarder-Image-02.png" width="250" alt="Files View"><br>
+      <sub><b>Files View</b><br>How files appear in clipboard manager</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/StoneClipboarder-Image-03.png" width="250" alt="Text View"><br>
+      <sub><b>Text View</b><br>How copied text content is displayed</sub>
+    </td>
+    <td align="center">
+      <img src="docs/StoneClipboarder-Image-Menu.png" width="250" alt="Menu Bar"><br>
+      <sub><b>Menu Bar</b><br>Quick access to recent items</sub>
+    </td>
+  </tr>
+</table>
 
 ### Main Window
 - **Left Panel**: List of all clipboard items with preview and timestamp

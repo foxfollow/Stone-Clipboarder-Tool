@@ -256,6 +256,6 @@ jobs:
           else
             git add docs/appcast.xml
             git commit -m "Auto-update appcast.xml for release $VERSION [skip ci]"
-            git push origin HEAD:dev02
-            echo "Appcast updated and pushed to dev02 branch"
+            git push origin HEAD:main
+            echo "Appcast updated and pushed to main branch"
           fi
