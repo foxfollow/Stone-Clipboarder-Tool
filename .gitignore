@@ -77,6 +77,9 @@ Developer_ID_*.p12
 Developer_ID_*.cer
 distribution_certificate.p12
 
+# Appcast example file
+appcast.xml.example
+
 # Temporary and backup files
 *~
 *.tmp
