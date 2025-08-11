@@ -110,3 +110,6 @@ coverage/
 UserInterfaceState.xcuserstate
 
 SPARKLE_SETUP.md
+ACTIONS_SETUP.md
+
+test*

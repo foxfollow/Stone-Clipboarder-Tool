@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StoneClipboarderTool - Updates</title>
     <style>
+        /* Light theme (default) */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             max-width: 800px;
@@ -12,11 +13,15 @@
             padding: 20px;
             line-height: 1.6;
             color: #333;
+            background-color: #ffffff;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
+        
         .header {
             text-align: center;
             margin-bottom: 40px;
         }
+        
         .app-icon {
             width: 128px;
             height: 128px;
@@ -26,12 +31,15 @@
             border-radius: 22px;
             margin: 0 auto 20px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
         }
+        
         @media (-webkit-min-device-pixel-ratio: 2) {
             .app-icon {
                 background-image: url('StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png');
             }
         }
+        
         .download-btn {
             background: #007AFF;
             color: white;
@@ -40,39 +48,179 @@
             text-decoration: none;
             display: inline-block;
             margin: 10px;
-            transition: background 0.2s;
+            transition: background 0.2s ease;
         }
+        
         .download-btn:hover {
             background: #0056CC;
         }
+        
         .feature-list {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
             margin: 30px 0;
         }
+        
         .feature {
             background: #f8f9fa;
             padding: 20px;
             border-radius: 8px;
             border-left: 4px solid #007AFF;
+            transition: background-color 0.3s ease;
         }
+        
         .footer {
             text-align: center;
             margin-top: 40px;
             padding-top: 20px;
             border-top: 1px solid #eee;
             color: #666;
+            transition: color 0.3s ease, border-color 0.3s ease;
         }
+        
         .update-info {
             background: #e8f4fd;
             padding: 15px;
             border-radius: 8px;
             margin: 20px 0;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Dark theme */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1a1a1a;
+                color: #e0e0e0;
+            }
+            
+            .app-icon {
+                box-shadow: 0 4px 20px rgba(255,255,255,0.1);
+            }
+            
+            .download-btn {
+                background: #0A84FF;
+            }
+            
+            .download-btn:hover {
+                background: #409CFF;
+            }
+            
+            .feature {
+                background: #2a2a2a;
+                border-left-color: #0A84FF;
+                color: #e0e0e0;
+            }
+            
+            .footer {
+                border-top-color: #444;
+                color: #999;
+            }
+            
+            .update-info {
+                background: #1e3a52;
+                color: #e0e0e0;
+            }
+        }
+
+        /* Theme toggle button */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: 2px solid #007AFF;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .theme-toggle:hover {
+            background: #007AFF;
+            transform: scale(1.1);
+        }
+        
+        /* Manual theme overrides */
+        body.light-theme {
+            background-color: #ffffff !important;
+            color: #333 !important;
+        }
+        
+        body.light-theme .feature {
+            background: #f8f9fa !important;
+            color: #333 !important;
+        }
+        
+        body.light-theme .footer {
+            color: #666 !important;
+            border-top-color: #eee !important;
+        }
+        
+        body.light-theme .update-info {
+            background: #e8f4fd !important;
+            color: #333 !important;
+        }
+        
+        body.light-theme .app-icon {
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+        }
+        
+        body.dark-theme {
+            background-color: #1a1a1a !important;
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .feature {
+            background: #2a2a2a !important;
+            border-left-color: #0A84FF !important;
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .footer {
+            border-top-color: #444 !important;
+            color: #999 !important;
+        }
+        
+        body.dark-theme .update-info {
+            background: #1e3a52 !important;
+            color: #e0e0e0 !important;
+        }
+        
+        body.dark-theme .app-icon {
+            box-shadow: 0 4px 20px rgba(255,255,255,0.1) !important;
+        }
+        
+        body.dark-theme .download-btn {
+            background: #0A84FF !important;
+        }
+        
+        body.dark-theme .download-btn:hover {
+            background: #409CFF !important;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .theme-toggle {
+                border-color: #0A84FF;
+            }
+            
+            .theme-toggle:hover {
+                background: #0A84FF;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Theme toggle button -->
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="theme-icon">🌙</span>
+    </button>
+
     <div class="header">
         <div class="app-icon"></div>
         <h1>StoneClipboarderTool</h1>
@@ -114,12 +262,45 @@
     </div>
 
     <script>
+        // Theme management
+        let currentTheme = localStorage.getItem('theme') || 'auto';
+        
+        function setTheme(theme) {
+            currentTheme = theme;
+            localStorage.setItem('theme', theme);
+            
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            
+            // Remove existing theme classes
+            body.classList.remove('light-theme', 'dark-theme');
+            
+            if (theme === 'light') {
+                body.classList.add('light-theme');
+                themeIcon.textContent = '🌙';
+            } else if (theme === 'dark') {
+                body.classList.add('dark-theme');
+                themeIcon.textContent = '☀️';
+            } else {
+                // Auto mode - follow system preference
+                themeIcon.textContent = window.matchMedia('(prefers-color-scheme: dark)').matches ? '☀️' : '🌙';
+            }
+        }
+        
+        function toggleTheme() {
+            if (currentTheme === 'auto' || currentTheme === 'light') {
+                setTheme('dark');
+            } else {
+                setTheme('light');
+            }
+        }
+        
         // Auto-refresh update feed status
         function checkUpdateFeed() {
             fetch('appcast.xml')
                 .then(response => {
                     if (response.ok) {
-                        document.querySelector('.update-info').style.background = '#d4edda';
+                        document.querySelector('.update-info').style.background = currentTheme === 'dark' ? '#1a4a3a' : '#d4edda';
                         document.querySelector('.update-info h3').textContent = '✅ Update Feed Active';
                     }
                 })
@@ -128,8 +309,18 @@
                 });
         }
 
-        // Check on page load
-        checkUpdateFeed();
+        // Initialize theme on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            setTheme(currentTheme);
+            checkUpdateFeed();
+        });
+        
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            if (currentTheme === 'auto') {
+                setTheme('auto');
+            }
+        });
     </script>
 </body>
 </html>
