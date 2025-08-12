@@ -1,15 +1,26 @@
-# StoneClipboarderTool
+# Stone Clipboarder Tool
+
+<div align="leading">
+
+![from macOS 15](https://img.shields.io/badge/macOS-15.0+-blue.svg) <br>
+![database](https://img.shields.io/badge/local%20DB-SwiftData-brightgreen)
+
+</div>
+
+<div align="center">
+
+<img src="docs/resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" width="128" height="128">
+
+</div>
 
 A macOS clipboard history manager that automatically saves and organizes everything you copy.
 
 ## 🔗 Links
 
-- **Live Preview**: [https://foxfollow.github.io/Stone-Clipboarder-Tool/](https://foxfollow.github.io/Stone-Clipboarder-Tool/)
+- **Live Preview**: [Visit site on GitHub Pages](https://foxfollow.github.io/Stone-Clipboarder-Tool/)
 - **Latest Release**: [Download from GitHub](https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest)
+- **Installation Guide**: [Step-by-step installation instructions](https://foxfollow.github.io/Stone-Clipboarder-Tool/installation)
 
-## Preview
-
-![StoneClipboarderTool Images View](docs/StoneClipboarder-Image-01.png)
 
 ## Features
 
@@ -40,21 +51,21 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 <table>
   <tr>
     <td align="center">
-      <img src="docs/StoneClipboarder-Image-01.png" width="250" alt="Images View"><br>
+      <img src="docs/resources/index/StoneClipboarder-Image-01.png" width="250" alt="Images View"><br>
       <sub><b>Images View</b><br>How images look in the app with preview</sub>
     </td>
     <td align="center">
-      <img src="docs/StoneClipboarder-Image-02.png" width="250" alt="Files View"><br>
+      <img src="docs/resources/index/StoneClipboarder-Image-02.png" width="250" alt="Files View"><br>
       <sub><b>Files View</b><br>How files appear in clipboard manager</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/StoneClipboarder-Image-03.png" width="250" alt="Text View"><br>
+      <img src="docs/resources/index/StoneClipboarder-Image-03.png" width="250" alt="Text View"><br>
       <sub><b>Text View</b><br>How copied text content is displayed</sub>
     </td>
     <td align="center">
-      <img src="docs/StoneClipboarder-Image-Menu.png" width="250" alt="Menu Bar"><br>
+      <img src="docs/resources/index/StoneClipboarder-Image-Menu.png" width="250" alt="Menu Bar"><br>
       <sub><b>Menu Bar</b><br>Quick access to recent items</sub>
     </td>
   </tr>
@@ -92,3 +103,8 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 3. Grant any required permissions for clipboard access
 
 The app uses SwiftUI and SwiftData for a modern, native macOS experience.
+
+## License
+The MIT License (MIT)
+
+Copyright © 2025 Heorhii Savoiskyi d3f0ld@proton.me
