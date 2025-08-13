@@ -254,7 +254,7 @@ struct SwipeableRow<Content: View>: View {
                         Divider()
                     }
                     
-                    Button("Delete123", role: .destructive) {
+                    Button("Delete Item", role: .destructive) {
                         performDelete()
                     }
                 }

@@ -25,6 +25,7 @@ final class CBItem {
     var fileName: String?
     var fileUTI: String? // Uniform Type Identifier
     var itemType: CBItemType
+    var isFavorite: Bool = false
     
     init(
         timestamp: Date,
