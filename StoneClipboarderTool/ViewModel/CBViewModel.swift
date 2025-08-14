@@ -93,24 +93,31 @@ class CBViewModel: ObservableObject {
     private func handleClipboardChange(_ clipboardContent: ClipboardContent) {
         switch clipboardContent {
         case .text(let content):
-            // Avoid duplicates by checking if the latest item has the same content
-            if let lastItem = items.first, lastItem.itemType == .text, lastItem.content == content {
-                return
-            }
-            addTextItem(content: content)
+            addOrUpdateTextItem(content: content)
         case .image(let image):
-            // For images, always save since comparing image data is expensive
-            addImageItem(image: image)
+            addOrUpdateImageItem(image: image)
         case .file(let url, let uti, let data):
-            // For files, always save since comparing file data could be expensive
-            addFileItem(url: url, uti: uti, data: data)
+            addOrUpdateFileItem(url: url, uti: uti, data: data)
         }
     }
 
     func addTextItem(content: String) {
+        addOrUpdateTextItem(content: content)
+    }
+
+    private func addOrUpdateTextItem(content: String) {
         guard let modelContext = modelContext else { return }
-        let newItem = CBItem(timestamp: Date(), content: content, itemType: .text)
-        modelContext.insert(newItem)
+
+        let tempItem = CBItem(timestamp: Date(), content: content, itemType: .text)
+
+        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
+            // Update existing item's timestamp
+            existingItem.timestamp = Date()
+        } else {
+            // Add new item
+            modelContext.insert(tempItem)
+        }
+
         do {
             try modelContext.save()
             fetchItems()
@@ -120,11 +127,23 @@ class CBViewModel: ObservableObject {
     }
 
     func addImageItem(image: NSImage) {
+        addOrUpdateImageItem(image: image)
+    }
+
+    private func addOrUpdateImageItem(image: NSImage) {
         guard let modelContext = modelContext else { return }
         guard let imageData = image.tiffRepresentation else { return }
 
-        let newItem = CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
-        modelContext.insert(newItem)
+        let tempItem = CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
+
+        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
+            // Update existing item's timestamp
+            existingItem.timestamp = Date()
+        } else {
+            // Add new item
+            modelContext.insert(tempItem)
+        }
+
         do {
             try modelContext.save()
             fetchItems()
@@ -134,10 +153,14 @@ class CBViewModel: ObservableObject {
     }
 
     func addFileItem(url: URL, uti: String, data: Data) {
+        addOrUpdateFileItem(url: url, uti: uti, data: data)
+    }
+
+    private func addOrUpdateFileItem(url: URL, uti: String, data: Data) {
         guard let modelContext = modelContext else { return }
 
         let fileName = url.lastPathComponent
-        let newItem = CBItem(
+        let tempItem = CBItem(
             timestamp: Date(),
             fileData: data,
             fileName: fileName,
@@ -145,7 +168,14 @@ class CBViewModel: ObservableObject {
             itemType: .file
         )
 
-        modelContext.insert(newItem)
+        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
+            // Update existing item's timestamp
+            existingItem.timestamp = Date()
+        } else {
+            // Add new item
+            modelContext.insert(tempItem)
+        }
+
         do {
             try modelContext.save()
             fetchItems()
@@ -197,7 +227,7 @@ class CBViewModel: ObservableObject {
 
         // Update the item's content
         item.content = newContent
-        item.timestamp = Date() // Update timestamp to move it to top
+        item.timestamp = Date()  // Update timestamp to move it to top
 
         do {
             try modelContext.save()
@@ -293,16 +323,24 @@ class CBViewModel: ObservableObject {
             if item.isImageFile {
                 try await openImageFileInPreview(item)
             } else {
-                throw NSError(domain: "CBViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Only image files can be opened in Preview"])
+                throw NSError(
+                    domain: "CBViewModel", code: -1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Only image files can be opened in Preview"
+                    ])
             }
         case .text:
-            throw NSError(domain: "CBViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Text items cannot be opened in Preview"])
+            throw NSError(
+                domain: "CBViewModel", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Text items cannot be opened in Preview"])
         }
     }
 
     private func openImageInPreview(_ item: CBItem) async throws {
         guard let image = item.image else {
-            throw NSError(domain: "CBViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "No image data available"])
+            throw NSError(
+                domain: "CBViewModel", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "No image data available"])
         }
 
         // Create temporary file for the image
@@ -312,9 +350,12 @@ class CBViewModel: ObservableObject {
 
         // Convert image to PNG data
         guard let tiffData = image.tiffRepresentation,
-              let bitmapRep = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-            throw NSError(domain: "CBViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to PNG"])
+            let bitmapRep = NSBitmapImageRep(data: tiffData),
+            let pngData = bitmapRep.representation(using: .png, properties: [:])
+        else {
+            throw NSError(
+                domain: "CBViewModel", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to PNG"])
         }
 
         // Write to temporary file
@@ -331,8 +372,11 @@ class CBViewModel: ObservableObject {
 
     private func openImageFileInPreview(_ item: CBItem) async throws {
         guard let fileData = item.fileData,
-              let fileName = item.fileName else {
-            throw NSError(domain: "CBViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "No file data available"])
+            let fileName = item.fileName
+        else {
+            throw NSError(
+                domain: "CBViewModel", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "No file data available"])
         }
 
         // Create temporary file with original extension

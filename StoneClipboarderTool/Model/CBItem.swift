@@ -14,7 +14,7 @@ enum CBItemType: String, Codable, CaseIterable {
     case text = "text"
     case image = "image"
     case file = "file"
-    
+
     var sfSybmolName: String {
         switch self {
         case .text: return "text.page"
@@ -22,7 +22,7 @@ enum CBItemType: String, Codable, CaseIterable {
         case .file: return "document.badge.ellipsis"
         }
     }
-    
+
     var sybmolColor: Color {
         switch self {
         case .text: return .blue
@@ -39,7 +39,7 @@ final class CBItem {
     var imageData: Data?
     var fileData: Data?
     var fileName: String?
-    var fileUTI: String? // Uniform Type Identifier
+    var fileUTI: String?  // Uniform Type Identifier
     var itemType: CBItemType
     var isFavorite: Bool = false
     var orderIndex: Int = 0
@@ -126,5 +126,29 @@ final class CBItem {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
         return formatter.string(fromByteCount: Int64(fileData.count))
+    }
+
+    // MARK: - Duplicate Detection
+
+    func isDuplicate(of other: CBItem) -> Bool {
+        // Different types are never duplicates
+        guard itemType == other.itemType else { return false }
+
+        switch itemType {
+        case .text:
+            return content == other.content
+        case .image:
+            // Compare image data
+            return imageData == other.imageData
+        case .file:
+            // Compare file content and name
+            return fileData == other.fileData && fileName == other.fileName
+        }
+    }
+
+    static func findExistingItem(in items: [CBItem], matching newItem: CBItem) -> CBItem? {
+        return items.first { existingItem in
+            newItem.isDuplicate(of: existingItem)
+        }
     }
 }
