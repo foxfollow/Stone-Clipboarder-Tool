@@ -14,12 +14,15 @@ struct StoneClipboarderToolApp: App {
     @StateObject private var cbViewModel = CBViewModel()
     @StateObject private var settingsManager = SettingsManager()
     @StateObject private var menuBarManager = MenuBarManager()
-
+    @StateObject private var hotkeyManager = HotkeyManager()
+    @StateObject private var quickPickerManager = QuickPickerWindowManager()
+    
     private let updaterController: SPUStandardUpdaterController
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            CBItem.self
+            CBItem.self,
+            HotkeyConfig.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -37,9 +40,10 @@ struct StoneClipboarderToolApp: App {
 
     var body: some Scene {
         WindowGroup("Clipboard History") {
-            ContentView(updater: updaterController.updater)
+            ContentView()
                 .environmentObject(cbViewModel)
                 .environmentObject(settingsManager)
+                .environmentObject(hotkeyManager)
                 .onAppear {
                     setupApp()
                 }
@@ -58,16 +62,36 @@ struct StoneClipboarderToolApp: App {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
         }
+        
+        // Custom Settings window with ID
+         WindowGroup("Settings", id: "settings") {
+             SettingsView(updater: updaterController.updater)
+                 .environmentObject(settingsManager)
+                 .environmentObject(hotkeyManager)
+                 .frame(width: 500, height: 500)
+         }
+         .windowResizability(.contentSize)
+         .windowStyle(.automatic)
 
         Settings {
             SettingsView(updater: updaterController.updater)
                 .environmentObject(settingsManager)
+                .environmentObject(hotkeyManager)
         }
+        
     }
 
     private func setupApp() {
         cbViewModel.setModelContext(sharedModelContainer.mainContext)
         cbViewModel.startClipboardMonitoring()
+
+        hotkeyManager.setModelContext(sharedModelContainer.mainContext)
+        hotkeyManager.setCBViewModel(cbViewModel)
+        quickPickerManager.setCBViewModel(cbViewModel)
+        hotkeyManager.quickPickerDelegate = quickPickerManager
+
+        // Load and register hotkeys
+        hotkeyManager.loadHotkeyConfigs()
 
         updateMenuBarVisibility()
         updateWindowVisibility()
