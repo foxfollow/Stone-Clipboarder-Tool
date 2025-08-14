@@ -46,6 +46,10 @@ class KeyCapturingPanel: NSPanel {
         super.orderFrontRegardless()
         self.makeKey()
     }
+
+    override func mouseDown(with event: NSEvent) {
+        self.performDrag(with: event)
+    }
 }
 
 @MainActor
@@ -55,9 +59,13 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     private var eventMonitor: Any?
     private var keyMonitor: Any?
     private var previousApp: NSRunningApplication?
+    private var isDragging = false
+    private var dragOffset: NSPoint = NSPoint.zero
 
     func setCBViewModel(_ viewModel: CBViewModel) {
         self.cbViewModel = viewModel
+        // Reset position flag on app start for fresh center positioning
+        UserDefaults.standard.set(false, forKey: "QuickPickerHasValidPosition")
     }
 
     func showQuickPicker() {
@@ -94,6 +102,8 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = false
         panel.worksWhenModal = true
+        panel.isMovableByWindowBackground = true
+        panel.isMovable = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
 
         // Create content view
@@ -104,13 +114,21 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         let hostingView = QuickPickerHostingView(rootView: contentView)
         panel.contentView = hostingView
 
-        // Center on screen
+        // Set position (saved position or center)
         if let screen = NSScreen.main {
             let screenFrame = screen.visibleFrame
-            let origin = NSPoint(
-                x: screenFrame.midX - 250,
-                y: screenFrame.midY - 200
-            )
+            let savedPosition = getSavedWindowPosition()
+
+            let origin: NSPoint
+            if isPositionValid(savedPosition, screenFrame: screenFrame) {
+                origin = savedPosition
+            } else {
+                // Default to center
+                origin = NSPoint(
+                    x: screenFrame.midX - 250,
+                    y: screenFrame.midY - 200
+                )
+            }
             panel.setFrameOrigin(origin)
         }
 
@@ -147,6 +165,8 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         removeKeyMonitoring()
 
         if let window = window {
+            // Save window position before closing
+            saveWindowPosition(window.frame.origin)
             window.orderOut(nil)
             window.close()
         }
@@ -215,6 +235,37 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             NSEvent.removeMonitor(monitor)
             keyMonitor = nil
         }
+    }
+
+    // MARK: - Window Position Management
+
+    private func saveWindowPosition(_ position: NSPoint) {
+        UserDefaults.standard.set(position.x, forKey: "QuickPickerWindowX")
+        UserDefaults.standard.set(position.y, forKey: "QuickPickerWindowY")
+        UserDefaults.standard.set(true, forKey: "QuickPickerHasValidPosition")
+    }
+
+    private func getSavedWindowPosition() -> NSPoint {
+        let x = UserDefaults.standard.double(forKey: "QuickPickerWindowX")
+        let y = UserDefaults.standard.double(forKey: "QuickPickerWindowY")
+        return NSPoint(x: x, y: y)
+    }
+
+    private func isPositionValid(_ position: NSPoint, screenFrame: NSRect) -> Bool {
+        // On app relaunch, always reset to center (fresh start)
+        let hasValidPosition = UserDefaults.standard.bool(forKey: "QuickPickerHasValidPosition")
+        if !hasValidPosition {
+            return false
+        }
+
+        // Check if saved position exists (not 0,0 default)
+        guard position.x != 0 || position.y != 0 else { return false }
+
+        // Check if position is completely within screen bounds (no corner hanging)
+        let windowSize = NSSize(width: 500, height: 400)
+        let windowRect = NSRect(origin: position, size: windowSize)
+
+        return screenFrame.contains(windowRect)
     }
 
     deinit {

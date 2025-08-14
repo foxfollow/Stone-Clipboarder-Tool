@@ -44,6 +44,7 @@ struct QuickPickerView: View {
     }
     var body: some View {
         VStack(spacing: 0) {
+            dragHandle
             searchBar
             Divider()
             QPItemList(
@@ -95,6 +96,20 @@ struct QuickPickerView: View {
                 selectedIndex = max(0, newItems.count - 1)
             }
         }
+    }
+
+    @ViewBuilder
+    private var dragHandle: some View {
+        HStack {
+            Spacer()
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.gray.opacity(0.4))
+                .frame(width: 36, height: 4)
+            Spacer()
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        .background(Color.clear)
     }
 
     @ViewBuilder
