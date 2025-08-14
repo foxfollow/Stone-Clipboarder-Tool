@@ -5,46 +5,54 @@
 //  Created by Heorhii Savoiskyi on 13.08.2025.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct QuickPickerView: View {
     @ObservedObject var viewModel: CBViewModel
     @State private var searchText = ""
     @State private var selectedIndex = 0
     @FocusState private var isSearchFocused: Bool
-    
+
     let onClose: () -> Void
-    
+
     init(viewModel: CBViewModel, onClose: @escaping () -> Void) {
         self.viewModel = viewModel
         self.onClose = onClose
     }
-    
+
     private var filteredItems: [CBItem] {
         let items = viewModel.items.sorted { $0.timestamp > $1.timestamp }
-        
-        if searchText.isEmpty {
+
+        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return Array(items)
         }
-        
+
+        let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+
         return items.filter { item in
             switch item.itemType {
             case .text:
-                return item.content?.localizedCaseInsensitiveContains(searchText) ?? false
-            case .image:
-                return "image".localizedCaseInsensitiveContains(searchText)
-            case .file:
-                return item.fileName?.localizedCaseInsensitiveContains(searchText) ?? false
+                if let content = item.content {
+                    return content.localizedCaseInsensitiveContains(trimmedSearch)
+                }
+                return false
+            case .image, .file:
+                return item.displayContent.localizedCaseInsensitiveContains(trimmedSearch)
             }
         }
     }
-    
     var body: some View {
         VStack(spacing: 0) {
             searchBar
             Divider()
-            itemsList
+            QPItemList(
+                filteredItems: filteredItems,
+                selectedIndex: $selectedIndex,
+                searchText: $searchText
+            ) {
+                performAction()
+            }
         }
         .frame(width: 500, height: 400)
         .background(Color(NSColor.windowBackgroundColor))
@@ -55,7 +63,9 @@ struct QuickPickerView: View {
         )
         .shadow(radius: 10)
         .onAppear {
-            isSearchFocused = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isSearchFocused = true
+            }
         }
         .onKeyPress(.escape) {
             onClose()
@@ -73,24 +83,33 @@ struct QuickPickerView: View {
             }
             return .handled
         }
+        .onKeyPress(.return) {
+            performAction()
+            return .handled
+        }
         .onChange(of: searchText) { _, _ in
             selectedIndex = 0
         }
+        .onChange(of: filteredItems) { _, newItems in
+            if selectedIndex >= newItems.count {
+                selectedIndex = max(0, newItems.count - 1)
+            }
+        }
     }
-    
+
     @ViewBuilder
     private var searchBar: some View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-            
+
             TextField("Search clipboard...", text: $searchText)
-                .textFieldStyle(.plain)
+                .textFieldStyle(.roundedBorder)
                 .focused($isSearchFocused)
                 .onSubmit {
                     performAction()
                 }
-            
+
             if !searchText.isEmpty {
                 Button(action: { searchText = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -102,57 +121,31 @@ struct QuickPickerView: View {
         .padding()
         .background(Color(NSColor.controlBackgroundColor))
     }
-    
-    @ViewBuilder
-    private var itemsList: some View {
-        if filteredItems.isEmpty {
-            VStack {
-                Spacer()
-                Text("No items found")
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
-        } else {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
-                            QPItemRow(item: item, isSelected: index == selectedIndex)
-                                .onTapGesture {
-                                    selectedIndex = index
-                                    performAction()
-                                }
-                                .id(index)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .onChange(of: selectedIndex) { _, newValue in
-                    withAnimation(.easeInOut(duration: 0.1)) {
-                        proxy.scrollTo(newValue, anchor: .center)
-                    }
-                }
-            }
-        }
-    }
-    
+
+    //    @ViewBuilder
+    //    private var itemsList: some View {
+    //
+    //    }
+
     private func performAction() {
         guard selectedIndex < filteredItems.count else { return }
-        
+
         let item = filteredItems[selectedIndex]
         copyToPasteboard(item)
+
+        // Close immediately without activating main app
         onClose()
-        
-        // Paste after a small delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+
+        // Paste after a longer delay to ensure target app is active
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             simulatePaste()
         }
     }
-    
+
     private func copyToPasteboard(_ item: CBItem) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        
+
         switch item.itemType {
         case .text:
             if let content = item.content {
@@ -160,38 +153,39 @@ struct QuickPickerView: View {
             }
         case .image:
             if let imageData = item.imageData,
-               let image = NSImage(data: imageData) {
+                let image = NSImage(data: imageData)
+            {
                 pasteboard.writeObjects([image])
             }
         case .file:
             if let fileData = item.fileData,
-               let fileName = item.fileName {
-                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+                let fileName = item.fileName
+            {
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+                    fileName)
                 try? fileData.write(to: tempURL)
                 pasteboard.writeObjects([tempURL as NSURL])
             }
         }
     }
-    
+
     private func simulatePaste() {
         guard let source = CGEventSource(stateID: .hidSystemState) else { return }
-        
+
         // Create Cmd+V key events
         let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
         let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-        
+
         keyDown?.flags = .maskCommand
         keyUp?.flags = .maskCommand
-        
+
         keyDown?.post(tap: .cghidEventTap)
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             keyUp?.post(tap: .cghidEventTap)
         }
     }
 }
-
-
 
 #Preview {
     QuickPickerView(viewModel: CBViewModel()) {

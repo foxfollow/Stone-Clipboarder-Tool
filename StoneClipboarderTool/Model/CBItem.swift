@@ -73,6 +73,9 @@ final class CBItem {
         case .image:
             return "[Image - \(imageSize)]"
         case .file:
+            if isImageFile {
+                return "[FileImage - \(fileName ?? "Unknown") (\(fileSizeString))]"
+            }
             return "[File - \(fileName ?? "Unknown") (\(fileSizeString))]"
         }
     }

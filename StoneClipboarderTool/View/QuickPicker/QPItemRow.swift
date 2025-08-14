@@ -10,26 +10,26 @@ import SwiftUI
 struct QPItemRow: View {
     let item: CBItem
     let isSelected: Bool
-    
+
     private var displayText: String {
         return item.displayContent
     }
-    
+
     private var icon: String {
         return item.itemType.sfSybmolName
     }
-    
+
     var body: some View {
         VStack(alignment: .leading) {
             HStack {
                 Image(systemName: item.itemType.sfSybmolName)
                     .foregroundColor(item.itemType.sybmolColor)
                     .imageScale(.small)
-                
+
                 Text(displayText)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                
+
                 Text(item.timestamp, style: .relative)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -40,8 +40,9 @@ struct QPItemRow: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(maxHeight: 100, alignment: .leading)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
-                
-            } else if item.itemType == .file && item.isImageFile, let image = item.filePreviewImage {
+
+            } else if item.itemType == .file && item.isImageFile, let image = item.filePreviewImage
+            {
                 //                if  {
                 Image(nsImage: image)
                     .resizable()
@@ -53,13 +54,20 @@ struct QPItemRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-//        .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+        .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
     }
 }
 
 #Preview {
-    let sampleImageData = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8//8/AwAI/wP+z4kAAAAASUVORK5CYII=")
-    QPItemRow(item: CBItem(timestamp: Date(), content: nil, imageData: sampleImageData, fileData: nil, fileName: nil, fileUTI: nil, itemType: .image, isFavorite: false, orderIndex: 0),
-              isSelected: false)
+    let sampleImageData = Data(
+        base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8//8/AwAI/wP+z4kAAAAASUVORK5CYII="
+    )
+    QPItemRow(
+        item: CBItem(
+            timestamp: Date(), content: nil, imageData: sampleImageData, fileData: nil,
+            fileName: nil, fileUTI: nil, itemType: .image, isFavorite: false, orderIndex: 0),
+        isSelected: false)
 }
