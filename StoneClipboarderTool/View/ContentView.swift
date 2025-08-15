@@ -139,6 +139,7 @@ struct ContentView: View {
                 }
                 .foregroundStyle(.red)
             }
+
             ForEach(cbViewModel.items) { item in
                 DetailedCardView(
                     editingMode: $editingMode,
@@ -146,14 +147,31 @@ struct ContentView: View {
                     item: item
                 )
                 .onAppear {
+                    cbViewModel.markItemAccessed(item)
                     if item == cbViewModel.items.last {
                         cbViewModel.loadMoreItems()
                     }
                 }
             }
             .onDelete(perform: deleteItems)
+
+            if cbViewModel.isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading more...")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
         }
         .listStyle(.sidebar)
+        .animation(.easeInOut(duration: 0.2), value: cbViewModel.items.count)
     }
 
     @ViewBuilder
@@ -172,28 +190,33 @@ struct ContentView: View {
                         editingMode: $editingMode,
                         selectedItem: $selectedItem,
                         item: item,
-                        showFavoriteControls: true)
+                        showFavoriteControls: true
+                    )
+                    .onAppear {
+                        cbViewModel.markItemAccessed(item)
+                    }
                 }
             }
         }
         .listStyle(.sidebar)
+        .animation(.easeInOut(duration: 0.3), value: cbViewModel.favoriteItems.count)
     }
 
     private func addItem(content: String? = nil) {
-        withAnimation {
+        withAnimation(.easeInOut(duration: 0.3)) {
             cbViewModel.addItem(content: content ?? "New item content")
         }
     }
 
     private func deleteAllItems() {
-        withAnimation {
+        withAnimation(.easeInOut(duration: 0.3)) {
             cbViewModel.deleteAllItems()
             editingMode = false
         }
     }
 
     private func deleteItems(offsets: IndexSet) {
-        withAnimation {
+        withAnimation(.easeInOut(duration: 0.3)) {
             cbViewModel.deleteItems(at: offsets, from: cbViewModel.items)
         }
     }
@@ -254,10 +277,13 @@ struct DetailedCardView: View {
         HStack {
             if editingMode {
                 DeleteButtonView(item: item)
+                    .transition(.scale.combined(with: .opacity))
             }
 
             Button {
-                selectedItem = item
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedItem = item
+                }
             } label: {
                 BarNavigationCellView(item: item)
             }
@@ -265,22 +291,26 @@ struct DetailedCardView: View {
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(selectedItem?.id == item.id ? Color.blue.opacity(0.2) : Color.clear)
+                    .animation(.easeInOut(duration: 0.15), value: selectedItem?.id == item.id)
             )
 
             Spacer()
 
             // Favorite button
             Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     cbViewModel.toggleFavorite(item)
                 }
             }) {
                 Image(systemName: item.isFavorite ? "heart.fill" : "heart")
                     .font(.system(size: 14))
                     .foregroundStyle(item.isFavorite ? .red : .secondary)
+                    .scaleEffect(item.isFavorite ? 1.1 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: item.isFavorite)
             }
             .buttonStyle(.plain)
             .help(item.isFavorite ? "Remove from favorites" : "Add to favorites")
         }
+        .animation(.easeInOut(duration: 0.2), value: editingMode)
     }
 }

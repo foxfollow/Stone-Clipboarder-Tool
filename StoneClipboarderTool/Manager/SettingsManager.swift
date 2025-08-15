@@ -50,6 +50,30 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @Published var menuBarDisplayLimit: Int {
+        didSet {
+            UserDefaults.standard.set(menuBarDisplayLimit, forKey: "menuBarDisplayLimit")
+        }
+    }
+
+    @Published var enableMemoryCleanup: Bool {
+        didSet {
+            UserDefaults.standard.set(enableMemoryCleanup, forKey: "enableMemoryCleanup")
+        }
+    }
+
+    @Published var memoryCleanupInterval: Int {
+        didSet {
+            UserDefaults.standard.set(memoryCleanupInterval, forKey: "memoryCleanupInterval")
+        }
+    }
+
+    @Published var maxInactiveTime: Int {
+        didSet {
+            UserDefaults.standard.set(maxInactiveTime, forKey: "maxInactiveTime")
+        }
+    }
+
     //    @Published var autoSelectOnPaste: Bool {
     //        didSet {
     //            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
@@ -66,6 +90,14 @@ class SettingsManager: ObservableObject {
         self.enableAutoCleanup =
             UserDefaults.standard.object(forKey: "enableAutoCleanup") as? Bool ?? true
         self.maxItemsToKeep = UserDefaults.standard.object(forKey: "maxItemsToKeep") as? Int ?? 1000
+        self.menuBarDisplayLimit =
+            UserDefaults.standard.object(forKey: "menuBarDisplayLimit") as? Int ?? 10
+        self.enableMemoryCleanup =
+            UserDefaults.standard.object(forKey: "enableMemoryCleanup") as? Bool ?? true
+        self.memoryCleanupInterval =
+            UserDefaults.standard.object(forKey: "memoryCleanupInterval") as? Int ?? 5
+        self.maxInactiveTime =
+            UserDefaults.standard.object(forKey: "maxInactiveTime") as? Int ?? 30
         //        self.autoSelectOnPaste = UserDefaults.standard.object(forKey: "autoSelectOnPaste") as? Bool ?? true
 
         // Default to showing menubar if first launch

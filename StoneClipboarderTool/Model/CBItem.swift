@@ -117,16 +117,69 @@ final class CBItem {
 
     // Memory-efficient thumbnail for UI display
     var thumbnail: NSImage? {
-        guard let thumbnailData = thumbnailData else {
-            // Fallback: generate thumbnail on-demand if not cached
-            if itemType == .image, let image = self.image {
-                return generateThumbnailImage(from: image)
-            } else if isImageFile, let fileData = fileData, let image = NSImage(data: fileData) {
-                return generateThumbnailImage(from: image)
-            }
-            return nil
+        // First check if we have cached thumbnail
+        if let thumbnailData = thumbnailData {
+            return NSImage(data: thumbnailData)
         }
-        return NSImage(data: thumbnailData)
+
+        // Fallback: generate thumbnail on-demand if not cached
+        // But only for small images to avoid memory spikes
+        if itemType == .image {
+            if let imageData = imageData, imageData.count < 5_000_000,  // 5MB limit
+                let image = NSImage(data: imageData)
+            {
+                let thumbnail = generateThumbnailImage(from: image)
+                // Cache the generated thumbnail for future use
+                if let thumbnailData = thumbnail?.tiffRepresentation {
+                    self.thumbnailData = thumbnailData
+                }
+                return thumbnail
+            }
+        } else if isImageFile {
+            if let fileData = fileData, fileData.count < 5_000_000,  // 5MB limit
+                let image = NSImage(data: fileData)
+            {
+                let thumbnail = generateThumbnailImage(from: image)
+                // Cache the generated thumbnail for future use
+                if let thumbnailData = thumbnail?.tiffRepresentation {
+                    self.thumbnailData = thumbnailData
+                }
+                return thumbnail
+            }
+        }
+
+        // Return placeholder for large images or failed generation
+        return createPlaceholderThumbnail()
+    }
+
+    private func createPlaceholderThumbnail() -> NSImage? {
+        let size = NSSize(width: 100, height: 100)
+        let image = NSImage(size: size)
+
+        image.lockFocus()
+
+        // Draw background
+        NSColor.systemGray.setFill()
+        NSRect(origin: .zero, size: size).fill()
+
+        // Draw icon
+        let iconSize: CGFloat = 40
+        let iconOrigin = NSPoint(
+            x: (size.width - iconSize) / 2,
+            y: (size.height - iconSize) / 2
+        )
+        let iconRect = NSRect(
+            origin: iconOrigin, size: NSSize(width: iconSize, height: iconSize))
+
+        let iconName = itemType == .image ? "photo" : "doc.richtext"
+        if let systemImage = NSImage(
+            systemSymbolName: iconName, accessibilityDescription: nil)
+        {
+            systemImage.draw(in: iconRect)
+        }
+
+        image.unlockFocus()
+        return image
     }
 
     var isImageFile: Bool {

@@ -14,6 +14,8 @@ import AppKit
 class CBViewModel: ObservableObject {
     @Published var items: [CBItem] = []
     @Published var selectedItem: CBItem?
+    @Published var isLoadingMore = false
+
     private var modelContext: ModelContext?
     private let clipboardManager = ClipboardManager()
     private var settingsManager: SettingsManager?
@@ -21,8 +23,13 @@ class CBViewModel: ObservableObject {
     private let defaultFetchLimit = 100
     private var currentFetchOffset = 0
 
+    // Memory management
+    private var memoryCleanupTimer: Timer?
+    private var lastAccessTimes: [PersistentIdentifier: Date] = [:]
+
     init() {
         setupClipboardMonitoring()
+        startMemoryCleanupTimer()
     }
 
     func setModelContext(_ context: ModelContext) {
@@ -32,6 +39,8 @@ class CBViewModel: ObservableObject {
 
     func setSettingsManager(_ manager: SettingsManager) {
         self.settingsManager = manager
+        // Restart timer with new settings
+        startMemoryCleanupTimer()
     }
 
     func fetchItems(limit: Int? = nil, reset: Bool = false) {
@@ -40,6 +49,8 @@ class CBViewModel: ObservableObject {
         if reset {
             currentFetchOffset = 0
             items.removeAll()
+        } else {
+            isLoadingMore = true
         }
 
         let fetchLimit = limit ?? defaultFetchLimit
@@ -49,17 +60,33 @@ class CBViewModel: ObservableObject {
         descriptor.fetchLimit = fetchLimit
         descriptor.fetchOffset = currentFetchOffset
 
-        do {
-            let newItems = try modelContext.fetch(descriptor)
-            if reset {
-                items = newItems
-            } else {
-                items.append(contentsOf: newItems)
+        Task {
+            do {
+                let newItems = try modelContext.fetch(descriptor)
+                await MainActor.run {
+                    if reset {
+                        self.items = newItems
+                    } else {
+                        self.items.append(contentsOf: newItems)
+                        self.isLoadingMore = false
+                    }
+                    self.currentFetchOffset += newItems.count
+
+                    // Track access times for memory management
+                    for item in newItems {
+                        self.lastAccessTimes[item.persistentModelID] = Date()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    print("Failed to fetch items: \(error)")
+                    if reset {
+                        self.items = []
+                    } else {
+                        self.isLoadingMore = false
+                    }
+                }
             }
-            currentFetchOffset += newItems.count
-        } catch {
-            print("Failed to fetch items: \(error)")
-            if reset { items = [] }
         }
     }
 
@@ -121,6 +148,8 @@ class CBViewModel: ObservableObject {
 
     func selectItem(_ item: CBItem) {
         selectedItem = item
+        // Update access time for memory management
+        lastAccessTimes[item.persistentModelID] = Date()
     }
 
     private func handleClipboardChange(_ clipboardContent: ClipboardContent) {
@@ -220,6 +249,9 @@ class CBViewModel: ObservableObject {
         guard let modelContext = modelContext else { return }
         item.timestamp = Date()
 
+        // Mark as recently accessed
+        markItemAccessed(item)
+
         do {
             try modelContext.save()
             fetchItems(reset: true)
@@ -252,6 +284,9 @@ class CBViewModel: ObservableObject {
         item.content = newContent
         item.contentPreview = newContent.prefix(100).description
         item.timestamp = Date()
+
+        // Mark as recently accessed
+        markItemAccessed(item)
 
         do {
             try modelContext.save()
@@ -337,6 +372,71 @@ class CBViewModel: ObservableObject {
 
     func loadMoreItems() {
         fetchItems()
+    }
+
+    // MARK: - Memory Management
+
+    private func startMemoryCleanupTimer() {
+        guard let settingsManager = settingsManager,
+            settingsManager.enableMemoryCleanup
+        else { return }
+
+        let interval = TimeInterval(settingsManager.memoryCleanupInterval * 60)
+        memoryCleanupTimer?.invalidate()
+        memoryCleanupTimer = Timer.scheduledTimer(
+            withTimeInterval: interval, repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.performMemoryCleanup()
+            }
+        }
+    }
+
+    private func performMemoryCleanup() {
+        guard let settingsManager = settingsManager,
+            settingsManager.enableMemoryCleanup
+        else { return }
+
+        let now = Date()
+        let maxInactiveTime = TimeInterval(settingsManager.maxInactiveTime * 60)
+        var itemsToCleanup: [CBItem] = []
+
+        // Find items that haven't been accessed recently
+        for item in items {
+            if let lastAccess = lastAccessTimes[item.persistentModelID] {
+                if now.timeIntervalSince(lastAccess) > maxInactiveTime {
+                    itemsToCleanup.append(item)
+                }
+            }
+        }
+
+        // Clean up thumbnails and cached data for inactive items
+        for item in itemsToCleanup {
+            cleanupItemMemory(item)
+        }
+
+        // Clean up old access time records
+        let cutoffTime = now.addingTimeInterval(-maxInactiveTime)
+        lastAccessTimes = lastAccessTimes.filter { $1 > cutoffTime }
+
+        print("Memory cleanup: Released \(itemsToCleanup.count) inactive items")
+    }
+
+    private func cleanupItemMemory(_ item: CBItem) {
+        // Clear thumbnail data for items not recently accessed
+        // This forces regeneration on next access but saves memory
+        item.thumbnailData = nil
+
+        // Trigger garbage collection hint
+        lastAccessTimes.removeValue(forKey: item.persistentModelID)
+    }
+
+    func markItemAccessed(_ item: CBItem) {
+        lastAccessTimes[item.persistentModelID] = Date()
+    }
+
+    deinit {
+        memoryCleanupTimer?.invalidate()
     }
 
     private func performCleanupIfNeeded() {

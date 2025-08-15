@@ -33,19 +33,14 @@ struct BarNavigationCellView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if item.itemType == .image, let thumbnail = item.thumbnail {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: 40, maxHeight: 30)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-
-            } else if item.itemType == .file && item.isImageFile, let thumbnail = item.thumbnail {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: 40, maxHeight: 30)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            if item.itemType == .image || (item.itemType == .file && item.isImageFile) {
+                if let thumbnail = item.thumbnail {
+                    Image(nsImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: 40, maxHeight: 30)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
             }
         }
         .padding(.horizontal, 8)

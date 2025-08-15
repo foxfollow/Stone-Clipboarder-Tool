@@ -66,6 +66,43 @@ struct SettingsView: View {
                 }
             }
 
+
+            Section("Menu Bar Display") {
+                HStack {
+                    Text("Menu bar display items")
+                    Spacer()
+                    Stepper(value: $settingsManager.menuBarDisplayLimit, in: 5...50, step: 5) {
+                        Text("\(settingsManager.menuBarDisplayLimit)")
+                    }
+                }
+                .help("Number of items shown in menu bar dropdown")
+            }
+
+            Section("Memory Management") {
+                Toggle("Enable memory cleanup", isOn: $settingsManager.enableMemoryCleanup)
+                    .help("Automatically release memory from inactive clipboard items")
+
+                if settingsManager.enableMemoryCleanup {
+                    HStack {
+                        Text("Cleanup interval (minutes)")
+                        Spacer()
+                        Stepper(value: $settingsManager.memoryCleanupInterval, in: 1...60, step: 1)
+                        {
+                            Text("\(settingsManager.memoryCleanupInterval)")
+                        }
+                    }
+                    .help("How often to check for inactive items")
+
+                    HStack {
+                        Text("Max inactive time (minutes)")
+                        Spacer()
+                        Stepper(value: $settingsManager.maxInactiveTime, in: 5...120, step: 5) {
+                            Text("\(settingsManager.maxInactiveTime)")
+                        }
+                    }
+                    .help("How long items stay in memory without access")
+                }
+            }
         }
         .formStyle(.grouped)
     }
