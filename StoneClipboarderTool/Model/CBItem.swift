@@ -35,14 +35,22 @@ enum CBItemType: String, Codable, CaseIterable {
 @Model
 final class CBItem {
     var timestamp: Date
-    var content: String?
-    var imageData: Data?
-    var fileData: Data?
+    @Attribute(.externalStorage) var content: String?
+    @Attribute(.externalStorage) var imageData: Data?
+    @Attribute(.externalStorage) var fileData: Data?
     var fileName: String?
-    var fileUTI: String?  // Uniform Type Identifier
+    var fileUTI: String?
     var itemType: CBItemType
     var isFavorite: Bool = false
     var orderIndex: Int = 0
+
+    // Lightweight preview content for UI performance
+    var contentPreview: String?
+    var imageSize: String?
+    var fileSize: Int64 = 0
+
+    // Thumbnail for memory-efficient UI display
+    @Attribute(.externalStorage) var thumbnailData: Data?
 
     init(
         timestamp: Date,
@@ -64,14 +72,36 @@ final class CBItem {
         self.itemType = itemType
         self.isFavorite = isFavorite
         self.orderIndex = orderIndex
+
+        // Generate lightweight previews
+        self.contentPreview = content?.prefix(100).description
+
+        // Calculate image size and generate thumbnail
+        if let imageData = imageData, let image = NSImage(data: imageData) {
+            let size = image.size
+            self.imageSize = "\(Int(size.width))×\(Int(size.height))"
+            self.thumbnailData = generateThumbnail(from: image)
+        }
+
+        // Calculate file size
+        if let fileData = fileData {
+            self.fileSize = Int64(fileData.count)
+
+            // Generate thumbnail for image files
+            if let uti = fileUTI, UTType(uti)?.conforms(to: .image) == true,
+                let image = NSImage(data: fileData)
+            {
+                self.thumbnailData = generateThumbnail(from: image)
+            }
+        }
     }
 
     var displayContent: String {
         switch itemType {
         case .text:
-            return content ?? "Empty text"
+            return contentPreview ?? content ?? "Empty text"
         case .image:
-            return "[Image - \(imageSize)]"
+            return "[Image - \(imageSize ?? calculateImageSize())]"
         case .file:
             if isImageFile {
                 return "[FileImage - \(fileName ?? "Unknown") (\(fileSizeString))]"
@@ -85,13 +115,25 @@ final class CBItem {
         return NSImage(data: imageData)
     }
 
-    // Check if file is an image based on UTI
+    // Memory-efficient thumbnail for UI display
+    var thumbnail: NSImage? {
+        guard let thumbnailData = thumbnailData else {
+            // Fallback: generate thumbnail on-demand if not cached
+            if itemType == .image, let image = self.image {
+                return generateThumbnailImage(from: image)
+            } else if isImageFile, let fileData = fileData, let image = NSImage(data: fileData) {
+                return generateThumbnailImage(from: image)
+            }
+            return nil
+        }
+        return NSImage(data: thumbnailData)
+    }
+
     var isImageFile: Bool {
         guard itemType == .file, let uti = fileUTI else { return false }
         return UTType(uti)?.conforms(to: .image) ?? false
     }
 
-    // Get file image for display (either the file content if it's an image, or a file icon)
     var filePreviewImage: NSImage? {
         if isImageFile, let fileData = fileData {
             return NSImage(data: fileData)
@@ -99,7 +141,6 @@ final class CBItem {
         return fileIcon
     }
 
-    // Get appropriate file icon based on UTI
     var fileIcon: NSImage? {
         guard let fileName = fileName else {
             return NSWorkspace.shared.icon(for: UTType.data)
@@ -115,33 +156,58 @@ final class CBItem {
         }
     }
 
-    private var imageSize: String {
-        guard let image = image else { return "Unknown size" }
+    private var fileSizeString: String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(
+            fromByteCount: fileSize > 0 ? fileSize : Int64(fileData?.count ?? 0))
+    }
+
+    private func calculateImageSize() -> String {
+        if let cached = imageSize {
+            return cached
+        }
+
+        guard let image = self.image else { return "Unknown size" }
         let size = image.size
         return "\(Int(size.width))×\(Int(size.height))"
     }
 
-    private var fileSizeString: String {
-        guard let fileData = fileData else { return "Unknown size" }
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: Int64(fileData.count))
+    private func generateThumbnail(from image: NSImage) -> Data? {
+        return generateThumbnailImage(from: image)?.tiffRepresentation
     }
 
-    // MARK: - Duplicate Detection
+    private func generateThumbnailImage(from image: NSImage) -> NSImage? {
+        let maxSize: CGFloat = 100
+        let imageSize = image.size
+
+        // Calculate thumbnail size maintaining aspect ratio
+        let aspectRatio = imageSize.width / imageSize.height
+        var thumbnailSize: NSSize
+
+        if aspectRatio > 1 {
+            thumbnailSize = NSSize(width: maxSize, height: maxSize / aspectRatio)
+        } else {
+            thumbnailSize = NSSize(width: maxSize * aspectRatio, height: maxSize)
+        }
+
+        let thumbnail = NSImage(size: thumbnailSize)
+        thumbnail.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: thumbnailSize))
+        thumbnail.unlockFocus()
+
+        return thumbnail
+    }
 
     func isDuplicate(of other: CBItem) -> Bool {
-        // Different types are never duplicates
         guard itemType == other.itemType else { return false }
 
         switch itemType {
         case .text:
             return content == other.content
         case .image:
-            // Compare image data
             return imageData == other.imageData
         case .file:
-            // Compare file content and name
             return fileData == other.fileData && fileName == other.fileName
         }
     }

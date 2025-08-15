@@ -86,6 +86,7 @@ struct StoneClipboarderToolApp: App {
 
     private func setupApp() {
         cbViewModel.setModelContext(sharedModelContainer.mainContext)
+        cbViewModel.setSettingsManager(settingsManager)
         cbViewModel.startClipboardMonitoring()
 
         hotkeyManager.setModelContext(sharedModelContainer.mainContext)

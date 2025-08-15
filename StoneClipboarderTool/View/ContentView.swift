@@ -12,7 +12,7 @@ import Sparkle
 
 struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
-    
+
     @EnvironmentObject var cbViewModel: CBViewModel
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var hotkeyManager: HotkeyManager
@@ -21,7 +21,6 @@ struct ContentView: View {
     @State private var showingDeleteAllAlert = false
     @State private var selectedItem: CBItem? = nil
     @State private var selectedTab: ClipboardTab = .recent
-
 
     enum ClipboardTab: CaseIterable {
         case recent, favorites
@@ -118,9 +117,11 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .init("SelectClipboardItem"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .init("SelectClipboardItem"))) {
+            notification in
             if let itemUUID = notification.object as? String,
-               let item = cbViewModel.items.first(where: { "\($0.id)" == itemUUID }) {
+                let item = cbViewModel.items.first(where: { "\($0.id)" == itemUUID })
+            {
                 selectedItem = item
             }
         }
@@ -142,7 +143,13 @@ struct ContentView: View {
                 DetailedCardView(
                     editingMode: $editingMode,
                     selectedItem: $selectedItem,
-                    item: item)
+                    item: item
+                )
+                .onAppear {
+                    if item == cbViewModel.items.last {
+                        cbViewModel.loadMoreItems()
+                    }
+                }
             }
             .onDelete(perform: deleteItems)
         }
@@ -181,7 +188,7 @@ struct ContentView: View {
     private func deleteAllItems() {
         withAnimation {
             cbViewModel.deleteAllItems()
-            editingMode = false  // Exit edit mode after deleting all
+            editingMode = false
         }
     }
 
@@ -226,7 +233,7 @@ struct ContentView: View {
     let hotkeyManager = HotkeyManager()
 
     return ContentView()
-    //updater: nil)
+        //updater: nil)
         .environmentObject(viewModel)
         .environmentObject(settingsManager)
         .environmentObject(hotkeyManager)

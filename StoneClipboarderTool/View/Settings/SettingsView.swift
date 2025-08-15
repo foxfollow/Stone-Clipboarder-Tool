@@ -7,8 +7,9 @@
 
 import Sparkle
 import SwiftUI
+
 #if DEBUG
-import SwiftData
+    import SwiftData
 #endif
 
 struct SettingsView: View {
@@ -16,20 +17,20 @@ struct SettingsView: View {
     @EnvironmentObject var hotkeyManager: HotkeyManager
     @Environment(\.dismiss) private var dismiss
     let updater: SPUUpdater?
-    
+
     @State private var selectedTab = 0
-    
+
     var body: some View {
         VStack {
             TabView(selection: $selectedTab) {
                 Tab("General", systemImage: "gearshape", value: 0) {
                     generalSettings
                 }
-                
+
                 Tab("Hotkeys", systemImage: "keyboard", value: 1) {
                     HotkeySettingsView()
                 }
-                
+
                 Tab("About", systemImage: "info.circle", value: 2) {
                     AboutSettingsView(updater: updater)
                 }
@@ -49,16 +50,22 @@ struct SettingsView: View {
                     .help("Keep the main window visible in the dock")
             }
 
-//            Section("Clipboard Settings") {
-//                HStack {
-//                    Text("Maximum History Items")
-//                    Spacer()
-//                    Stepper(value: $settingsManager.maxLastItems, in: 10...1000, step: 10) {
-//                        Text("\(settingsManager.maxLastItems)")
-//                    }
-//                }
-//                .help("Maximum number of items to keep in clipboard history")
-//            }
+            Section("Memory Optimization") {
+                Toggle("Auto-cleanup old items", isOn: $settingsManager.enableAutoCleanup)
+                    .help("Automatically remove old clipboard items to maintain performance")
+
+                if settingsManager.enableAutoCleanup {
+                    HStack {
+                        Text("Keep maximum items")
+                        Spacer()
+                        Stepper(value: $settingsManager.maxItemsToKeep, in: 100...5000, step: 100) {
+                            Text("\(settingsManager.maxItemsToKeep)")
+                        }
+                    }
+                    .help("Maximum number of items to keep before auto-cleanup")
+                }
+            }
+
         }
         .formStyle(.grouped)
     }
@@ -72,7 +79,7 @@ struct SettingsView: View {
     let hotkeyManager = HotkeyManager()
     let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-    
+
     SettingsView(updater: updaterController.updater)
         .environmentObject(viewModel)
         .environmentObject(settingsManager)
@@ -81,6 +88,6 @@ struct SettingsView: View {
         .onAppear {
             viewModel.setModelContext(container.mainContext)
         }
-//        .environmentObject(SettingsManager())
-//        .environmentObject(HotkeyManager())
+    //        .environmentObject(SettingsManager())
+    //        .environmentObject(HotkeyManager())
 }

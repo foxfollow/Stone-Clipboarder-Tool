@@ -9,12 +9,12 @@ import SwiftUI
 
 struct MenuBarItemView: View {
     let item: CBItem
-    
+
     private var contentPreview: String {
         let display = item.displayContent
         return display.count > 50 ? String(display.prefix(50)) + "..." : display
     }
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -22,27 +22,30 @@ struct MenuBarItemView: View {
                     .font(.system(.body, design: .monospaced))
                     .lineLimit(2)
                     .foregroundStyle(.primary)
-                if let image = item.image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: 100)
-                        .cornerRadius(4)
-                } else if let fileImage = item.filePreviewImage, item.fileData != nil {
-                    Image(nsImage: fileImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: item.isImageFile ? 100 : 36)
-                        .cornerRadius(4)
+                if item.itemType != .text {
+                    if let thumbnail = item.thumbnail {
+                        Image(nsImage: thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: 100)
+                            .cornerRadius(4)
+                    } else if item.itemType == .file && !item.isImageFile, let fileIcon = item.fileIcon
+                    {
+                        Image(nsImage: fileIcon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: 36)
+                            .cornerRadius(4)
+                    }
                 }
-                
+
                 Text(item.timestamp, format: Date.FormatStyle(date: .omitted, time: .shortened))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            
+
             Spacer()
-            
+
             Image(systemName: item.itemType.sfSybmolName)
                 .foregroundStyle(item.itemType.sybmolColor)
                 .imageScale(.small)
@@ -69,4 +72,3 @@ struct MenuBarItemView: View {
         }
     }
 }
-

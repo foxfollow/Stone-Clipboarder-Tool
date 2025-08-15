@@ -34,23 +34,20 @@ struct QPItemRow: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            if item.itemType == .image, let image = item.image {
-                Image(nsImage: image)
+            if item.itemType == .image, let thumbnail = item.thumbnail {
+                Image(nsImage: thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxHeight: 100, alignment: .leading)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            } else if item.itemType == .file && item.isImageFile, let image = item.filePreviewImage
-            {
-                //                if  {
-                Image(nsImage: image)
+            } else if item.itemType == .file && item.isImageFile, let thumbnail = item.thumbnail {
+                Image(nsImage: thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxHeight: 100, alignment: .leading)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            //            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

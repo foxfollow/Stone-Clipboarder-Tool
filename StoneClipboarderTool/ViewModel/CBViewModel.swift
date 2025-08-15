@@ -16,6 +16,10 @@ class CBViewModel: ObservableObject {
     @Published var selectedItem: CBItem?
     private var modelContext: ModelContext?
     private let clipboardManager = ClipboardManager()
+    private var settingsManager: SettingsManager?
+
+    private let defaultFetchLimit = 100
+    private var currentFetchOffset = 0
 
     init() {
         setupClipboardMonitoring()
@@ -26,16 +30,36 @@ class CBViewModel: ObservableObject {
         fetchItems()
     }
 
-    func fetchItems() {
+    func setSettingsManager(_ manager: SettingsManager) {
+        self.settingsManager = manager
+    }
+
+    func fetchItems(limit: Int? = nil, reset: Bool = false) {
         guard let modelContext = modelContext else { return }
-        let descriptor = FetchDescriptor<CBItem>(sortBy: [
-            SortDescriptor(\.timestamp, order: .reverse)
-        ])
+
+        if reset {
+            currentFetchOffset = 0
+            items.removeAll()
+        }
+
+        let fetchLimit = limit ?? defaultFetchLimit
+        var descriptor = FetchDescriptor<CBItem>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        descriptor.fetchLimit = fetchLimit
+        descriptor.fetchOffset = currentFetchOffset
+
         do {
-            items = try modelContext.fetch(descriptor)
+            let newItems = try modelContext.fetch(descriptor)
+            if reset {
+                items = newItems
+            } else {
+                items.append(contentsOf: newItems)
+            }
+            currentFetchOffset += newItems.count
         } catch {
             print("Failed to fetch items: \(error)")
-            items = []
+            if reset { items = [] }
         }
     }
 
@@ -43,9 +67,11 @@ class CBViewModel: ObservableObject {
         guard let modelContext = modelContext else { return }
         let newItem = CBItem(timestamp: Date(), content: content)
         modelContext.insert(newItem)
+
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
+            performCleanupIfNeeded()
         } catch {
             print("Failed to save item: \(error)")
         }
@@ -54,9 +80,10 @@ class CBViewModel: ObservableObject {
     func deleteItem(_ item: CBItem) {
         guard let modelContext = modelContext else { return }
         modelContext.delete(item)
+
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to delete item: \(error)")
         }
@@ -67,9 +94,10 @@ class CBViewModel: ObservableObject {
         for index in offsets {
             modelContext.delete(items[index])
         }
+
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to delete items: \(error)")
         }
@@ -116,16 +144,15 @@ class CBViewModel: ObservableObject {
         let tempItem = CBItem(timestamp: Date(), content: content, itemType: .text)
 
         if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            // Update existing item's timestamp
             existingItem.timestamp = Date()
         } else {
-            // Add new item
             modelContext.insert(tempItem)
         }
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
+            performCleanupIfNeeded()
         } catch {
             print("Failed to save text item: \(error)")
         }
@@ -142,16 +169,15 @@ class CBViewModel: ObservableObject {
         let tempItem = CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
 
         if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            // Update existing item's timestamp
             existingItem.timestamp = Date()
         } else {
-            // Add new item
             modelContext.insert(tempItem)
         }
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
+            performCleanupIfNeeded()
         } catch {
             print("Failed to save image item: \(error)")
         }
@@ -174,16 +200,15 @@ class CBViewModel: ObservableObject {
         )
 
         if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            // Update existing item's timestamp
             existingItem.timestamp = Date()
         } else {
-            // Add new item
             modelContext.insert(tempItem)
         }
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
+            performCleanupIfNeeded()
         } catch {
             print("Failed to save file item: \(error)")
         }
@@ -192,18 +217,15 @@ class CBViewModel: ObservableObject {
     func copyItem(_ item: CBItem) {
         clipboardManager.copyItemToClipboard(item)
 
-        // Update timestamp to move it to top
         guard let modelContext = modelContext else { return }
-
         item.timestamp = Date()
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to update item timestamp: \(error)")
         }
-
     }
 
     func saveItemToFile(_ item: CBItem) {
@@ -211,17 +233,14 @@ class CBViewModel: ObservableObject {
     }
 
     func copyAndUpdateItem(_ item: CBItem) {
-
-        // Copy to clipboard based on item type
         clipboardManager.copyItemToClipboard(item)
 
         guard let modelContext = modelContext else { return }
-        // Update timestamp to move it to top
         item.timestamp = Date()
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to update item timestamp: \(error)")
         }
@@ -230,13 +249,13 @@ class CBViewModel: ObservableObject {
     func updateItemContent(_ item: CBItem, newContent: String) {
         guard let modelContext = modelContext else { return }
 
-        // Update the item's content
         item.content = newContent
-        item.timestamp = Date()  // Update timestamp to move it to top
+        item.contentPreview = newContent.prefix(100).description
+        item.timestamp = Date()
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to update item content: \(error)")
         }
@@ -248,17 +267,15 @@ class CBViewModel: ObservableObject {
         item.isFavorite.toggle()
 
         if item.isFavorite {
-            // Set order index for new favorite
             let maxOrderIndex = items.filter { $0.isFavorite }.map { $0.orderIndex }.max() ?? -1
             item.orderIndex = maxOrderIndex + 1
         } else {
-            // Reset order index when removing from favorites
             item.orderIndex = 0
         }
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to toggle favorite: \(error)")
         }
@@ -273,7 +290,7 @@ class CBViewModel: ObservableObject {
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to update favorite order: \(error)")
         }
@@ -290,14 +307,13 @@ class CBViewModel: ObservableObject {
     func deleteAllItems() {
         guard let modelContext = modelContext else { return }
 
-        // Delete all items
         for item in items {
             modelContext.delete(item)
         }
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to delete all items: \(error)")
         }
@@ -306,7 +322,6 @@ class CBViewModel: ObservableObject {
     func deleteAllFavorites() {
         guard let modelContext = modelContext else { return }
 
-        // Remove favorite status from all items
         for item in items where item.isFavorite {
             item.isFavorite = false
             item.orderIndex = 0
@@ -314,9 +329,44 @@ class CBViewModel: ObservableObject {
 
         do {
             try modelContext.save()
-            fetchItems()
+            fetchItems(reset: true)
         } catch {
             print("Failed to clear all favorites: \(error)")
+        }
+    }
+
+    func loadMoreItems() {
+        fetchItems()
+    }
+
+    private func performCleanupIfNeeded() {
+        guard let modelContext = modelContext,
+            let settingsManager = settingsManager,
+            settingsManager.enableAutoCleanup
+        else { return }
+
+        let countDescriptor = FetchDescriptor<CBItem>()
+        do {
+            let totalCount = try modelContext.fetchCount(countDescriptor)
+
+            if totalCount > settingsManager.maxItemsToKeep {
+                let itemsToDelete = totalCount - settingsManager.maxItemsToKeep
+                var oldItemsDescriptor = FetchDescriptor<CBItem>(
+                    sortBy: [SortDescriptor(\.timestamp, order: .forward)]
+                )
+                oldItemsDescriptor.fetchLimit = itemsToDelete
+
+                let oldItems = try modelContext.fetch(oldItemsDescriptor)
+                let nonFavoriteOldItems = oldItems.filter { !$0.isFavorite }
+
+                for item in nonFavoriteOldItems {
+                    modelContext.delete(item)
+                }
+
+                try modelContext.save()
+            }
+        } catch {
+            print("Failed to perform cleanup: \(error)")
         }
     }
 
@@ -348,12 +398,10 @@ class CBViewModel: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: "No image data available"])
         }
 
-        // Create temporary file for the image
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "clipboard_image_\(UUID().uuidString).png"
         let tempFile = tempDir.appendingPathComponent(fileName)
 
-        // Convert image to PNG data
         guard let tiffData = image.tiffRepresentation,
             let bitmapRep = NSBitmapImageRep(data: tiffData),
             let pngData = bitmapRep.representation(using: .png, properties: [:])
@@ -363,16 +411,34 @@ class CBViewModel: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to PNG"])
         }
 
-        // Write to temporary file
         try pngData.write(to: tempFile)
-
-        // Open in Preview.app
         NSWorkspace.shared.open(tempFile)
 
-        // Clean up temp file after a delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
             try? FileManager.default.removeItem(at: tempFile)
         }
+    }
+
+    private func generateThumbnailData(from image: NSImage) -> Data? {
+        let maxSize: CGFloat = 100
+        let imageSize = image.size
+
+        // Calculate thumbnail size maintaining aspect ratio
+        let aspectRatio = imageSize.width / imageSize.height
+        var thumbnailSize: NSSize
+
+        if aspectRatio > 1 {
+            thumbnailSize = NSSize(width: maxSize, height: maxSize / aspectRatio)
+        } else {
+            thumbnailSize = NSSize(width: maxSize * aspectRatio, height: maxSize)
+        }
+
+        let thumbnail = NSImage(size: thumbnailSize)
+        thumbnail.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: thumbnailSize))
+        thumbnail.unlockFocus()
+
+        return thumbnail.tiffRepresentation
     }
 
     private func openImageFileInPreview(_ item: CBItem) async throws {
@@ -384,18 +450,13 @@ class CBViewModel: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: "No file data available"])
         }
 
-        // Create temporary file with original extension
         let tempDir = FileManager.default.temporaryDirectory
         let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
         let tempFile = tempDir.appendingPathComponent(tempFileName)
 
-        // Write file data to temporary file
         try fileData.write(to: tempFile)
-
-        // Open in Preview.app
         NSWorkspace.shared.open(tempFile)
 
-        // Clean up temp file after a delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
             try? FileManager.default.removeItem(at: tempFile)
         }

@@ -38,19 +38,35 @@ class SettingsManager: ObservableObject {
         }
     }
 
-//    @Published var autoSelectOnPaste: Bool {
-//        didSet {
-//            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
-//        }
-//    }
+    @Published var enableAutoCleanup: Bool {
+        didSet {
+            UserDefaults.standard.set(enableAutoCleanup, forKey: "enableAutoCleanup")
+        }
+    }
+
+    @Published var maxItemsToKeep: Int {
+        didSet {
+            UserDefaults.standard.set(maxItemsToKeep, forKey: "maxItemsToKeep")
+        }
+    }
+
+    //    @Published var autoSelectOnPaste: Bool {
+    //        didSet {
+    //            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
+    //        }
+    //    }
 
     init() {
         self.showInMenubar = UserDefaults.standard.bool(forKey: "showInMenubar")
         self.showMainWindow = UserDefaults.standard.bool(forKey: "showMainWindow")
         self.maxLastItems = UserDefaults.standard.object(forKey: "maxLastItems") as? Int ?? 10
-        self.maxFavoriteItems = UserDefaults.standard.object(forKey: "maxFavoriteItems") as? Int ?? 10
+        self.maxFavoriteItems =
+            UserDefaults.standard.object(forKey: "maxFavoriteItems") as? Int ?? 10
         self.enableHotkeys = UserDefaults.standard.object(forKey: "enableHotkeys") as? Bool ?? true
-//        self.autoSelectOnPaste = UserDefaults.standard.object(forKey: "autoSelectOnPaste") as? Bool ?? true
+        self.enableAutoCleanup =
+            UserDefaults.standard.object(forKey: "enableAutoCleanup") as? Bool ?? true
+        self.maxItemsToKeep = UserDefaults.standard.object(forKey: "maxItemsToKeep") as? Int ?? 1000
+        //        self.autoSelectOnPaste = UserDefaults.standard.object(forKey: "autoSelectOnPaste") as? Bool ?? true
 
         // Default to showing menubar if first launch
         if UserDefaults.standard.object(forKey: "showInMenubar") == nil {
