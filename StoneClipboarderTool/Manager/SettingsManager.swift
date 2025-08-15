@@ -38,11 +38,11 @@ class SettingsManager: ObservableObject {
         }
     }
 
-    @Published var autoSelectOnPaste: Bool {
-        didSet {
-            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
-        }
-    }
+//    @Published var autoSelectOnPaste: Bool {
+//        didSet {
+//            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
+//        }
+//    }
 
     init() {
         self.showInMenubar = UserDefaults.standard.bool(forKey: "showInMenubar")
@@ -50,7 +50,7 @@ class SettingsManager: ObservableObject {
         self.maxLastItems = UserDefaults.standard.object(forKey: "maxLastItems") as? Int ?? 10
         self.maxFavoriteItems = UserDefaults.standard.object(forKey: "maxFavoriteItems") as? Int ?? 10
         self.enableHotkeys = UserDefaults.standard.object(forKey: "enableHotkeys") as? Bool ?? true
-        self.autoSelectOnPaste = UserDefaults.standard.object(forKey: "autoSelectOnPaste") as? Bool ?? true
+//        self.autoSelectOnPaste = UserDefaults.standard.object(forKey: "autoSelectOnPaste") as? Bool ?? true
 
         // Default to showing menubar if first launch
         if UserDefaults.standard.object(forKey: "showInMenubar") == nil {

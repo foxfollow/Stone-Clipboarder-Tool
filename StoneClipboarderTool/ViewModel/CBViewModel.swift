@@ -13,6 +13,7 @@ import AppKit
 @MainActor
 class CBViewModel: ObservableObject {
     @Published var items: [CBItem] = []
+    @Published var selectedItem: CBItem?
     private var modelContext: ModelContext?
     private let clipboardManager = ClipboardManager()
 
@@ -88,6 +89,10 @@ class CBViewModel: ObservableObject {
 
     func stopClipboardMonitoring() {
         clipboardManager.stopMonitoring()
+    }
+
+    func selectItem(_ item: CBItem) {
+        selectedItem = item
     }
 
     private func handleClipboardChange(_ clipboardContent: ClipboardContent) {

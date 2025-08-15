@@ -16,7 +16,7 @@ struct StoneClipboarderToolApp: App {
     @StateObject private var menuBarManager = MenuBarManager()
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var quickPickerManager = QuickPickerWindowManager()
-    
+
     private let updaterController: SPUStandardUpdaterController
 
     var sharedModelContainer: ModelContainer = {
@@ -53,6 +53,9 @@ struct StoneClipboarderToolApp: App {
                 .onChange(of: settingsManager.showMainWindow) { _, newValue in
                     updateWindowVisibility()
                 }
+                .onChange(of: settingsManager.enableHotkeys) { _, newValue in
+                    hotkeyManager.refreshHotkeyRegistrations()
+                }
         }
         .modelContainer(sharedModelContainer)
         .windowResizability(.contentSize)
@@ -62,23 +65,23 @@ struct StoneClipboarderToolApp: App {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
         }
-        
+
         // Custom Settings window with ID
-         WindowGroup("Settings", id: "settings") {
-             SettingsView(updater: updaterController.updater)
-                 .environmentObject(settingsManager)
-                 .environmentObject(hotkeyManager)
-                 .frame(width: 500, height: 500)
-         }
-         .windowResizability(.contentSize)
-         .windowStyle(.automatic)
+        WindowGroup("Settings", id: "settings") {
+            SettingsView(updater: updaterController.updater)
+                .environmentObject(settingsManager)
+                .environmentObject(hotkeyManager)
+                .frame(width: 500, height: 500)
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.automatic)
 
         Settings {
             SettingsView(updater: updaterController.updater)
                 .environmentObject(settingsManager)
                 .environmentObject(hotkeyManager)
         }
-        
+
     }
 
     private func setupApp() {
@@ -87,6 +90,7 @@ struct StoneClipboarderToolApp: App {
 
         hotkeyManager.setModelContext(sharedModelContainer.mainContext)
         hotkeyManager.setCBViewModel(cbViewModel)
+        hotkeyManager.setSettingsManager(settingsManager)
         quickPickerManager.setCBViewModel(cbViewModel)
         hotkeyManager.quickPickerDelegate = quickPickerManager
 

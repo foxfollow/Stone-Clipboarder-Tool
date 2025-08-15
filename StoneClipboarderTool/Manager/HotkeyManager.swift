@@ -5,19 +5,21 @@
 //  Created by Heorhii Savoiskyi on 13.08.2025.
 //
 
-import Foundation
-import Carbon
 import AppKit
+import Carbon
+import Foundation
 import SwiftData
 
 @MainActor
 class HotkeyManager: ObservableObject {
     @Published var hotkeyConfigs: [HotkeyConfig] = []
 
-    private var registeredHotkeys: [UInt32: () -> Void] = [:]
+    private var registeredHotkeys: [UInt32: EventHotKeyRef] = [:]
+    private var hotkeyActions: [UInt32: () -> Void] = [:]
     private var eventHandler: EventHandlerRef?
     private var cbViewModel: CBViewModel?
     private var modelContext: ModelContext?
+    private var settingsManager: SettingsManager?
 
     weak var quickPickerDelegate: QuickPickerDelegate?
 
@@ -26,61 +28,66 @@ class HotkeyManager: ObservableObject {
     }
 
     deinit {
+        // Unregister hotkeys synchronously in deinit
+        for (_, hotKeyRef) in registeredHotkeys {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        registeredHotkeys.removeAll()
+        hotkeyActions.removeAll()
+
         if let eventHandler = eventHandler {
             RemoveEventHandler(eventHandler)
         }
-        registeredHotkeys.removeAll()
     }
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
-        loadHotkeyConfigs()
     }
 
     func setCBViewModel(_ viewModel: CBViewModel) {
         self.cbViewModel = viewModel
     }
 
+    func setSettingsManager(_ manager: SettingsManager) {
+        self.settingsManager = manager
+    }
+
     private func setupEventHandler() {
-        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
 
         let callback: EventHandlerProcPtr = { (nextHandler, theEvent, userData) -> OSStatus in
             guard let userData = userData,
-                  let theEvent = theEvent else {
-                print("Invalid event handler parameters")
+                let theEvent = theEvent
+            else {
                 return noErr
             }
 
-            do {
-                let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
+            let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
 
-                var hotkeyID = EventHotKeyID()
-                let status = GetEventParameter(
-                    theEvent,
-                    OSType(kEventParamDirectObject),
-                    OSType(typeEventHotKeyID),
-                    nil,
-                    MemoryLayout<EventHotKeyID>.size,
-                    nil,
-                    &hotkeyID
-                )
+            var hotkeyID = EventHotKeyID()
+            let status = GetEventParameter(
+                theEvent,
+                OSType(kEventParamDirectObject),
+                OSType(typeEventHotKeyID),
+                nil,
+                MemoryLayout<EventHotKeyID>.size,
+                nil,
+                &hotkeyID
+            )
 
-                if status == noErr {
-                    Task { @MainActor in
-                        manager.handleHotkeyPressed(hotkeyID.id)
-                    }
-                } else {
-                    print("Failed to get hotkey ID from event: \(status)")
+            if status == noErr {
+                Task { @MainActor in
+                    manager.handleHotkeyPressed(hotkeyID.id)
                 }
-            } catch {
-                print("Error in hotkey callback: \(error)")
             }
 
             return noErr
         }
 
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-        let status = InstallEventHandler(GetApplicationEventTarget(), callback, 1, &eventType, selfPtr, &eventHandler)
+        let status = InstallEventHandler(
+            GetApplicationEventTarget(), callback, 1, &eventType, selfPtr, &eventHandler)
 
         if status != noErr {
             print("Failed to install event handler: \(status)")
@@ -88,54 +95,142 @@ class HotkeyManager: ObservableObject {
     }
 
     private func handleHotkeyPressed(_ hotkeyID: UInt32) {
-        guard let action = registeredHotkeys[hotkeyID] else {
-            print("No action found for hotkey ID: \(hotkeyID)")
+        guard let settingsManager = settingsManager,
+            settingsManager.enableHotkeys
+        else {
             return
         }
 
+        guard let action = hotkeyActions[hotkeyID] else {
+            return
+        }
+
+        action()
+    }
+
+    // MARK: - Configuration Management
+
+    func loadHotkeyConfigs() {
+        guard let modelContext = modelContext else { return }
+
+        let descriptor = FetchDescriptor<HotkeyConfig>(sortBy: [
+            SortDescriptor(\.timestamp, order: .forward)
+        ])
+
         do {
-            action()
+            hotkeyConfigs = try modelContext.fetch(descriptor)
+
+            if hotkeyConfigs.isEmpty {
+                createDefaultHotkeyConfigs()
+            }
+
+            refreshHotkeyRegistrations()
+
         } catch {
-            print("Error executing hotkey action: \(error)")
+            print("Failed to load hotkey configs: \(error)")
+            createDefaultHotkeyConfigs()
         }
     }
 
-    // MARK: - Public Methods
+    private func createDefaultHotkeyConfigs() {
+        guard let modelContext = modelContext else { return }
 
-    func registerDefaultHotkeys() {
-        // Quick picker
-        registerHotkey(keyCode: 49, modifiers: [.control, .option]) { [weak self] in
-            self?.showQuickPicker()
+        for action in HotkeyAction.allCases {
+            let config = HotkeyConfig(action: action)
+            modelContext.insert(config)
+            hotkeyConfigs.append(config)
         }
 
-        // Last items (Ctrl+Option+1-0)
-        registerLastItemHotkeys()
-
-        // Favorites (Ctrl+Shift+1-0)
-        registerFavoriteHotkeys()
+        do {
+            try modelContext.save()
+            refreshHotkeyRegistrations()
+        } catch {
+            print("Failed to create default hotkey configs: \(error)")
+        }
     }
 
-    private func registerLastItemHotkeys() {
-        let keyCodes: [UInt32] = [18, 19, 20, 21, 23, 22, 26, 28, 25, 29] // 1-9,0
+    func updateHotkeyConfig(_ config: HotkeyConfig, shortcutKeys: String?, isEnabled: Bool) {
+        guard let modelContext = modelContext else { return }
 
-        for (index, keyCode) in keyCodes.enumerated() {
-            registerHotkey(keyCode: keyCode, modifiers: [.control, .option]) { [weak self] in
+        config.shortcutKeys = shortcutKeys
+        config.isEnabled = isEnabled
+        config.timestamp = Date()
+
+        do {
+            try modelContext.save()
+            let descriptor = FetchDescriptor<HotkeyConfig>(sortBy: [
+                SortDescriptor(\.timestamp, order: .forward)
+            ])
+            hotkeyConfigs = try modelContext.fetch(descriptor)
+            refreshHotkeyRegistrations()
+        } catch {
+            print("Failed to update hotkey config: \(error)")
+        }
+    }
+
+    // MARK: - Hotkey Registration
+
+    @MainActor
+    func refreshHotkeyRegistrations() {
+        unregisterAllHotkeys()
+
+        guard let settingsManager = settingsManager,
+            settingsManager.enableHotkeys
+        else {
+            return
+        }
+
+        for config in hotkeyConfigs {
+            guard config.isEnabled,
+                let action = config.hotkeyAction,
+                let shortcut = config.shortcutKeys,
+                !shortcut.isEmpty,
+                shortcut != "None"
+            else {
+                continue
+            }
+
+            registerHotkeyFromConfig(config: config, action: action, shortcut: shortcut)
+        }
+    }
+
+    @MainActor
+    private func registerHotkeyFromConfig(
+        config: HotkeyConfig, action: HotkeyAction, shortcut: String
+    ) {
+        guard let (keyCode, modifiers) = parseShortcut(shortcut) else {
+            print("Failed to parse shortcut: \(shortcut), setting to None")
+            // Set invalid shortcuts to None
+            config.shortcutKeys = "None"
+            return
+        }
+
+        let actionClosure: () -> Void
+
+        switch action {
+        case .mainPanel:
+            actionClosure = { [weak self] in
+                self?.showQuickPicker()
+            }
+        case .last1, .last2, .last3, .last4, .last5, .last6, .last7, .last8, .last9, .last0:
+            let index = action.index
+            actionClosure = { [weak self] in
                 self?.executeLastItemAction(index: index)
             }
-        }
-    }
-
-    private func registerFavoriteHotkeys() {
-        let keyCodes: [UInt32] = [18, 19, 20, 21, 23, 22, 26, 28, 25, 29] // 1-9,0
-
-        for (index, keyCode) in keyCodes.enumerated() {
-            registerHotkey(keyCode: keyCode, modifiers: [.control, .shift]) { [weak self] in
+        case .fav1, .fav2, .fav3, .fav4, .fav5, .fav6, .fav7, .fav8, .fav9, .fav0:
+            let index = action.index
+            actionClosure = { [weak self] in
                 self?.executeFavoriteAction(index: index)
             }
         }
+
+        registerHotkey(keyCode: keyCode, modifiers: modifiers, action: actionClosure)
     }
 
-    private func registerHotkey(keyCode: UInt32, modifiers: [KeyModifier], action: @escaping () -> Void) {
+    @MainActor
+    private func registerHotkey(
+        keyCode: UInt32, modifiers: [KeyModifier], action: @escaping () -> Void
+    ) {
         let modifierFlags = modifiers.reduce(0) { result, modifier in
             result | modifier.carbonFlag
         }
@@ -154,71 +249,148 @@ class HotkeyManager: ObservableObject {
             &eventHotKeyRef
         )
 
-        if status == noErr {
-            registeredHotkeys[hotkeyID] = action
-            print("Registered hotkey: keyCode=\(keyCode), modifiers=\(modifierFlags), id=\(hotkeyID)")
+        if status == noErr, let hotKeyRef = eventHotKeyRef {
+            registeredHotkeys[hotkeyID] = hotKeyRef
+            hotkeyActions[hotkeyID] = action
         } else {
             print("Failed to register hotkey: keyCode=\(keyCode), status=\(status)")
         }
     }
 
+    @MainActor
+    private func unregisterAllHotkeys() {
+        for (_, hotKeyRef) in registeredHotkeys {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        registeredHotkeys.removeAll()
+        hotkeyActions.removeAll()
+    }
+
     private func generateHotkeyID(keyCode: UInt32, modifiers: UInt32) -> UInt32 {
-        // Simple ID generation: combine keyCode and modifiers
         return (modifiers << 16) | keyCode
+    }
+
+    // MARK: - Shortcut Parsing
+
+    private func parseShortcut(_ shortcut: String) -> (keyCode: UInt32, modifiers: [KeyModifier])? {
+        let components = shortcut.components(separatedBy: CharacterSet.whitespacesAndNewlines)
+            .joined()
+
+        var modifiers: [KeyModifier] = []
+        var keyChar = ""
+
+        for char in components {
+            switch char {
+            case "⌃":
+                modifiers.append(.control)
+            case "⌥":
+                modifiers.append(.option)
+            case "⇧":
+                modifiers.append(.shift)
+            case "⌘":
+                modifiers.append(.command)
+            default:
+                keyChar.append(char)
+            }
+        }
+
+        // Must have both modifiers and a key character
+        guard !modifiers.isEmpty, !keyChar.isEmpty, let keyCode = keyCodeForCharacter(keyChar)
+        else {
+            return nil
+        }
+
+        return (keyCode, modifiers)
+    }
+
+    private func keyCodeForCharacter(_ character: String) -> UInt32? {
+        switch character.lowercased() {
+        case "1": return 18
+        case "2": return 19
+        case "3": return 20
+        case "4": return 21
+        case "5": return 23
+        case "6": return 22
+        case "7": return 26
+        case "8": return 28
+        case "9": return 25
+        case "0": return 29
+        case "space": return 49
+        case "a": return 0
+        case "b": return 11
+        case "c": return 8
+        case "d": return 2
+        case "e": return 14
+        case "f": return 3
+        case "g": return 5
+        case "h": return 4
+        case "i": return 34
+        case "j": return 38
+        case "k": return 40
+        case "l": return 37
+        case "m": return 46
+        case "n": return 45
+        case "o": return 31
+        case "p": return 35
+        case "q": return 12
+        case "r": return 15
+        case "s": return 1
+        case "t": return 17
+        case "u": return 32
+        case "v": return 9
+        case "w": return 13
+        case "x": return 7
+        case "y": return 16
+        case "z": return 6
+        default: return nil
+        }
     }
 
     // MARK: - Actions
 
     private func showQuickPicker() {
-        print("Showing quick picker...")
         quickPickerDelegate?.showQuickPicker()
     }
 
     private func executeLastItemAction(index: Int) {
-        guard let cbViewModel = cbViewModel else {
-            print("CBViewModel not available")
+        guard let cbViewModel = cbViewModel,
+            let settingsManager = settingsManager
+        else {
             return
         }
 
-        guard index >= 0 && index < 10 else {
-            print("Invalid index \(index) for last item action")
+        guard index >= 0 && index < settingsManager.maxLastItems else {
             return
         }
 
         let items = cbViewModel.recentItems
         guard index < items.count else {
-            print("Index \(index) out of bounds for \(items.count) items")
             return
         }
 
         let item = items[index]
-        print("Executing last item action for index \(index): \(item.displayContent)")
-
         Task { @MainActor in
             pasteItemToActiveApplication(item)
         }
     }
 
     private func executeFavoriteAction(index: Int) {
-        guard let cbViewModel = cbViewModel else {
-            print("CBViewModel not available")
+        guard let cbViewModel = cbViewModel,
+            let settingsManager = settingsManager
+        else {
             return
         }
 
-        guard index >= 0 && index < 10 else {
-            print("Invalid index \(index) for favorite action")
+        guard index >= 0 && index < settingsManager.maxFavoriteItems else {
             return
         }
 
         let favoriteItems = cbViewModel.favoriteItems
         guard index < favoriteItems.count else {
-            print("Index \(index) out of bounds for \(favoriteItems.count) favorite items")
             return
         }
 
         let item = favoriteItems[index]
-        print("Executing favorite action for index \(index): \(item.displayContent)")
-
         Task { @MainActor in
             pasteItemToActiveApplication(item)
         }
@@ -227,169 +399,85 @@ class HotkeyManager: ObservableObject {
     @MainActor
     private func pasteItemToActiveApplication(_ item: CBItem) {
         guard let cbViewModel = cbViewModel else {
-            print("CBViewModel not available for pasting")
             return
         }
 
-        // Validate item
         guard !item.displayContent.isEmpty else {
-            print("Item has no valid content to paste")
             return
         }
 
-        do {
-            // Copy to clipboard
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
 
-            var copySuccessful = false
+        var copySuccessful = false
 
-            switch item.itemType {
-            case .text:
-                if let content = item.content, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    pasteboard.setString(content, forType: .string)
+        switch item.itemType {
+        case .text:
+            if let content = item.content,
+                !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            {
+                pasteboard.setString(content, forType: .string)
+                copySuccessful = true
+            }
+        case .image:
+            if let imageData = item.imageData,
+                !imageData.isEmpty,
+                let image = NSImage(data: imageData)
+            {
+                pasteboard.writeObjects([image])
+                copySuccessful = true
+            }
+        case .file:
+            if let fileData = item.fileData,
+                !fileData.isEmpty,
+                let fileName = item.fileName,
+                !fileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            {
+                let tempDir = FileManager.default.temporaryDirectory
+                let tempFile = tempDir.appendingPathComponent(fileName)
+                do {
+                    try fileData.write(to: tempFile)
+                    pasteboard.writeObjects([tempFile as NSURL])
                     copySuccessful = true
-                    print("Copied text to clipboard: \(content.prefix(50))...")
-                } else {
-                    print("No valid text content to paste")
-                    return
-                }
-            case .image:
-                if let imageData = item.imageData,
-                   !imageData.isEmpty,
-                   let image = NSImage(data: imageData) {
-                    pasteboard.writeObjects([image])
-                    copySuccessful = true
-                    print("Copied image to clipboard")
-                } else {
-                    print("No valid image data to paste")
-                    return
-                }
-            case .file:
-                if let fileData = item.fileData,
-                   !fileData.isEmpty,
-                   let fileName = item.fileName,
-                   !fileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    // Create temporary file and add to pasteboard
-                    let tempDir = FileManager.default.temporaryDirectory
-                    let tempFile = tempDir.appendingPathComponent(fileName)
-                    do {
-                        try fileData.write(to: tempFile)
-                        pasteboard.writeObjects([tempFile as NSURL])
-                        copySuccessful = true
-                        print("Copied file to clipboard: \(fileName)")
-                    } catch {
-                        print("Failed to write temp file: \(error)")
-                        return
-                    }
-                } else {
-                    print("No valid file data to paste")
-                    return
+                } catch {
+                    print("Failed to write temp file: \(error)")
                 }
             }
+        }
 
-            // Only simulate paste if copy was successful
-            if copySuccessful {
-                // Simulate Cmd+V to paste
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                    self?.simulatePasteKeyPress()
-                }
-
-                // Update item timestamp safely
-                Task { @MainActor in
-                    guard let viewModel = self.cbViewModel else { return }
-                    viewModel.copyAndUpdateItem(item)
-                }
+        if copySuccessful {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.simulatePasteKeyPress()
             }
-        } catch {
-            print("Error pasting item: \(error)")
+
+            Task { @MainActor in
+                guard let viewModel = self.cbViewModel else { return }
+                viewModel.copyAndUpdateItem(item)
+
+            }
         }
     }
 
     private func simulatePasteKeyPress() {
         guard let source = CGEventSource(stateID: .hidSystemState) else {
-            print("Failed to create CGEventSource for paste simulation")
             return
         }
 
-        // Create Cmd+V key events
-        guard let keyDownEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
-              let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else {
-            print("Failed to create key events for paste simulation")
+        guard
+            let keyDownEvent = CGEvent(
+                keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
+            let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
+        else {
             return
         }
 
         keyDownEvent.flags = .maskCommand
         keyUpEvent.flags = .maskCommand
 
-        // Post key down
         keyDownEvent.post(tap: .cghidEventTap)
 
-        // Small delay before key up
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             keyUpEvent.post(tap: .cghidEventTap)
-        }
-
-        print("Simulated Cmd+V paste sequence")
-    }
-
-    // MARK: - Configuration Loading
-
-    func loadHotkeyConfigs() {
-        guard let modelContext = modelContext else { return }
-
-        let descriptor = FetchDescriptor<HotkeyConfig>(sortBy: [
-            SortDescriptor(\.timestamp, order: .forward)
-        ])
-
-        do {
-            hotkeyConfigs = try modelContext.fetch(descriptor)
-
-            if hotkeyConfigs.isEmpty {
-                createDefaultHotkeyConfigs()
-            }
-
-            // Register all hotkeys
-            registerDefaultHotkeys()
-
-        } catch {
-            print("Failed to load hotkey configs: \(error)")
-            createDefaultHotkeyConfigs()
-            registerDefaultHotkeys()
-        }
-    }
-
-    private func createDefaultHotkeyConfigs() {
-        guard let modelContext = modelContext else { return }
-
-        for action in HotkeyAction.allCases {
-            let config = HotkeyConfig(action: action)
-            modelContext.insert(config)
-            hotkeyConfigs.append(config)
-        }
-
-        do {
-            try modelContext.save()
-        } catch {
-            print("Failed to create default hotkey configs: \(error)")
-        }
-    }
-
-    func updateHotkeyConfig(_ config: HotkeyConfig, shortcutKeys: String?, isEnabled: Bool) {
-        guard let modelContext = modelContext else { return }
-
-        config.shortcutKeys = shortcutKeys
-        config.isEnabled = isEnabled
-        config.timestamp = Date()
-
-        do {
-            try modelContext.save()
-
-            if let index = hotkeyConfigs.firstIndex(where: { $0.id == config.id }) {
-                hotkeyConfigs[index] = config
-            }
-        } catch {
-            print("Failed to update hotkey config: \(error)")
         }
     }
 
@@ -397,8 +485,7 @@ class HotkeyManager: ObservableObject {
 
     private func fourCharCodeFrom(_ string: String) -> FourCharCode {
         guard !string.isEmpty else {
-            print("Warning: Empty string for fourCharCode, using default")
-            return OSType(0x53434254) // "SCBT"
+            return OSType(0x5343_4254)
         }
 
         let utf8 = string.utf8
