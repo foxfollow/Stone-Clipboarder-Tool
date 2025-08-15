@@ -89,7 +89,7 @@ class SettingsManager: ObservableObject {
         self.enableHotkeys = UserDefaults.standard.object(forKey: "enableHotkeys") as? Bool ?? true
         self.enableAutoCleanup =
             UserDefaults.standard.object(forKey: "enableAutoCleanup") as? Bool ?? true
-        self.maxItemsToKeep = UserDefaults.standard.object(forKey: "maxItemsToKeep") as? Int ?? 1000
+        self.maxItemsToKeep = UserDefaults.standard.object(forKey: "maxItemsToKeep") as? Int ?? 300
         self.menuBarDisplayLimit =
             UserDefaults.standard.object(forKey: "menuBarDisplayLimit") as? Int ?? 10
         self.enableMemoryCleanup =

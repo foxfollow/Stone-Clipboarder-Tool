@@ -5,9 +5,9 @@
 //  Created by Heorhii Savoiskyi on 08.08.2025.
 //
 
-import SwiftUI
-import SwiftData
 import AppKit
+import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 enum CBItemType: String, Codable, CaseIterable {
@@ -118,37 +118,44 @@ final class CBItem {
     // Memory-efficient thumbnail for UI display
     var thumbnail: NSImage? {
         // First check if we have cached thumbnail
-        if let thumbnailData = thumbnailData {
-            return NSImage(data: thumbnailData)
+        if let thumbnailData = thumbnailData,
+            let cachedThumbnail = NSImage(data: thumbnailData)
+        {
+            return cachedThumbnail
         }
 
-        // Fallback: generate thumbnail on-demand if not cached
-        // But only for small images to avoid memory spikes
+        // Generate thumbnail on-demand for images
         if itemType == .image {
-            if let imageData = imageData, imageData.count < 5_000_000,  // 5MB limit
+            if let imageData = imageData,
                 let image = NSImage(data: imageData)
             {
                 let thumbnail = generateThumbnailImage(from: image)
-                // Cache the generated thumbnail for future use
-                if let thumbnailData = thumbnail?.tiffRepresentation {
-                    self.thumbnailData = thumbnailData
+                // Cache the generated thumbnail immediately
+                if let thumbnail = thumbnail,
+                    let pngData = thumbnail.pngRepresentation
+                {
+                    self.thumbnailData = pngData
                 }
-                return thumbnail
+                return thumbnail ?? createPlaceholderThumbnail()
             }
-        } else if isImageFile {
-            if let fileData = fileData, fileData.count < 5_000_000,  // 5MB limit
+        }
+        // Generate thumbnail for image files
+        else if isImageFile {
+            if let fileData = fileData,
                 let image = NSImage(data: fileData)
             {
                 let thumbnail = generateThumbnailImage(from: image)
-                // Cache the generated thumbnail for future use
-                if let thumbnailData = thumbnail?.tiffRepresentation {
-                    self.thumbnailData = thumbnailData
+                // Cache the generated thumbnail immediately
+                if let thumbnail = thumbnail,
+                    let pngData = thumbnail.pngRepresentation
+                {
+                    self.thumbnailData = pngData
                 }
-                return thumbnail
+                return thumbnail ?? createPlaceholderThumbnail()
             }
         }
 
-        // Return placeholder for large images or failed generation
+        // Return placeholder for failed generation
         return createPlaceholderThumbnail()
     }
 
@@ -231,8 +238,13 @@ final class CBItem {
     }
 
     private func generateThumbnailImage(from image: NSImage) -> NSImage? {
-        let maxSize: CGFloat = 100
+        let maxSize: CGFloat = 80
         let imageSize = image.size
+
+        // Ensure we have valid dimensions
+        guard imageSize.width > 0 && imageSize.height > 0 else {
+            return nil
+        }
 
         // Calculate thumbnail size maintaining aspect ratio
         let aspectRatio = imageSize.width / imageSize.height
@@ -244,11 +256,20 @@ final class CBItem {
             thumbnailSize = NSSize(width: maxSize * aspectRatio, height: maxSize)
         }
 
+        // Create high-quality thumbnail
         let thumbnail = NSImage(size: thumbnailSize)
         thumbnail.lockFocus()
-        image.draw(in: NSRect(origin: .zero, size: thumbnailSize))
-        thumbnail.unlockFocus()
 
+        // Use high-quality interpolation
+        NSGraphicsContext.current?.imageInterpolation = .high
+
+        image.draw(
+            in: NSRect(origin: .zero, size: thumbnailSize),
+            from: NSRect(origin: .zero, size: imageSize),
+            operation: .copy,
+            fraction: 1.0)
+
+        thumbnail.unlockFocus()
         return thumbnail
     }
 
@@ -269,5 +290,16 @@ final class CBItem {
         return items.first { existingItem in
             newItem.isDuplicate(of: existingItem)
         }
+    }
+}
+
+extension NSImage {
+    var pngRepresentation: Data? {
+        guard let tiffData = self.tiffRepresentation,
+            let bitmapRep = NSBitmapImageRep(data: tiffData)
+        else {
+            return nil
+        }
+        return bitmapRep.representation(using: .png, properties: [:])
     }
 }

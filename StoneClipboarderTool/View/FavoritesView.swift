@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct FavoritesView: View {
     @EnvironmentObject var cbViewModel: CBViewModel

@@ -22,7 +22,7 @@ struct StoneClipboarderToolApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             CBItem.self,
-            HotkeyConfig.self
+            HotkeyConfig.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -87,6 +87,10 @@ struct StoneClipboarderToolApp: App {
     private func setupApp() {
         cbViewModel.setModelContext(sharedModelContainer.mainContext)
         cbViewModel.setSettingsManager(settingsManager)
+
+        // Ensure recent items are loaded immediately
+        cbViewModel.fetchItems(reset: true)
+
         cbViewModel.startClipboardMonitoring()
 
         hotkeyManager.setModelContext(sharedModelContainer.mainContext)
@@ -94,6 +98,11 @@ struct StoneClipboarderToolApp: App {
         hotkeyManager.setSettingsManager(settingsManager)
         quickPickerManager.setCBViewModel(cbViewModel)
         hotkeyManager.quickPickerDelegate = quickPickerManager
+
+        // Connect menubar refresh callback to fix state after QuickPicker operations
+        quickPickerManager.setMenuBarRefreshCallback {
+            menuBarManager.refreshMenuBar()
+        }
 
         // Load and register hotkeys
         hotkeyManager.loadHotkeyConfigs()
@@ -105,6 +114,11 @@ struct StoneClipboarderToolApp: App {
     private func updateMenuBarVisibility() {
         if settingsManager.showInMenubar {
             menuBarManager.setupMenuBar(cbViewModel: cbViewModel, settingsManager: settingsManager)
+
+            // Monitor and refresh menubar state periodically to prevent corruption
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                menuBarManager.refreshMenuBar()
+            }
         } else {
             menuBarManager.hideMenuBar()
         }

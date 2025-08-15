@@ -15,6 +15,10 @@ class QuickPickerHostingView: NSHostingView<QuickPickerView> {
 
     override func becomeFirstResponder() -> Bool {
         let result = super.becomeFirstResponder()
+        // Ensure the hosting view can receive keyboard events
+        DispatchQueue.main.async {
+            self.window?.makeFirstResponder(self)
+        }
         return result
     }
 
@@ -38,8 +42,20 @@ class KeyCapturingPanel: NSPanel {
         return true
     }
 
+    override func becomeFirstResponder() -> Bool {
+        let result = super.becomeFirstResponder()
+        return result
+    }
+
     override func sendEvent(_ event: NSEvent) {
         super.sendEvent(event)
+
+        // Force focus for any keyboard events
+        if event.type == .keyDown || event.type == .keyUp {
+            if !self.isKeyWindow {
+                self.makeKey()
+            }
+        }
     }
 
     override func orderFrontRegardless() {
@@ -48,6 +64,7 @@ class KeyCapturingPanel: NSPanel {
     }
 
     override func mouseDown(with event: NSEvent) {
+        self.makeKey()
         self.performDrag(with: event)
     }
 }
@@ -58,14 +75,20 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     private weak var cbViewModel: CBViewModel?
     private var eventMonitor: Any?
     private var keyMonitor: Any?
+    private var localKeyMonitor: Any?
     private var previousApp: NSRunningApplication?
     private var isDragging = false
     private var dragOffset: NSPoint = NSPoint.zero
+    private var menuBarRefreshCallback: (() -> Void)?
 
     func setCBViewModel(_ viewModel: CBViewModel) {
         self.cbViewModel = viewModel
         // Reset position flag on app start for fresh center positioning
         UserDefaults.standard.set(false, forKey: "QuickPickerHasValidPosition")
+    }
+
+    func setMenuBarRefreshCallback(_ callback: @escaping () -> Void) {
+        self.menuBarRefreshCallback = callback
     }
 
     func showQuickPicker() {
@@ -83,7 +106,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         // Store the currently active app so we can return focus to it later
         previousApp = NSWorkspace.shared.frontmostApplication
 
-        // Create a panel with high priority level to capture focus
+        // Create a panel that captures focus without activating the main app
         let panel = KeyCapturingPanel(
             contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
             styleMask: [.borderless],
@@ -94,7 +117,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         panel.quickPickerDelegate = self
 
         panel.isFloatingPanel = true
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.overlayWindow)))
+        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)))
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
@@ -104,7 +127,9 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         panel.worksWhenModal = true
         panel.isMovableByWindowBackground = true
         panel.isMovable = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        panel.collectionBehavior = [
+            .canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .stationary,
+        ]
 
         // Create content view
         let contentView = QuickPickerView(viewModel: cbViewModel) { [weak self] in
@@ -132,24 +157,16 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             panel.setFrameOrigin(origin)
         }
 
-        // Temporarily activate app to capture focus, then show panel
-        let wasActive = NSApp.isActive
-        if !wasActive {
-            NSApp.activate(ignoringOtherApps: true)
-        }
-
+        // Show panel without activating main app
         panel.orderFrontRegardless()
         panel.makeKey()
 
-        // Simple focus setup without interfering with text input
+        // Force keyboard focus to the panel
         DispatchQueue.main.async {
-            // If we activated the app, hide all other windows immediately
-            if !wasActive {
-                for window in NSApp.windows {
-                    if window !== panel && window.isVisible {
-                        window.orderOut(nil)
-                    }
-                }
+            panel.makeKey()
+            if let contentView = panel.contentView {
+                panel.makeFirstResponder(contentView)
+                contentView.becomeFirstResponder()
             }
         }
 
@@ -158,11 +175,13 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         // Setup click-outside monitoring and key monitoring
         setupEventMonitoring()
         setupKeyMonitoring()
+        setupLocalKeyMonitoring()
     }
 
     func hideQuickPicker() {
         removeEventMonitoring()
         removeKeyMonitoring()
+        removeLocalKeyMonitoring()
 
         if let window = window {
             // Save window position before closing
@@ -173,13 +192,16 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
         self.window = nil
 
-        // Return focus to the previous app immediately
-        if let previousApp = previousApp, previousApp.isActive == false {
-            DispatchQueue.main.async {
-                previousApp.activate(options: [])
-            }
+        // Return focus to the previous app if we had stored one
+        if let previousApp = previousApp {
+            previousApp.activate(options: [])
         }
         previousApp = nil
+
+        // Refresh menubar after operations to fix any state issues
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            self.menuBarRefreshCallback?()
+        }
     }
 
     func handleKeyEvent(_ event: NSEvent) {
@@ -237,6 +259,29 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         }
     }
 
+    private func setupLocalKeyMonitoring() {
+        removeLocalKeyMonitoring()
+
+        // Local monitor to capture all keyboard events when panel is key
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) {
+            [weak self] event in
+            guard let self = self,
+                let window = self.window,
+                window.isKeyWindow
+            else { return event }
+
+            // Let SwiftUI handle navigation and text input
+            return event
+        }
+    }
+
+    private func removeLocalKeyMonitoring() {
+        if let monitor = localKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            localKeyMonitor = nil
+        }
+    }
+
     // MARK: - Window Position Management
 
     private func saveWindowPosition(_ position: NSPoint) {
@@ -274,6 +319,9 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             NSEvent.removeMonitor(monitor)
         }
         if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }
     }

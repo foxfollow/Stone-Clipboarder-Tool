@@ -4,8 +4,9 @@
 //
 //  Created by Heorhii Savoiskyi on 08.08.2025.
 //
-
+#if DEBUG
 import SwiftData
+#endif
 import SwiftUI
 import Combine
 import Sparkle

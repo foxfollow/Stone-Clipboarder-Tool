@@ -15,10 +15,12 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var hotkeyManager: HotkeyManager
+    @EnvironmentObject var cbViewModel: CBViewModel
     @Environment(\.dismiss) private var dismiss
     let updater: SPUUpdater?
 
     @State private var selectedTab = 0
+    @State private var showingCleanupAlert = false
 
     var body: some View {
         VStack {
@@ -64,8 +66,12 @@ struct SettingsView: View {
                     }
                     .help("Maximum number of items to keep before auto-cleanup")
                 }
-            }
 
+                Button("Clean Up Now") {
+                    showingCleanupAlert = true
+                }
+                .help("Manually trigger cleanup to remove old items and free memory")
+            }
 
             Section("Menu Bar Display") {
                 HStack {
@@ -105,6 +111,16 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .alert("Clean Up Clipboard History", isPresented: $showingCleanupAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clean Up", role: .destructive) {
+                cbViewModel.performManualCleanup()
+            }
+        } message: {
+            Text(
+                "This will remove old items beyond the maximum limit and free up memory. Favorites will be preserved."
+            )
+        }
     }
 }
 #Preview {
@@ -124,7 +140,6 @@ struct SettingsView: View {
         .modelContainer(container)
         .onAppear {
             viewModel.setModelContext(container.mainContext)
+            viewModel.setSettingsManager(settingsManager)
         }
-    //        .environmentObject(SettingsManager())
-    //        .environmentObject(HotkeyManager())
 }

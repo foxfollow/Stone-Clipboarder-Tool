@@ -6,12 +6,17 @@
 //
 
 import AppKit
+import SwiftData
 import SwiftUI
 
 struct QuickPickerView: View {
     @ObservedObject var viewModel: CBViewModel
     @State private var searchText = ""
     @State private var selectedIndex = 0
+    @State private var quickPickerItems: [CBItem] = []
+    @State private var isLoadingItems = false
+    @State private var hasMoreItems = true
+    @State private var searchTask: Task<Void, Never>?
     @FocusState private var isSearchFocused: Bool
 
     let onClose: () -> Void
@@ -22,15 +27,13 @@ struct QuickPickerView: View {
     }
 
     private var filteredItems: [CBItem] {
-        let items = viewModel.items.sorted { $0.timestamp > $1.timestamp }
-
         if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return Array(items)
+            return quickPickerItems
         }
 
         let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        return items.filter { item in
+        return quickPickerItems.filter { item in
             switch item.itemType {
             case .text:
                 if let content = item.content {
@@ -42,6 +45,7 @@ struct QuickPickerView: View {
             }
         }
     }
+
     var body: some View {
         VStack(spacing: 0) {
             dragHandle
@@ -50,7 +54,12 @@ struct QuickPickerView: View {
             QPItemList(
                 filteredItems: filteredItems,
                 selectedIndex: $selectedIndex,
-                searchText: $searchText
+                searchText: $searchText,
+                isLoading: isLoadingItems,
+                hasMoreItems: hasMoreItems,
+                onLoadMore: {
+                    loadMoreItems()
+                }
             ) {
                 performAction()
             }
@@ -64,9 +73,8 @@ struct QuickPickerView: View {
         )
         .shadow(radius: 10)
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isSearchFocused = true
-            }
+            loadInitialItems()
+            isSearchFocused = true
         }
         .onKeyPress(.escape) {
             onClose()
@@ -88,12 +96,30 @@ struct QuickPickerView: View {
             performAction()
             return .handled
         }
-        .onChange(of: searchText) { _, _ in
+        .onChange(of: searchText) { _, newValue in
             selectedIndex = 0
+
+            // Cancel previous search task
+            searchTask?.cancel()
+
+            if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Debounce search with 300ms delay
+                searchTask = Task {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    if !Task.isCancelled {
+                        await MainActor.run {
+                            performSearch(newValue)
+                        }
+                    }
+                }
+            } else {
+                // Reset to showing all items when search is cleared
+                loadInitialItems()
+            }
         }
-        .onChange(of: filteredItems) { _, newItems in
-            if selectedIndex >= newItems.count {
-                selectedIndex = max(0, newItems.count - 1)
+        .onChange(of: filteredItems.count) { _, newCount in
+            if selectedIndex >= newCount {
+                selectedIndex = max(0, newCount - 1)
             }
         }
     }
@@ -137,67 +163,149 @@ struct QuickPickerView: View {
         .background(Color(NSColor.controlBackgroundColor))
     }
 
-    //    @ViewBuilder
-    //    private var itemsList: some View {
-    //
-    //    }
-
     private func performAction() {
         guard selectedIndex < filteredItems.count else { return }
 
         let item = filteredItems[selectedIndex]
+
+        viewModel.markItemAccessed(item)
         copyToPasteboard(item)
 
-        // Close immediately without activating main app
         onClose()
 
-        // Paste after a longer delay to ensure target app is active
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             simulatePaste()
         }
     }
 
     private func copyToPasteboard(_ item: CBItem) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-
-        switch item.itemType {
-        case .text:
-            if let content = item.content {
-                pasteboard.setString(content, forType: .string)
-            }
-        case .image:
-            if let imageData = item.imageData,
-                let image = NSImage(data: imageData)
-            {
-                pasteboard.writeObjects([image])
-            }
-        case .file:
-            if let fileData = item.fileData,
-                let fileName = item.fileName
-            {
-                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-                    fileName)
-                try? fileData.write(to: tempURL)
-                pasteboard.writeObjects([tempURL as NSURL])
-            }
-        }
+        viewModel.copyAndUpdateItem(item)
     }
 
     private func simulatePaste() {
         guard let source = CGEventSource(stateID: .hidSystemState) else { return }
 
-        // Create Cmd+V key events
         let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
         let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
 
         keyDown?.flags = .maskCommand
         keyUp?.flags = .maskCommand
 
-        keyDown?.post(tap: .cghidEventTap)
+        let location = CGEventTapLocation.cghidEventTap
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            keyUp?.post(tap: .cghidEventTap)
+        keyDown?.post(tap: location)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+            keyUp?.post(tap: location)
+        }
+    }
+
+    private func loadInitialItems() {
+        guard let modelContext = viewModel.modelContext else { return }
+
+        // Get the most recent 30 items synchronously for instant display
+        var recentDescriptor = FetchDescriptor<CBItem>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        recentDescriptor.fetchLimit = 30
+
+        do {
+            let recentItems = try modelContext.fetch(recentDescriptor)
+            self.quickPickerItems = recentItems
+            self.hasMoreItems = recentItems.count == 30
+            self.isLoadingItems = false
+
+            // Don't automatically load more - only when user scrolls
+            // The 30 items are enough for immediate use
+        } catch {
+            print("Failed to load recent QuickPicker items: \(error)")
+            self.quickPickerItems = []
+            self.hasMoreItems = false
+            self.isLoadingItems = false
+        }
+    }
+
+    private func loadMoreItems() {
+        guard let modelContext = viewModel.modelContext, !isLoadingItems, hasMoreItems else {
+            return
+        }
+
+        isLoadingItems = true
+
+        Task {
+            var descriptor = FetchDescriptor<CBItem>(
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+            descriptor.fetchOffset = quickPickerItems.count
+            descriptor.fetchLimit = 50
+
+            do {
+                let newItems = try modelContext.fetch(descriptor)
+                await MainActor.run {
+                    self.quickPickerItems.append(contentsOf: newItems)
+                    self.hasMoreItems = newItems.count == 50
+                    self.isLoadingItems = false
+
+                    // Clean up memory - keep only last 150 items loaded, but always keep first 30
+                    if self.quickPickerItems.count > 150 {
+                        let firstThirty = Array(self.quickPickerItems.prefix(30))
+                        let remaining = Array(self.quickPickerItems.dropFirst(30).prefix(120))
+                        self.quickPickerItems = firstThirty + remaining
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    print("Failed to load more QuickPicker items: \(error)")
+                    self.hasMoreItems = false
+                    self.isLoadingItems = false
+                }
+            }
+        }
+    }
+
+    private func performSearch(_ searchTerm: String) {
+        guard let modelContext = viewModel.modelContext else { return }
+
+        isLoadingItems = true
+
+        Task {
+            let trimmedSearch = searchTerm.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Fetch items for search - use a reasonable limit
+            var descriptor = FetchDescriptor<CBItem>(
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+            descriptor.fetchLimit = 300  // Reasonable limit for search
+
+            do {
+                let allItems = try modelContext.fetch(descriptor)
+                let searchLower = trimmedSearch.lowercased()
+
+                let searchResults = allItems.filter { item in
+                    switch item.itemType {
+                    case .text:
+                        return item.content?.lowercased().contains(searchLower) == true
+                            || item.contentPreview?.lowercased().contains(searchLower) == true
+                    case .file:
+                        return item.fileName?.lowercased().contains(searchLower) == true
+                    case .image:
+                        return true  // Show all images in search for now
+                    }
+                }
+
+                await MainActor.run {
+                    self.quickPickerItems = searchResults
+                    self.hasMoreItems = false  // Don't paginate search results
+                    self.isLoadingItems = false
+                }
+            } catch {
+                await MainActor.run {
+                    print("Failed to search QuickPicker items: \(error)")
+                    self.quickPickerItems = []
+                    self.hasMoreItems = false
+                    self.isLoadingItems = false
+                }
+            }
         }
     }
 }

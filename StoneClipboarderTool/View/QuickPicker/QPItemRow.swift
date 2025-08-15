@@ -5,55 +5,76 @@
 //  Created by Heorhii Savoiskyi on 14.08.2025.
 //
 
+import SwiftData
 import SwiftUI
 
 struct QPItemRow: View {
     let item: CBItem
     let isSelected: Bool
 
-    private var displayText: String {
-        return item.displayContent
-    }
-
-    private var icon: String {
-        return item.itemType.sfSybmolName
-    }
-
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Image(systemName: item.itemType.sfSybmolName)
-                    .foregroundColor(item.itemType.sybmolColor)
-                    .imageScale(.small)
+        HStack(spacing: 12) {
+            // Icon or thumbnail
+            iconView
 
-                Text(displayText)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.displayContent)
+                    .font(.system(size: 13))
+                    .lineLimit(2)
+                    .foregroundStyle(.primary)
 
-                Text(item.timestamp, style: .relative)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack {
+                    Text(item.timestamp, style: .relative)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    if item.isFavorite {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.red)
+                    }
+                }
             }
-            if item.itemType == .image, let thumbnail = item.thumbnail {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: 100, alignment: .leading)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            } else if item.itemType == .file && item.isImageFile, let thumbnail = item.thumbnail {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: 100, alignment: .leading)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
+            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var iconView: some View {
+        if item.itemType == .image || (item.itemType == .file && item.isImageFile) {
+            Group {
+                if let thumbnail = item.thumbnail {
+                    Image(nsImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } else {
+                    Image(systemName: item.itemType.sfSybmolName)
+                        .font(.title2)
+                        .foregroundStyle(item.itemType.sybmolColor)
+                }
+            }
+            .frame(width: 40, height: 40)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        } else {
+            Image(systemName: item.itemType.sfSybmolName)
+                .font(.title2)
+                .foregroundStyle(item.itemType.sybmolColor)
+                .frame(width: 40, height: 40)
+        }
     }
 }
 
