@@ -78,11 +78,23 @@ class CBViewModel: ObservableObject {
 
             do {
                 let recentItems = try modelContext.fetch(recentDescriptor)
-                self.items = recentItems
-                self.currentFetchOffset = recentItems.count
+                
+                // Deduplicate items based on persistentModelID
+                var uniqueItems: [CBItem] = []
+                var seenIds = Set<PersistentIdentifier>()
+                
+                for item in recentItems {
+                    if !seenIds.contains(item.persistentModelID) {
+                        uniqueItems.append(item)
+                        seenIds.insert(item.persistentModelID)
+                    }
+                }
+                
+                self.items = uniqueItems
+                self.currentFetchOffset = uniqueItems.count
 
                 // Track access times for memory management
-                for item in recentItems {
+                for item in uniqueItems {
                     self.lastAccessTimes[item.persistentModelID] = Date()
                 }
 
@@ -98,12 +110,23 @@ class CBViewModel: ObservableObject {
                 do {
                     let newItems = try modelContext.fetch(descriptor)
                     await MainActor.run {
-                        self.items.append(contentsOf: newItems)
+                        // Deduplicate new items and check against existing items
+                        var existingIds = Set(self.items.map { $0.persistentModelID })
+                        var uniqueNewItems: [CBItem] = []
+                        
+                        for item in newItems {
+                            if !existingIds.contains(item.persistentModelID) {
+                                uniqueNewItems.append(item)
+                                existingIds.insert(item.persistentModelID)
+                            }
+                        }
+                        
+                        self.items.append(contentsOf: uniqueNewItems)
                         self.isLoadingMore = false
                         self.currentFetchOffset += newItems.count
 
                         // Track access times for memory management
-                        for item in newItems {
+                        for item in uniqueNewItems {
                             self.lastAccessTimes[item.persistentModelID] = Date()
                         }
                     }

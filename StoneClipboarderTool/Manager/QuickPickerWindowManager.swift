@@ -35,7 +35,7 @@ class KeyCapturingPanel: NSPanel {
     }
 
     override var canBecomeMain: Bool {
-        return false
+        return true  // Allow it to become main to receive proper focus
     }
 
     override var acceptsFirstResponder: Bool {
@@ -105,6 +105,14 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
         // Store the currently active app so we can return focus to it later
         previousApp = NSWorkspace.shared.frontmostApplication
+        
+        // Hide main window if it's visible to prevent it from appearing
+        for window in NSApp.windows {
+            if window.title == "Clipboard History" {
+                window.orderOut(nil)
+                break
+            }
+        }
 
         // Create a panel that captures focus without activating the main app
         let panel = KeyCapturingPanel(
@@ -117,7 +125,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         panel.quickPickerDelegate = self
 
         panel.isFloatingPanel = true
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)))
+        panel.level = .floating  // Use floating level instead of screenSaver
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
@@ -128,7 +136,8 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         panel.isMovableByWindowBackground = true
         panel.isMovable = true
         panel.collectionBehavior = [
-            .canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .stationary,
+            .canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle,
+            .transient  // Add transient to prevent it from becoming main
         ]
 
         // Create content view
@@ -157,16 +166,35 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             panel.setFrameOrigin(origin)
         }
 
+        // Store current activation policy
+        let currentPolicy = NSApp.activationPolicy()
+        
+        // Temporarily set to accessory to prevent dock icon bounce
+        if currentPolicy == .regular {
+            NSApp.setActivationPolicy(.accessory)
+        }
+        
         // Show panel without activating main app
         panel.orderFrontRegardless()
         panel.makeKey()
-
+        
+        // Activate the app to ensure we can receive keyboard events
+        NSApp.activate(ignoringOtherApps: true)
+        
         // Force keyboard focus to the panel
         DispatchQueue.main.async {
             panel.makeKey()
+            panel.makeMain()
             if let contentView = panel.contentView {
                 panel.makeFirstResponder(contentView)
                 contentView.becomeFirstResponder()
+            }
+            
+            // Restore activation policy after a short delay
+            if currentPolicy == .regular {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NSApp.setActivationPolicy(currentPolicy)
+                }
             }
         }
 
