@@ -11,11 +11,42 @@
         <language>en</language>
 
         <item>
+            <title>Version VERSION_NUMBER</title>
+            <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
+            <sparkle:version>VERSION_NUMBER</sparkle:version>
+            <sparkle:shortVersionString
+            >VERSION_NUMBER</sparkle:shortVersionString>
+            <description
+            ><![CDATA[
+                <h2>StoneClipboarderTool VERSION_NUMBER</h2>
+                <ul>
+                    <li>🔥 NEW: Global Hotkeys System - System-wide keyboard shortcuts for instant clipboard access</li>
+                    <li>⚡️ NEW: Quick Picker Window - Spotlight-like floating panel (Ctrl+Option+Space)</li>
+                    <li>🎮 NEW: Direct Paste to Active Apps - Hotkeys automatically paste to current application</li>
+                    <li>🪟 NEW: Favorites - Save often-used items for quick access</li>
+                    <li>🎯 NEW: Quick Access Shortcuts - Ctrl+Option+1-0 for last items, Ctrl+Shift+1-0 for favorites</li>
+                    <li>🏷️ Enhanced UI - Visual type indicators and improved file previews</li>
+                    <li>⚙️ Extended Settings - Hotkey configuration and advanced preferences</li>
+                    <li>📊 Better Data Models - Enhanced clipboard item management with favorites support</li>
+                    <li>📊 Memory usage optimization</li>
+                </ul>
+            ]]></description>
+            <pubDate>RELEASE_DATE</pubDate>
+            <enclosure
+                url="https://github.com/REPO_OWNER/REPO_NAME/releases/download/vVERSION_NUMBER/StoneClipboarderTool.zip"
+                sparkle:version="VERSION_NUMBER"
+                sparkle:shortVersionString="VERSION_NUMBER"
+                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
+                length="FILE_SIZE"
+                type="application/octet-stream"
+            />
+        </item>
+
+        <item>
             <title>Version 1.0.7</title>
             <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
             <sparkle:version>1.0.7</sparkle:version>
-            <sparkle:shortVersionString
-            >1.0.7</sparkle:shortVersionString>
+            <sparkle:shortVersionString>1.0.7</sparkle:shortVersionString>
             <description
             ><![CDATA[
                 <h2>StoneClipboarderTool 1.0.7</h2>
