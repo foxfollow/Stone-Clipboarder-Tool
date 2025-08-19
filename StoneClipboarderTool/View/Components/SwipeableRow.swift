@@ -18,14 +18,14 @@ enum SwipeAction {
 struct TwoFingerSwipeDetector: NSViewRepresentable {
     let onSwipeUpdate: (CGFloat) -> Void
     let onSwipeEnded: (SwipeAction) -> Void
-    
+
     func makeNSView(context: Context) -> TwoFingerSwipeNSView {
         let view = TwoFingerSwipeNSView()
         view.onSwipeUpdate = onSwipeUpdate
         view.onSwipeEnded = onSwipeEnded
         return view
     }
-    
+
     func updateNSView(_ nsView: TwoFingerSwipeNSView, context: Context) {
         nsView.onSwipeUpdate = onSwipeUpdate
         nsView.onSwipeEnded = onSwipeEnded
@@ -41,62 +41,62 @@ class TwoFingerSwipeNSView: NSView {
     private let swipeThreshold: CGFloat = 100
     private let verticalTolerance: CGFloat = 50
     private var eventMonitor: Any?
-    
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         self.wantsLayer = true
         setupEventMonitoring()
     }
-    
+
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         self.wantsLayer = true
         setupEventMonitoring()
     }
-    
+
     private func setupEventMonitoring() {
         // Monitor scroll wheel events at the application level
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self = self else { return event }
-            
+
             // Check if the event is within our bounds
-            if let window = self.window {
+            if self.window != nil {
                 let locationInWindow = event.locationInWindow
                 let locationInView = self.convert(locationInWindow, from: nil)
-                
+
                 if self.bounds.contains(locationInView) {
                     self.handleScrollWheel(with: event)
                 }
             }
-            
+
             return event // Always return the event to allow normal scrolling
         }
     }
-    
+
     deinit {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
         }
     }
-    
-    
+
+
     private func handleScrollWheel(with event: NSEvent) {
         // Only handle precise trackpad gestures
         guard event.hasPreciseScrollingDeltas else {
             return
         }
-        
+
         switch event.phase {
         case .began:
             accumulatedDeltaX = 0
             accumulatedDeltaY = 0
             isTrackingSwipe = true
-            
+
         case .changed:
             if isTrackingSwipe {
                 accumulatedDeltaX += event.scrollingDeltaX
                 accumulatedDeltaY += abs(event.scrollingDeltaY)
-                
+
                 // Only handle horizontal swipes with minimal vertical movement
                 if accumulatedDeltaY < verticalTolerance {
                     // Update the visual offset during swipe (allow both directions)
@@ -104,12 +104,12 @@ class TwoFingerSwipeNSView: NSView {
                     onSwipeUpdate?(clampedOffset)
                 }
             }
-            
+
         case .ended:
             if isTrackingSwipe {
                 let shouldDelete = accumulatedDeltaX < -swipeThreshold && accumulatedDeltaY < verticalTolerance
                 let shouldOpenMain = accumulatedDeltaX > swipeThreshold && accumulatedDeltaY < verticalTolerance
-                
+
                 if accumulatedDeltaY < verticalTolerance {
                     // This was a horizontal swipe gesture
                     if shouldDelete {
@@ -122,13 +122,13 @@ class TwoFingerSwipeNSView: NSView {
                 }
             }
             isTrackingSwipe = false
-            
+
         case .cancelled:
             if isTrackingSwipe && accumulatedDeltaY < verticalTolerance {
                 onSwipeEnded?(.none)
             }
             isTrackingSwipe = false
-            
+
         default:
             break
         }
@@ -142,12 +142,12 @@ struct SwipeableRow<Content: View>: View {
     let item: CBItem?
     let onPreview: ((CBItem) -> Void)?
     let onOpenMain: ((CBItem) -> Void)?
-    
+
     @FocusState private var isFocused: Bool
     @State private var swipeOffset: CGFloat = 0
     @State private var isDeleting = false
     @State private var showActionButtons = false
-    
+
     // Computed property to determine if Preview button should be shown
     private var shouldShowPreviewButton: Bool {
         guard let item = item else { return false }
@@ -160,7 +160,7 @@ struct SwipeableRow<Content: View>: View {
             return false
         }
     }
-    
+
     init(@ViewBuilder content: () -> Content, onDelete: @escaping () -> Void) {
         self.content = content()
         self.onDelete = onDelete
@@ -168,7 +168,7 @@ struct SwipeableRow<Content: View>: View {
         self.onPreview = nil
         self.onOpenMain = nil
     }
-    
+
     init(
         item: CBItem,
         onDelete: @escaping () -> Void,
@@ -182,7 +182,7 @@ struct SwipeableRow<Content: View>: View {
         self.onPreview = onPreview
         self.onOpenMain = onOpenMain
     }
-    
+
     var body: some View {
         HStack(spacing: 0) {
             content
@@ -192,8 +192,8 @@ struct SwipeableRow<Content: View>: View {
                 .background(
                     Rectangle()
                         .fill(
-                            swipeOffset < -50 ? Color.red.opacity(0.1) : 
-                            swipeOffset > 50 ? Color.green.opacity(0.1) : 
+                            swipeOffset < -50 ? Color.red.opacity(0.1) :
+                            swipeOffset > 50 ? Color.green.opacity(0.1) :
                             Color.clear
                         )
                         .animation(.easeOut(duration: 0.1), value: swipeOffset)
@@ -241,24 +241,24 @@ struct SwipeableRow<Content: View>: View {
                             onPreview(item)
                         }
                     }
-                    
+
                     // Open in Main Window button in context menu
                     if let item = item, let onOpenMain = onOpenMain {
                         Button("Open in Main Window") {
                             onOpenMain(item)
                         }
                     }
-                    
+
                     // Add separator if we have other actions
                     if item != nil && (onPreview != nil || onOpenMain != nil) {
                         Divider()
                     }
-                    
-                    Button("Delete123", role: .destructive) {
+
+                    Button("Delete Item", role: .destructive) {
                         performDelete()
                     }
                 }
-            
+
             // Action buttons that appear during swipe
             if showActionButtons {
                 HStack(spacing: 4) {
@@ -276,7 +276,7 @@ struct SwipeableRow<Content: View>: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    
+
                     // Open in Main Window button
                     if let item = item, let onOpenMain = onOpenMain {
                         Button {
@@ -291,7 +291,7 @@ struct SwipeableRow<Content: View>: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    
+
                     // Delete button
                     Button {
                         performDelete()
@@ -312,26 +312,26 @@ struct SwipeableRow<Content: View>: View {
         }
         .clipped()
     }
-    
+
     private func resetSwipeState() {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
             swipeOffset = 0
             showActionButtons = false
         }
     }
-    
+
     private func performDelete() {
         guard !isDeleting else { return }
-        
+
         // Add haptic feedback
         let feedback = NSHapticFeedbackManager.defaultPerformer
         feedback.perform(.generic, performanceTime: .now)
-        
+
         withAnimation(.easeInOut(duration: 0.3)) {
             isDeleting = true
             swipeOffset = -300 // Slide out completely
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             onDelete()
         }
@@ -343,12 +343,12 @@ struct KeyboardDeleteableRow<Content: View>: View {
     let content: Content
     let onDelete: () -> Void
     @FocusState private var isFocused: Bool
-    
+
     init(@ViewBuilder content: () -> Content, onDelete: @escaping () -> Void) {
         self.content = content()
         self.onDelete = onDelete
     }
-    
+
     var body: some View {
         content
             .focusable()

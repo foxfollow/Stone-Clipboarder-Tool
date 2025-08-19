@@ -14,12 +14,15 @@ struct StoneClipboarderToolApp: App {
     @StateObject private var cbViewModel = CBViewModel()
     @StateObject private var settingsManager = SettingsManager()
     @StateObject private var menuBarManager = MenuBarManager()
+    @StateObject private var hotkeyManager = HotkeyManager()
+    @StateObject private var quickPickerManager = QuickPickerWindowManager()
 
     private let updaterController: SPUStandardUpdaterController
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            CBItem.self
+            CBItem.self,
+            HotkeyConfig.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -37,9 +40,10 @@ struct StoneClipboarderToolApp: App {
 
     var body: some Scene {
         WindowGroup("Clipboard History") {
-            ContentView(updater: updaterController.updater)
+            ContentView()
                 .environmentObject(cbViewModel)
                 .environmentObject(settingsManager)
+                .environmentObject(hotkeyManager)
                 .onAppear {
                     setupApp()
                 }
@@ -48,6 +52,9 @@ struct StoneClipboarderToolApp: App {
                 }
                 .onChange(of: settingsManager.showMainWindow) { _, newValue in
                     updateWindowVisibility()
+                }
+                .onChange(of: settingsManager.enableHotkeys) { _, newValue in
+                    hotkeyManager.refreshHotkeyRegistrations()
                 }
         }
         .modelContainer(sharedModelContainer)
@@ -59,15 +66,46 @@ struct StoneClipboarderToolApp: App {
             }
         }
 
+        // Custom Settings window with ID
+        WindowGroup("Settings", id: "settings") {
+            SettingsView(updater: updaterController.updater)
+                .environmentObject(settingsManager)
+                .environmentObject(hotkeyManager)
+                .frame(width: 500, height: 500)
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.automatic)
+
         Settings {
             SettingsView(updater: updaterController.updater)
                 .environmentObject(settingsManager)
+                .environmentObject(hotkeyManager)
         }
+
     }
 
     private func setupApp() {
         cbViewModel.setModelContext(sharedModelContainer.mainContext)
+        cbViewModel.setSettingsManager(settingsManager)
+
+        // Ensure recent items are loaded immediately
+        cbViewModel.fetchItems(reset: true)
+
         cbViewModel.startClipboardMonitoring()
+
+        hotkeyManager.setModelContext(sharedModelContainer.mainContext)
+        hotkeyManager.setCBViewModel(cbViewModel)
+        hotkeyManager.setSettingsManager(settingsManager)
+        quickPickerManager.setCBViewModel(cbViewModel)
+        hotkeyManager.quickPickerDelegate = quickPickerManager
+
+        // Connect menubar refresh callback to fix state after QuickPicker operations
+        quickPickerManager.setMenuBarRefreshCallback {
+            menuBarManager.refreshMenuBar()
+        }
+
+        // Load and register hotkeys
+        hotkeyManager.loadHotkeyConfigs()
 
         updateMenuBarVisibility()
         updateWindowVisibility()
@@ -76,6 +114,11 @@ struct StoneClipboarderToolApp: App {
     private func updateMenuBarVisibility() {
         if settingsManager.showInMenubar {
             menuBarManager.setupMenuBar(cbViewModel: cbViewModel, settingsManager: settingsManager)
+
+            // Monitor and refresh menubar state periodically to prevent corruption
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                menuBarManager.refreshMenuBar()
+            }
         } else {
             menuBarManager.hideMenuBar()
         }

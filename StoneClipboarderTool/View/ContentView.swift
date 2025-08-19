@@ -4,38 +4,66 @@
 //
 //  Created by Heorhii Savoiskyi on 08.08.2025.
 //
-
+#if DEBUG
 import SwiftData
+#endif
 import SwiftUI
 import Combine
 import Sparkle
 
 struct ContentView: View {
+    @Environment(\.openWindow) private var openWindow
+
     @EnvironmentObject var cbViewModel: CBViewModel
     @EnvironmentObject var settingsManager: SettingsManager
+    @EnvironmentObject var hotkeyManager: HotkeyManager
+
     @State private var editingMode: Bool = false
-    @State private var showingSettings = false
     @State private var showingDeleteAllAlert = false
     @State private var selectedItem: CBItem? = nil
-    
-    let updater: SPUUpdater?
+    @State private var selectedTab: ClipboardTab = .recent
+
+    enum ClipboardTab: CaseIterable {
+        case recent, favorites
+
+        var title: String {
+            switch self {
+            case .recent: return "Recent"
+            case .favorites: return "Favorites"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .recent: return "clock"
+            case .favorites: return "heart"
+            }
+        }
+    }
 
     var body: some View {
         NavigationSplitView {
-            List {
-                if editingMode {
-                    Button("Delete All", role: .destructive) {
-                        showingDeleteAllAlert = true
+            VStack(spacing: 0) {
+                // Tab picker
+                Picker("View", selection: $selectedTab) {
+                    ForEach(ClipboardTab.allCases, id: \.self) { tab in
+                        Label(tab.title, systemImage: tab.icon)
+                            .tag(tab)
                     }
-                    .foregroundStyle(.red)
                 }
-                ForEach(cbViewModel.items) { item in
-                    DetailedCardView(
-                        editingMode: $editingMode,
-                        selectedItem: $selectedItem,
-                        item: item)
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                // Content based on selected tab
+                Group {
+                    switch selectedTab {
+                    case .recent:
+                        recentItemsList
+                    case .favorites:
+                        favoritesItemsList
+                    }
                 }
-                .onDelete(perform: deleteItems)
             }
             .navigationSplitViewColumnWidth(
                 min: 180,
@@ -48,12 +76,10 @@ struct ContentView: View {
                 }
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button(action: {
-                        showingSettings = true
+                        openWindow(id: "settings")
                     }) {
                         Label("Settings", systemImage: "gear")
                     }
-
-
 
                     Button(action: {
                         addItem()
@@ -72,10 +98,6 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView(updater: updater)
-                    .environmentObject(settingsManager)
             }
             .alert("Delete All Clipboard History", isPresented: $showingDeleteAllAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -96,55 +118,132 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .init("SelectClipboardItem"))) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .init("SelectClipboardItem"))) {
+            notification in
             if let itemUUID = notification.object as? String,
-               let item = cbViewModel.items.first(where: { "\($0.id)" == itemUUID }) {
+                let item = cbViewModel.items.first(where: { "\($0.id)" == itemUUID })
+            {
                 selectedItem = item
             }
         }
         .onAppear {
-            // Configure window to automatically follow user across desktops
-            DispatchQueue.main.async {
-                if let window = NSApp.windows.first(where: { $0.title == "Clipboard History" }) {
-                    // Set window behavior to automatically move to active space
-                    window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
-                    
-                    // Set up workspace observer to move window when user changes desktops
-                    NotificationCenter.default.addObserver(
-                        forName: NSWorkspace.activeSpaceDidChangeNotification,
-                        object: nil,
-                        queue: .main
-                    ) { _ in
-                        // Force window to follow to new desktop if it's visible and main window is shown
-                        if settingsManager.showMainWindow && window.isVisible {
-                            // Temporarily hide and show to force move to current space
-                            window.orderOut(nil)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                window.makeKeyAndOrderFront(nil)
-                            }
-                        }
+            setupWindowBehavior()
+        }
+    }
+
+    @ViewBuilder
+    private var recentItemsList: some View {
+        List {
+            if editingMode {
+                Button("Delete All", role: .destructive) {
+                    showingDeleteAllAlert = true
+                }
+                .foregroundStyle(.red)
+            }
+
+            ForEach(cbViewModel.items) { item in
+                DetailedCardView(
+                    editingMode: $editingMode,
+                    selectedItem: $selectedItem,
+                    item: item
+                )
+                .onAppear {
+                    cbViewModel.markItemAccessed(item)
+                    if item == cbViewModel.items.last {
+                        cbViewModel.loadMoreItems()
+                    }
+                }
+            }
+            .onDelete(perform: deleteItems)
+
+            if cbViewModel.isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading more...")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.sidebar)
+        .animation(.easeInOut(duration: 0.2), value: cbViewModel.items.count)
+    }
+
+    @ViewBuilder
+    private var favoritesItemsList: some View {
+        List {
+            if cbViewModel.favoriteItems.isEmpty {
+                ContentUnavailableView {
+                    Label("No Favorites", systemImage: "heart")
+                } description: {
+                    Text("Tap the heart icon on items to add them to favorites")
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(cbViewModel.favoriteItems) { item in
+                    DetailedCardView(
+                        editingMode: $editingMode,
+                        selectedItem: $selectedItem,
+                        item: item,
+                        showFavoriteControls: true
+                    )
+                    .onAppear {
+                        cbViewModel.markItemAccessed(item)
                     }
                 }
             }
         }
+        .listStyle(.sidebar)
+        .animation(.easeInOut(duration: 0.3), value: cbViewModel.favoriteItems.count)
     }
 
     private func addItem(content: String? = nil) {
-        withAnimation {
+        withAnimation(.easeInOut(duration: 0.3)) {
             cbViewModel.addItem(content: content ?? "New item content")
         }
     }
 
     private func deleteAllItems() {
-        withAnimation {
+        withAnimation(.easeInOut(duration: 0.3)) {
             cbViewModel.deleteAllItems()
-            editingMode = false  // Exit edit mode after deleting all
+            editingMode = false
         }
     }
 
     private func deleteItems(offsets: IndexSet) {
-        withAnimation {
+        withAnimation(.easeInOut(duration: 0.3)) {
             cbViewModel.deleteItems(at: offsets, from: cbViewModel.items)
+        }
+    }
+
+    private func setupWindowBehavior() {
+        DispatchQueue.main.async {
+            if let window = NSApp.windows.first(where: { $0.title == "Clipboard History" }) {
+                // Set window behavior to automatically move to active space
+                window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
+
+                // Set up workspace observer to move window when user changes desktops
+                NotificationCenter.default.addObserver(
+                    forName: NSWorkspace.activeSpaceDidChangeNotification,
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    // Force window to follow to new desktop if it's visible and main window is shown
+                    if settingsManager.showMainWindow && window.isVisible {
+                        // Temporarily hide and show to force move to current space
+                        window.orderOut(nil)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            window.makeKeyAndOrderFront(nil)
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -155,10 +254,13 @@ struct ContentView: View {
     let container = try! ModelContainer(for: schema, configurations: [configuration])
     let viewModel = CBViewModel()
     let settingsManager = SettingsManager()
+    let hotkeyManager = HotkeyManager()
 
-    return ContentView(updater: nil)
+    return ContentView()
+        //updater: nil)
         .environmentObject(viewModel)
         .environmentObject(settingsManager)
+        .environmentObject(hotkeyManager)
         .modelContainer(container)
         .onAppear {
             viewModel.setModelContext(container.mainContext)
@@ -170,14 +272,19 @@ struct DetailedCardView: View {
     @Binding var editingMode: Bool
     @Binding var selectedItem: CBItem?
     var item: CBItem
+    var showFavoriteControls: Bool = false
 
     var body: some View {
         HStack {
             if editingMode {
                 DeleteButtonView(item: item)
+                    .transition(.scale.combined(with: .opacity))
             }
+
             Button {
-                selectedItem = item
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedItem = item
+                }
             } label: {
                 BarNavigationCellView(item: item)
             }
@@ -185,7 +292,26 @@ struct DetailedCardView: View {
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(selectedItem?.id == item.id ? Color.blue.opacity(0.2) : Color.clear)
+                    .animation(.easeInOut(duration: 0.15), value: selectedItem?.id == item.id)
             )
+
+            Spacer()
+
+            // Favorite button
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    cbViewModel.toggleFavorite(item)
+                }
+            }) {
+                Image(systemName: item.isFavorite ? "heart.fill" : "heart")
+                    .font(.system(size: 14))
+                    .foregroundStyle(item.isFavorite ? .red : .secondary)
+                    .scaleEffect(item.isFavorite ? 1.1 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: item.isFavorite)
+            }
+            .buttonStyle(.plain)
+            .help(item.isFavorite ? "Remove from favorites" : "Add to favorites")
         }
+        .animation(.easeInOut(duration: 0.2), value: editingMode)
     }
 }

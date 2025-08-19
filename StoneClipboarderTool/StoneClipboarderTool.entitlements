@@ -10,5 +10,15 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<key>com.apple.security.automation.apple-events</key>
+	<false/>
+	<key>com.apple.security.device.camera</key>
+	<false/>
+	<key>com.apple.security.device.microphone</key>
+	<false/>
+	<key>com.apple.security.personal-information.addressbook</key>
+	<false/>
+	<key>com.apple.security.personal-information.calendars</key>
+	<false/>
 </dict>
 </plist>

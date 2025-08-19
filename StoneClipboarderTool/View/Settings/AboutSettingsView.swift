@@ -1,35 +1,25 @@
 //
-//  SettingsView.swift
+//  AboutSettingsView.swift
 //  StoneClipboarderTool
 //
-//  Created by Heorhii Savoiskyi on 08.08.2025.
+//  Created by Heorhii Savoiskyi on 14.08.2025.
 //
 
-import Sparkle
 import SwiftUI
+import Sparkle
 
-struct SettingsView: View {
-    @EnvironmentObject var settingsManager: SettingsManager
-    @Environment(\.dismiss) private var dismiss
+struct AboutSettingsView: View {
     let updater: SPUUpdater?
-
+    
     var body: some View {
         Form {
-            Section("Appearance") {
-                Toggle("Show in Menu Bar", isOn: $settingsManager.showInMenubar)
-                    .help("Show clipboard history in the menu bar for quick access")
-
-                Toggle("Show Main Window", isOn: $settingsManager.showMainWindow)
-                    .help("Keep the main window visible in the dock")
-            }
-
             Section("About") {
                 HStack {
                     Image("128AppIcon")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 32, height: 32)
-
+                    
                     VStack(alignment: .leading) {
                         Text("StoneClipboarderTool")
                             .font(.headline)
@@ -37,27 +27,27 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-
+                    
                     Spacer()
                 }
                 .padding(.vertical, 8)
-
+                
                 HStack {
                     Text(
                         "Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")"
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
-
+                    
                     Spacer()
-
+                    
                     Button("Check for Updates") {
                         updater?.checkForUpdates()
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!(updater?.canCheckForUpdates ?? false))
                 }
-
+                
                 HStack {
                     Text("Built with ❤️")
                         .font(.caption)
@@ -71,7 +61,7 @@ struct SettingsView: View {
                         }
                     }
                     //                    .buttonStyle(.borderedProminent)
-
+                    
                     Button("Privacy Policy") {
                         if let url = URL(
                             string:
@@ -80,7 +70,7 @@ struct SettingsView: View {
                             NSWorkspace.shared.open(url)
                         }
                     }
-
+                    
                     Button("Terms of Use") {
                         if let url = URL(
                             string:
@@ -89,9 +79,9 @@ struct SettingsView: View {
                             NSWorkspace.shared.open(url)
                         }
                     }
-
+                    
                 }
-
+                
                 HStack {
                     Text("© 2025 Heorhii Savoiskyi")
                         .font(.caption)
@@ -102,24 +92,24 @@ struct SettingsView: View {
                         let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
                         let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
                         let deviceModel = getDeviceModel()
-
+                        
                         let subject = "StoneClipboarderTool Feedback"
                         let body = """
                         Hi,
-
+                        
                         I'd like to share feedback about StoneClipboarderTool:
-
+                        
                         [Please describe your feedback here]
-
+                        
                         ---
                         App Version: \(appVersion) (\(buildNumber))
                         macOS Version: \(osVersion)
                         Device: \(deviceModel)
                         """
-
+                        
                         let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
                         let encodedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-
+                        
                         if let url = URL(string: "mailto:d3f0ld@pm.me?subject=\(encodedSubject)&body=\(encodedBody)") {
                             NSWorkspace.shared.open(url)
                         }
@@ -129,17 +119,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Settings")
-        .frame(width: 400, height: 400)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
-                    dismiss()
-                }
-            }
-        }
     }
-
+    
     private func getDeviceModel() -> String {
         var size = 0
         sysctlbyname("hw.model", nil, &size, nil, 0)
@@ -147,9 +128,5 @@ struct SettingsView: View {
         sysctlbyname("hw.model", &model, &size, nil, 0)
         return String(cString: model)
     }
-}
-
-#Preview {
-    SettingsView(updater: nil)
-        .environmentObject(SettingsManager())
+    
 }

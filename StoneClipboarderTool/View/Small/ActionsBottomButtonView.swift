@@ -60,6 +60,7 @@ struct ActionsBottomButtonView: View {
                     }
                     .buttonStyle(.bordered)
                 } else {
+                    // TODO: if it is link add "Open Link" button
                     Button("Edit Text") {
                         startEditing()
                     }
