@@ -32,7 +32,7 @@ jobs:
 
       - name: Setup Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_26_beta_5.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
           xcodebuild -version
 
       - name: Install Sparkle tools
@@ -85,6 +85,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO \
+            ARCHS="x86_64 arm64" \
             | tee build.log
           echo "Build completed"
 
@@ -101,13 +102,78 @@ jobs:
             find build/ -name "*.app" -type d 2>/dev/null || echo "No .app bundles found"
             exit 1
           fi
-          echo "App built successfully at: build/Build/Products/Release/StoneClipboarderTool.app"
-          ls -la "build/Build/Products/Release/StoneClipboarderTool.app"
+
+          # Verify app bundle structure
+          APP_PATH="build/Build/Products/Release/StoneClipboarderTool.app"
+          echo "App built successfully at: $APP_PATH"
+
+          # Check critical app bundle components
+          if [ ! -f "$APP_PATH/Contents/Info.plist" ]; then
+            echo "ERROR: Info.plist not found"
+            exit 1
+          fi
+
+          if [ ! -d "$APP_PATH/Contents/MacOS" ]; then
+            echo "ERROR: MacOS directory not found"
+            exit 1
+          fi
+
+          # Find the main executable
+          MAIN_EXEC=$(find "$APP_PATH/Contents/MacOS" -type f -name "StoneClipboarderTool" | head -1)
+          if [ -z "$MAIN_EXEC" ]; then
+            echo "ERROR: Main executable not found"
+            echo "Contents of MacOS directory:"
+            ls -la "$APP_PATH/Contents/MacOS/"
+            exit 1
+          fi
+
+          echo "Main executable found at: $MAIN_EXEC"
+          echo "Executable info:"
+          file "$MAIN_EXEC"
+          ls -la "$MAIN_EXEC"
 
       - name: Create app bundle
         run: |
           mkdir -p release
-          cp -r build/Build/Products/Release/StoneClipboarderTool.app release/
+
+          echo "Copying app bundle..."
+          cp -R build/Build/Products/Release/StoneClipboarderTool.app release/
+
+          # Verify copy was successful
+          if [ ! -d "release/StoneClipboarderTool.app" ]; then
+            echo "ERROR: Failed to copy app bundle"
+            exit 1
+          fi
+
+          # Set proper permissions for app bundle
+          echo "Setting app bundle permissions..."
+          find release/StoneClipboarderTool.app -type d -exec chmod 755 {} \;
+          find release/StoneClipboarderTool.app -type f -exec chmod 644 {} \;
+
+          # Make executables executable
+          find release/StoneClipboarderTool.app/Contents/MacOS -type f -exec chmod 755 {} \;
+
+          # Verify main executable exists and is executable
+          MAIN_EXEC="release/StoneClipboarderTool.app/Contents/MacOS/StoneClipboarderTool"
+          if [ ! -f "$MAIN_EXEC" ]; then
+            echo "ERROR: Main executable not found after copy"
+            echo "Contents of MacOS directory:"
+            ls -la release/StoneClipboarderTool.app/Contents/MacOS/ || echo "MacOS directory not found"
+            echo "All executables found:"
+            find release/StoneClipboarderTool.app -name "StoneClipboarderTool" -type f
+            exit 1
+          fi
+
+          echo "Verifying executable:"
+          ls -la "$MAIN_EXEC"
+          file "$MAIN_EXEC"
+
+          # Verify app bundle structure
+          echo "App bundle verification:"
+          echo "- Info.plist: $([ -f "release/StoneClipboarderTool.app/Contents/Info.plist" ] && echo "✓" || echo "✗")"
+          echo "- MacOS directory: $([ -d "release/StoneClipboarderTool.app/Contents/MacOS" ] && echo "✓" || echo "✗")"
+          echo "- Main executable: $([ -x "$MAIN_EXEC" ] && echo "✓" || echo "✗")"
+
           ls -la release/
 
       - name: Create ZIP and handle signing
@@ -115,10 +181,57 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           cd release
-          zip -r StoneClipboarderTool.zip StoneClipboarderTool.app
 
-          echo "ZIP created successfully"
+          # Verify app exists before zipping
+          if [ ! -d "StoneClipboarderTool.app" ]; then
+            echo "ERROR: App bundle not found in release directory"
+            ls -la
+            exit 1
+          fi
+
+          echo "Creating ZIP archive with ditto..."
+          # Use ditto to create a zip archive that preserves all necessary attributes for an app bundle
+          ditto -c -k --sequesterRsrc StoneClipboarderTool.app StoneClipboarderTool.zip
+
+          # Verify ZIP was created successfully
+          if [ ! -f "StoneClipboarderTool.zip" ]; then
+            echo "ERROR: ZIP file was not created"
+            ls -la
+            exit 1
+          fi
+
+          # Test ZIP integrity
+          echo "Testing ZIP integrity..."
+          if ! unzip -t StoneClipboarderTool.zip > /dev/null; then
+            echo "ERROR: ZIP integrity check failed"
+            exit 1
+          fi
+
+          # Test extraction
+          echo "Testing ZIP extraction..."
+          mkdir -p test_extract
+          cd test_extract
+          if ! unzip -q ../StoneClipboarderTool.zip; then
+            echo "ERROR: Failed to extract ZIP"
+            exit 1
+          fi
+
+          # Verify extracted app
+          if [ ! -f "StoneClipboarderTool.app/Contents/MacOS/StoneClipboarderTool" ]; then
+            echo "ERROR: Extracted app is missing main executable"
+            find . -name "StoneClipboarderTool" -type f
+            exit 1
+          fi
+
+          echo "ZIP extraction test successful"
+          cd ..
+          rm -rf test_extract
+
+          # Show ZIP info
+          echo "ZIP file info:"
           ls -la StoneClipboarderTool.zip
+          echo "ZIP contents (first 20 entries):"
+          unzip -l StoneClipboarderTool.zip | head -20
 
           # Initialize signature
           SIGNATURE="UNSIGNED_BUILD"
