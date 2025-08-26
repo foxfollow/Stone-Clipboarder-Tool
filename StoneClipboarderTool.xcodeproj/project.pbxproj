@@ -270,7 +270,7 @@
 		BF6748722E45EEE50035F367 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = StoneClipboarderIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconMain;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = StoneClipboarderTool/StoneClipboarderTool.entitlements;
@@ -301,7 +301,7 @@
 		BF6748732E45EEE50035F367 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = StoneClipboarderIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconMain;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = StoneClipboarderTool/StoneClipboarderTool.entitlements;

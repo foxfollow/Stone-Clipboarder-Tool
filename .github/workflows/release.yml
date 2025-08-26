@@ -32,7 +32,7 @@ jobs:
 
       - name: Setup Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
           xcodebuild -version
 
       - name: Install Sparkle tools
@@ -190,8 +190,8 @@ jobs:
           fi
 
           echo "Creating ZIP archive with ditto..."
-          # Use ditto to create a zip archive that preserves all necessary attributes for an app bundle
-          ditto -c -k --sequesterRsrc StoneClipboarderTool.app StoneClipboarderTool.zip
+          # FIX: Use --keepParent flag to preserve the app bundle structure
+          ditto -c -k --sequesterRsrc --keepParent StoneClipboarderTool.app StoneClipboarderTool.zip
 
           # Verify ZIP was created successfully
           if [ ! -f "StoneClipboarderTool.zip" ]; then
@@ -216,9 +216,17 @@ jobs:
             exit 1
           fi
 
-          # Verify extracted app
+          # Verify extracted app - now checking for the complete app bundle
+          if [ ! -d "StoneClipboarderTool.app" ]; then
+            echo "ERROR: Extracted app bundle not found"
+            echo "Contents of test_extract:"
+            ls -la
+            exit 1
+          fi
+
           if [ ! -f "StoneClipboarderTool.app/Contents/MacOS/StoneClipboarderTool" ]; then
             echo "ERROR: Extracted app is missing main executable"
+            echo "Looking for executable:"
             find . -name "StoneClipboarderTool" -type f
             exit 1
           fi
