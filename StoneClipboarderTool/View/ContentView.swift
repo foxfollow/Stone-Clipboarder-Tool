@@ -248,24 +248,24 @@ struct ContentView: View {
     }
 }
 
-#Preview {
-    let schema = Schema([CBItem.self])
-    let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-    let container = try! ModelContainer(for: schema, configurations: [configuration])
-    let viewModel = CBViewModel()
-    let settingsManager = SettingsManager()
-    let hotkeyManager = HotkeyManager()
-
-    return ContentView()
-        //updater: nil)
-        .environmentObject(viewModel)
-        .environmentObject(settingsManager)
-        .environmentObject(hotkeyManager)
-        .modelContainer(container)
-        .onAppear {
-            viewModel.setModelContext(container.mainContext)
-        }
-}
+//#Preview {
+//    let schema = Schema([CBItem.self])
+//    let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+//    let container = try! ModelContainer(for: schema, configurations: [configuration])
+//    let viewModel = CBViewModel()
+//    let settingsManager = SettingsManager()
+//    let hotkeyManager = HotkeyManager()
+//
+//    return ContentView()
+//        //updater: nil)
+//        .environmentObject(viewModel)
+//        .environmentObject(settingsManager)
+//        .environmentObject(hotkeyManager)
+//        .modelContainer(container)
+//        .onAppear {
+//            viewModel.setModelContext(container.mainContext)
+//        }
+//}
 
 struct DetailedCardView: View {
     @EnvironmentObject var cbViewModel: CBViewModel

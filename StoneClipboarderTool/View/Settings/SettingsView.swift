@@ -123,23 +123,23 @@ struct SettingsView: View {
         }
     }
 }
-#Preview {
-    let schema = Schema([CBItem.self])
-    let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-    let container = try! ModelContainer(for: schema, configurations: [configuration])
-    let viewModel = CBViewModel()
-    let settingsManager = SettingsManager()
-    let hotkeyManager = HotkeyManager()
-    let updaterController = SPUStandardUpdaterController(
-        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-
-    SettingsView(updater: updaterController.updater)
-        .environmentObject(viewModel)
-        .environmentObject(settingsManager)
-        .environmentObject(hotkeyManager)
-        .modelContainer(container)
-        .onAppear {
-            viewModel.setModelContext(container.mainContext)
-            viewModel.setSettingsManager(settingsManager)
-        }
-}
+//#Preview {
+//    let schema = Schema([CBItem.self])
+//    let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+//    let container = try! ModelContainer(for: schema, configurations: [configuration])
+//    let viewModel = CBViewModel()
+//    let settingsManager = SettingsManager()
+//    let hotkeyManager = HotkeyManager()
+//    let updaterController = SPUStandardUpdaterController(
+//        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+//
+//    SettingsView(updater: updaterController.updater)
+//        .environmentObject(viewModel)
+//        .environmentObject(settingsManager)
+//        .environmentObject(hotkeyManager)
+//        .modelContainer(container)
+//        .onAppear {
+//            viewModel.setModelContext(container.mainContext)
+//            viewModel.setSettingsManager(settingsManager)
+//        }
+//}
