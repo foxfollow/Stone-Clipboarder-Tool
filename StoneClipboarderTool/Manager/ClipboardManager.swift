@@ -13,6 +13,7 @@ enum ClipboardContent {
     case text(String)
     case image(NSImage)
     case file(URL, String, Data) // URL, UTI, Data
+    case combined(String, NSImage) // Text + Image together
 }
 
 class ClipboardManager: ObservableObject {
@@ -123,6 +124,26 @@ class ClipboardManager: ObservableObject {
                     onClipboardChange?(.image(image))
                 }
             }
+
+        case .bothAsOne:
+            // Capture text and image together as one combined item
+            if hasText && hasImage {
+                // Both present - capture as combined item
+                if let content = pasteboard.string(forType: .string),
+                   let image = NSImage(pasteboard: pasteboard) {
+                    onClipboardChange?(.combined(content, image))
+                }
+            } else if hasText {
+                // Only text available
+                if let content = pasteboard.string(forType: .string) {
+                    onClipboardChange?(.text(content))
+                }
+            } else if hasImage {
+                // Only image available
+                if let image = NSImage(pasteboard: pasteboard) {
+                    onClipboardChange?(.image(image))
+                }
+            }
         }
     }
     
@@ -216,11 +237,11 @@ class ClipboardManager: ObservableObject {
         case .text:
             savePanel.allowedContentTypes = [.plainText]
             savePanel.nameFieldStringValue = "clipboard_text.txt"
-            
+
         case .image:
             savePanel.allowedContentTypes = [.png, .jpeg]
             savePanel.nameFieldStringValue = "clipboard_image.png"
-            
+
         case .file:
             if let fileName = item.fileName {
                 savePanel.nameFieldStringValue = fileName
@@ -230,6 +251,12 @@ class ClipboardManager: ObservableObject {
             } else {
                 savePanel.nameFieldStringValue = "clipboard_file"
             }
+
+        case .combined:
+            // For combined items, save as a folder or prompt user
+            savePanel.allowedContentTypes = [.folder]
+            savePanel.nameFieldStringValue = "clipboard_combined"
+            savePanel.canCreateDirectories = true
         }
         
         // Present save panel
@@ -243,25 +270,44 @@ class ClipboardManager: ObservableObject {
                     case .text:
                         let content = item.content ?? ""
                         try content.write(to: url, atomically: true, encoding: .utf8)
-                        
+
                     case .image:
                         guard let image = item.image,
                               let tiffData = image.tiffRepresentation,
                               let bitmapRep = NSBitmapImageRep(data: tiffData) else { return }
-                        
+
                         let imageData: Data?
                         if url.pathExtension.lowercased() == "png" {
                             imageData = bitmapRep.representation(using: .png, properties: [:])
                         } else {
                             imageData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.9])
                         }
-                        
+
                         guard let data = imageData else { return }
                         try data.write(to: url)
-                        
+
                     case .file:
                         guard let fileData = item.fileData else { return }
                         try fileData.write(to: url)
+
+                    case .combined:
+                        // Save both text and image in a folder
+                        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+
+                        // Save text file
+                        if let content = item.content {
+                            let textFile = url.appendingPathComponent("text.txt")
+                            try content.write(to: textFile, atomically: true, encoding: .utf8)
+                        }
+
+                        // Save image file
+                        if let image = item.image,
+                           let tiffData = image.tiffRepresentation,
+                           let bitmapRep = NSBitmapImageRep(data: tiffData),
+                           let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+                            let imageFile = url.appendingPathComponent("image.png")
+                            try pngData.write(to: imageFile)
+                        }
                     }
                     
                     DispatchQueue.main.async {
@@ -292,6 +338,22 @@ class ClipboardManager: ObservableObject {
                let fileName = item.fileName,
                let uti = item.fileUTI {
                 copyFileToClipboard(data: fileData, fileName: fileName, uti: uti)
+            }
+        case .combined:
+            // Copy both text and image to clipboard
+            pasteboard.clearContents()
+            var objects: [NSPasteboardWriting] = []
+
+            if let content = item.content {
+                objects.append(content as NSPasteboardWriting)
+            }
+            if let image = item.image {
+                objects.append(image)
+            }
+
+            if !objects.isEmpty {
+                pasteboard.writeObjects(objects)
+                lastChangeCount = pasteboard.changeCount
             }
         }
     }

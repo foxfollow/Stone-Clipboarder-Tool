@@ -443,6 +443,27 @@ class HotkeyManager: ObservableObject {
                     print("Failed to write temp file: \(error)")
                 }
             }
+        case .combined:
+            // Copy both text and image to clipboard
+            var objects: [NSPasteboardWriting] = []
+
+            if let content = item.content,
+               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            {
+                objects.append(content as NSPasteboardWriting)
+            }
+
+            if let imageData = item.imageData,
+               !imageData.isEmpty,
+               let image = NSImage(data: imageData)
+            {
+                objects.append(image)
+            }
+
+            if !objects.isEmpty {
+                pasteboard.writeObjects(objects)
+                copySuccessful = true
+            }
         }
 
         if copySuccessful {

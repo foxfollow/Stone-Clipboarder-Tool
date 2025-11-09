@@ -26,6 +26,8 @@ struct ZoomableDetailView: View {
             return "Image"
         case .file:
             return "File"
+        case .combined:
+            return "Text + Image"
         }
     }
     
@@ -49,8 +51,8 @@ struct ZoomableDetailView: View {
                 
                 Spacer()
                 
-                // Zoom controls (show for images and image files)
-                if item.itemType == .image || (item.itemType == .file && item.isImageFile) {
+                // Zoom controls (show for images, combined items, and image files)
+                if item.itemType == .image || item.itemType == .combined || (item.itemType == .file && item.isImageFile) {
                     ZoomControllsView(
                         zoomScale: $zoomScale,
                         onFitToWindow: {
@@ -85,6 +87,52 @@ struct ZoomableDetailView: View {
                     }
                     .onChange(of: item.id) { _, _ in
                         // Reset zoom when changing items
+                        zoomScale = 1.0
+                        shouldFitToWindow = true
+                    }
+                case .combined:
+                    // Display both text and image for combined items
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Text section
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Text Content")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+
+                                Text(item.content ?? "No text content")
+                                    .textSelection(.enabled)
+                                    .font(.system(.body, design: .monospaced))
+                                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                                    .padding(12)
+                                    .background(Color(NSColor.controlBackgroundColor))
+                                    .cornerRadius(8)
+                            }
+
+                            Divider()
+
+                            // Image section with zoom support
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Image Content")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+
+                                ZoomableScrollView(
+                                    zoomLevel: $zoomScale,
+                                    shouldFitToWindow: $shouldFitToWindow
+                                ) {
+                                    imageContentView
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 300, maxHeight: .infinity, alignment: .topLeading)
+                                .clipped()
+                            }
+                        }
+                    }
+                    .onAppear {
+                        zoomScale = 1.0
+                        shouldFitToWindow = true
+                    }
+                    .onChange(of: item.id) { _, _ in
                         zoomScale = 1.0
                         shouldFitToWindow = true
                     }

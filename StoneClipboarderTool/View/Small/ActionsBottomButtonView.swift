@@ -6,6 +6,7 @@
 
 import SwiftUI
 import AppKit
+import Vision
 
 struct ActionsBottomButtonView: View {
     @EnvironmentObject var cbViewModel: CBViewModel
@@ -18,11 +19,23 @@ struct ActionsBottomButtonView: View {
     // Computed property to determine if Preview button should be shown
     private var shouldShowPreviewButton: Bool {
         switch item.itemType {
-        case .image:
+        case .image, .combined:
             return item.image != nil
         case .file:
             return item.isImageFile && item.filePreviewImage != nil
         case .text:
+            return false
+        }
+    }
+
+    // Computed property to determine if OCR button should be shown
+    private var shouldShowOCRButton: Bool {
+        switch item.itemType {
+        case .image:
+            return item.image != nil
+        case .file:
+            return item.isImageFile && item.filePreviewImage != nil
+        case .combined, .text:
             return false
         }
     }
@@ -46,7 +59,15 @@ struct ActionsBottomButtonView: View {
                 }
                 .buttonStyle(.bordered)
             }
-            
+
+            // OCR button for extracting text from images
+            if shouldShowOCRButton {
+                Button("Extract Text (OCR)") {
+                    extractTextFromImage()
+                }
+                .buttonStyle(.bordered)
+            }
+
             if item.itemType == .text {
                 if isEditing {
                     Button("Save Changes") {
@@ -99,7 +120,7 @@ struct ActionsBottomButtonView: View {
     
     private func openInPreview() {
         switch item.itemType {
-        case .image:
+        case .image, .combined:
             openImageInPreview()
         case .file:
             if item.isImageFile {
@@ -168,5 +189,67 @@ struct ActionsBottomButtonView: View {
             print("Error creating temp file for Preview: \(error.localizedDescription)")
         }
     }
-    
+
+    private func extractTextFromImage() {
+        // Get the image based on item type
+        let imageToProcess: NSImage?
+        switch item.itemType {
+        case .image:
+            imageToProcess = item.image
+        case .file where item.isImageFile:
+            imageToProcess = item.filePreviewImage
+        default:
+            imageToProcess = nil
+        }
+
+        guard let image = imageToProcess,
+              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            print("Failed to get image for OCR")
+            return
+        }
+
+        // Create Vision request
+        let request = VNRecognizeTextRequest { request, error in
+            if let error = error {
+                print("OCR error: \(error.localizedDescription)")
+                return
+            }
+
+            guard let observations = request.results as? [VNRecognizedTextObservation] else {
+                print("No text recognized")
+                return
+            }
+
+            // Extract all recognized text
+            let recognizedText = observations.compactMap { observation in
+                observation.topCandidates(1).first?.string
+            }.joined(separator: "\n")
+
+            if recognizedText.isEmpty {
+                print("No text found in image")
+                return
+            }
+
+            // Create a new text item with extracted text on main thread
+            DispatchQueue.main.async {
+                cbViewModel.addTextItem(content: recognizedText)
+                print("Extracted \(recognizedText.count) characters from image")
+            }
+        }
+
+        // Configure request for best accuracy
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+
+        // Perform OCR
+        let requestHandler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try requestHandler.perform([request])
+            } catch {
+                print("Failed to perform OCR: \(error.localizedDescription)")
+            }
+        }
+    }
+
 }

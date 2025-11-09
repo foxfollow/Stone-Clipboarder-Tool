@@ -35,7 +35,7 @@ struct QuickPickerView: View {
 
         return quickPickerItems.filter { item in
             switch item.itemType {
-            case .text:
+            case .text, .combined:
                 if let content = item.content {
                     return content.localizedCaseInsensitiveContains(trimmedSearch)
                 }
@@ -283,7 +283,7 @@ struct QuickPickerView: View {
 
                 let searchResults = allItems.filter { item in
                     switch item.itemType {
-                    case .text:
+                    case .text, .combined:
                         return item.content?.lowercased().contains(searchLower) == true
                             || item.contentPreview?.lowercased().contains(searchLower) == true
                     case .file:

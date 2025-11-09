@@ -210,6 +210,8 @@ class CBViewModel: ObservableObject {
             addOrUpdateImageItem(image: image)
         case .file(let url, let uti, let data):
             addOrUpdateFileItem(url: url, uti: uti, data: data)
+        case .combined(let content, let image):
+            addOrUpdateCombinedItem(content: content, image: image)
         }
     }
 
@@ -259,6 +261,32 @@ class CBViewModel: ObservableObject {
             performCleanupIfNeeded()
         } catch {
             print("Failed to save image item: \(error)")
+        }
+    }
+
+    private func addOrUpdateCombinedItem(content: String, image: NSImage) {
+        guard let modelContext = _modelContext else { return }
+        guard let imageData = image.tiffRepresentation else { return }
+
+        let tempItem = CBItem(
+            timestamp: Date(),
+            content: content,
+            imageData: imageData,
+            itemType: .combined
+        )
+
+        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
+            existingItem.timestamp = Date()
+        } else {
+            modelContext.insert(tempItem)
+        }
+
+        do {
+            try modelContext.save()
+            fetchItems(reset: true)
+            performCleanupIfNeeded()
+        } catch {
+            print("Failed to save combined item: \(error)")
         }
     }
 
@@ -324,7 +352,7 @@ class CBViewModel: ObservableObject {
 
     private func openInPreviewAsync(item: CBItem) async throws {
         switch item.itemType {
-        case .image:
+        case .image, .combined:
             try await openImageInPreview(item)
         case .file:
             if item.isImageFile {
