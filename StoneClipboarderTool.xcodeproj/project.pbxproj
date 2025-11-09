@@ -270,9 +270,8 @@
 		BF6748722E45EEE50035F367 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconMain;
+				ASSETCATALOG_COMPILER_APPICON_NAME = StoneClipboarderIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = StoneClipboarderTool/StoneClipboarderTool.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -283,6 +282,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = StoneClipboarderTool/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Stone Clipboarder";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -301,9 +301,8 @@
 		BF6748732E45EEE50035F367 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconMain;
+				ASSETCATALOG_COMPILER_APPICON_NAME = StoneClipboarderIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = StoneClipboarderTool/StoneClipboarderTool.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -314,6 +313,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = StoneClipboarderTool/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Stone Clipboarder";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
