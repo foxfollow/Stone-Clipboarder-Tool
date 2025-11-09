@@ -19,9 +19,10 @@ class ClipboardManager: ObservableObject {
     private var timer: Timer?
     private var lastChangeCount: Int = 0
     private let pasteboard = NSPasteboard.general
-    
+
     var onClipboardChange: ((ClipboardContent) -> Void)?
-    
+    weak var settingsManager: SettingsManager?
+
     init() {
         lastChangeCount = pasteboard.changeCount
     }
@@ -39,22 +40,61 @@ class ClipboardManager: ObservableObject {
     
     private func checkClipboard() {
         guard pasteboard.changeCount != lastChangeCount else { return }
-        
+
         lastChangeCount = pasteboard.changeCount
-        
-        // Check for files first (highest priority)
+
+        let captureMode = settingsManager?.clipboardCaptureMode ?? .textOnly
+
+        // ALWAYS check for files first to prevent them from being captured as text
+        // This is critical to fix the issue where file URLs were being saved as text
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL],
            let fileURL = urls.first,
            fileURL.isFileURL {
             handleFileFromURL(fileURL)
+            return // Exit early - files are handled, don't process text/image
         }
-        // Check for images (medium priority)
-        else if let image = NSImage(pasteboard: pasteboard) {
-            onClipboardChange?(.image(image))
-        }
-        // Check for text (lowest priority)
-        else if let content = pasteboard.string(forType: .string), !content.isEmpty {
-            onClipboardChange?(.text(content))
+
+        // Now handle text and image based on capture mode
+        // Note: This only applies to non-file clipboard content
+        let hasText = pasteboard.string(forType: .string).map { !$0.isEmpty } ?? false
+        let hasImage = NSImage(pasteboard: pasteboard) != nil
+
+        switch captureMode {
+        case .textOnly:
+            // Only capture text, ignore images
+            if hasText, let content = pasteboard.string(forType: .string) {
+                onClipboardChange?(.text(content))
+            }
+
+        case .imageOnly:
+            // Only capture images, ignore text
+            if hasImage, let image = NSImage(pasteboard: pasteboard) {
+                onClipboardChange?(.image(image))
+            }
+
+        case .both:
+            // Capture both text and image if both are present
+            // This is useful for apps like Microsoft Word that put both on clipboard
+            if hasText && hasImage {
+                // First capture text
+                if let content = pasteboard.string(forType: .string) {
+                    onClipboardChange?(.text(content))
+                }
+                // Then capture image as a separate item
+                if let image = NSImage(pasteboard: pasteboard) {
+                    onClipboardChange?(.image(image))
+                }
+            } else if hasText {
+                // Only text available
+                if let content = pasteboard.string(forType: .string) {
+                    onClipboardChange?(.text(content))
+                }
+            } else if hasImage {
+                // Only image available
+                if let image = NSImage(pasteboard: pasteboard) {
+                    onClipboardChange?(.image(image))
+                }
+            }
         }
     }
     

@@ -43,6 +43,7 @@ class CBViewModel: ObservableObject {
 
     func setSettingsManager(_ manager: SettingsManager) {
         self.settingsManager = manager
+        clipboardManager.settingsManager = manager
         startMemoryCleanupTimer()
 
         // Trigger cleanup when maxItemsToKeep changes
