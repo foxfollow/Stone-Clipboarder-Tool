@@ -61,15 +61,43 @@ class ClipboardManager: ObservableObject {
 
         switch captureMode {
         case .textOnly:
-            // Only capture text, ignore images
-            if hasText, let content = pasteboard.string(forType: .string) {
-                onClipboardChange?(.text(content))
+            // Prefer text when both text and image are present (e.g., Microsoft Word)
+            // But still capture standalone images (e.g., screenshots)
+            if hasText && hasImage {
+                // Both present - prefer text only
+                if let content = pasteboard.string(forType: .string) {
+                    onClipboardChange?(.text(content))
+                }
+            } else if hasText {
+                // Only text available
+                if let content = pasteboard.string(forType: .string) {
+                    onClipboardChange?(.text(content))
+                }
+            } else if hasImage {
+                // Only image available (e.g., screenshots) - capture it
+                if let image = NSImage(pasteboard: pasteboard) {
+                    onClipboardChange?(.image(image))
+                }
             }
 
         case .imageOnly:
-            // Only capture images, ignore text
-            if hasImage, let image = NSImage(pasteboard: pasteboard) {
-                onClipboardChange?(.image(image))
+            // Prefer images when both are present
+            // But still capture text when there's no image
+            if hasText && hasImage {
+                // Both present - prefer image only
+                if let image = NSImage(pasteboard: pasteboard) {
+                    onClipboardChange?(.image(image))
+                }
+            } else if hasImage {
+                // Only image available
+                if let image = NSImage(pasteboard: pasteboard) {
+                    onClipboardChange?(.image(image))
+                }
+            } else if hasText {
+                // Only text available - capture it
+                if let content = pasteboard.string(forType: .string) {
+                    onClipboardChange?(.text(content))
+                }
             }
 
         case .both:

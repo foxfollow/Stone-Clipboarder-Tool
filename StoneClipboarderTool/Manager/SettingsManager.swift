@@ -23,9 +23,9 @@ enum ClipboardCaptureMode: String, Codable, CaseIterable {
     var description: String {
         switch self {
         case .textOnly:
-            return "Capture only text from clipboard (default, prevents images from Microsoft Word)"
+            return "Prefer text when both available (e.g., Word), but still capture standalone images (screenshots)"
         case .imageOnly:
-            return "Capture only images from clipboard"
+            return "Prefer images when both available, but still capture standalone text"
         case .both:
             return "Capture both text and image separately when both are available"
         }
