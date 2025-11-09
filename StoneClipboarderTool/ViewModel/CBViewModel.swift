@@ -527,6 +527,11 @@ class CBViewModel: ObservableObject {
         var itemsToCleanup: [CBItem] = []
 
         for item in items {
+            // Skip favorites - never cleanup their memory
+            if item.isFavorite {
+                continue
+            }
+
             if let lastAccess = lastAccessTimes[item.persistentModelID] {
                 if now.timeIntervalSince(lastAccess) > maxInactiveTime {
                     itemsToCleanup.append(item)
@@ -541,7 +546,7 @@ class CBViewModel: ObservableObject {
         let cutoffTime = now.addingTimeInterval(-maxInactiveTime)
         lastAccessTimes = lastAccessTimes.filter { $1 > cutoffTime }
 
-        print("Memory cleanup: Released \(itemsToCleanup.count) inactive items")
+        print("Memory cleanup: Released \(itemsToCleanup.count) inactive items (favorites preserved)")
     }
 
     private func cleanupItemMemory(_ item: CBItem) {
