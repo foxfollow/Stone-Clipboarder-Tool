@@ -25,6 +25,12 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 ## Features
 
 - **Automatic Clipboard Monitoring**: Captures everything you copy while the app is running
+- **Clipboard Capture Modes**: Choose to capture only text, only images, or both (useful for Microsoft Word text-only paste)
+- **OCR Text Recognition**: Extract text from images using Apple Vision framework
+- **Combined Clipboard Items**: Save text and image as a single item (BETA)
+- **Global Hotkeys**: System-wide keyboard shortcuts for instant clipboard access (⌃⌥1-0, ⌃⇧1-0)
+- **Quick Picker Window**: Spotlight-like floating panel (⌃⌥Space) for fast item selection
+- **Favorites System**: Pin frequently-used items that won't be auto-deleted
 - **Menu Bar Integration**: Quick access to recent 10 clipboard items from the menu bar
 - **Native Settings**: Access settings through macOS app menu (⌘,) or menu bar
 - **Persistent Storage**: Uses SwiftData to store clipboard history locally
