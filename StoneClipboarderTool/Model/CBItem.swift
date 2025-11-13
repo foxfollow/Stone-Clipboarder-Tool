@@ -14,12 +14,14 @@ enum CBItemType: String, Codable, CaseIterable {
     case text = "text"
     case image = "image"
     case file = "file"
+    case combined = "combined"  // Text + Image together
 
     var sfSybmolName: String {
         switch self {
         case .text: return "text.page"
         case .image: return "photo"
         case .file: return "document.badge.ellipsis"
+        case .combined: return "text.and.photo"
         }
     }
 
@@ -28,6 +30,7 @@ enum CBItemType: String, Codable, CaseIterable {
         case .text: return .blue
         case .image: return .orange
         case .file: return .pink
+        case .combined: return .purple
         }
     }
 }
@@ -107,11 +110,15 @@ final class CBItem {
                 return "[FileImage - \(fileName ?? "Unknown") (\(fileSizeString))]"
             }
             return "[File - \(fileName ?? "Unknown") (\(fileSizeString))]"
+        case .combined:
+            let textPart = contentPreview ?? content ?? "No text"
+            let imagePart = imageSize ?? calculateImageSize()
+            return "\(textPart)\n[Image - \(imagePart)]"
         }
     }
 
     var image: NSImage? {
-        guard itemType == .image, let imageData = imageData else { return nil }
+        guard (itemType == .image || itemType == .combined), let imageData = imageData else { return nil }
         return NSImage(data: imageData)
     }
 
@@ -124,8 +131,8 @@ final class CBItem {
             return cachedThumbnail
         }
 
-        // Generate thumbnail on-demand for images
-        if itemType == .image {
+        // Generate thumbnail on-demand for images and combined items
+        if itemType == .image || itemType == .combined {
             if let imageData = imageData,
                 let image = NSImage(data: imageData)
             {
@@ -283,6 +290,8 @@ final class CBItem {
             return imageData == other.imageData
         case .file:
             return fileData == other.fileData && fileName == other.fileName
+        case .combined:
+            return content == other.content && imageData == other.imageData
         }
     }
 

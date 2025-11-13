@@ -7,6 +7,35 @@
 
 import Foundation
 
+enum ClipboardCaptureMode: String, Codable, CaseIterable {
+    case textOnly = "textOnly"
+    case imageOnly = "imageOnly"
+    case both = "both"
+    case bothAsOne = "bothAsOne"
+
+    var displayName: String {
+        switch self {
+        case .textOnly: return "Text Only"
+        case .imageOnly: return "Image Only"
+        case .both: return "Both Text and Image"
+        case .bothAsOne: return "Both as One Item (BETA)"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .textOnly:
+            return "Prefer text when both available (e.g., Word), but still capture standalone images (screenshots)"
+        case .imageOnly:
+            return "Prefer images when both available, but still capture standalone text"
+        case .both:
+            return "Capture both text and image separately when both are available"
+        case .bothAsOne:
+            return "Capture text and image together as one combined item (see both in preview)"
+        }
+    }
+}
+
 class SettingsManager: ObservableObject {
     @Published var showInMenubar: Bool {
         didSet {
@@ -74,6 +103,12 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @Published var clipboardCaptureMode: ClipboardCaptureMode {
+        didSet {
+            UserDefaults.standard.set(clipboardCaptureMode.rawValue, forKey: "clipboardCaptureMode")
+        }
+    }
+
     //    @Published var autoSelectOnPaste: Bool {
     //        didSet {
     //            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
@@ -98,6 +133,21 @@ class SettingsManager: ObservableObject {
             UserDefaults.standard.object(forKey: "memoryCleanupInterval") as? Int ?? 5
         self.maxInactiveTime =
             UserDefaults.standard.object(forKey: "maxInactiveTime") as? Int ?? 30
+
+        // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
+        if let savedModeString = UserDefaults.standard.string(forKey: "clipboardCaptureMode"),
+           let savedMode = ClipboardCaptureMode(rawValue: savedModeString) {
+            self.clipboardCaptureMode = savedMode
+        } else if let oldPreference = UserDefaults.standard.object(forKey: "preferTextOverImage") as? Bool {
+            // Migrate old boolean setting: true = textOnly, false = imageOnly
+            self.clipboardCaptureMode = oldPreference ? .textOnly : .imageOnly
+            UserDefaults.standard.set(self.clipboardCaptureMode.rawValue, forKey: "clipboardCaptureMode")
+            UserDefaults.standard.removeObject(forKey: "preferTextOverImage")
+        } else {
+            // Default to textOnly for new installations
+            self.clipboardCaptureMode = .textOnly
+        }
+
         //        self.autoSelectOnPaste = UserDefaults.standard.object(forKey: "autoSelectOnPaste") as? Bool ?? true
 
         // Default to showing menubar if first launch

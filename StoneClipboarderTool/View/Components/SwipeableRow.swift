@@ -152,7 +152,7 @@ struct SwipeableRow<Content: View>: View {
     private var shouldShowPreviewButton: Bool {
         guard let item = item else { return false }
         switch item.itemType {
-        case .image:
+        case .image, .combined:
             return item.image != nil
         case .file:
             return item.isImageFile && item.filePreviewImage != nil

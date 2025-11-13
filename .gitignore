@@ -116,3 +116,5 @@ SPARKLE_SETUP.md
 ACTIONS_SETUP.md
 
 test*
+*.xcscheme
+CLAUDE.md

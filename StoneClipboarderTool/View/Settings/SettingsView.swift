@@ -52,6 +52,22 @@ struct SettingsView: View {
                     .help("Keep the main window visible in the dock")
             }
 
+            Section("Clipboard Behavior") {
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker("Clipboard capture mode:", selection: $settingsManager.clipboardCaptureMode) {
+                        ForEach(ClipboardCaptureMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text(settingsManager.clipboardCaptureMode.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .help("Choose how to capture clipboard content. Files are always captured regardless of this setting.")
+            }
+            
             Section("Memory Optimization") {
                 Toggle("Auto-cleanup old items", isOn: $settingsManager.enableAutoCleanup)
                     .help("Automatically remove old clipboard items to maintain performance")

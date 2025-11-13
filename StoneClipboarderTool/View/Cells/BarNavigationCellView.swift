@@ -33,7 +33,7 @@ struct BarNavigationCellView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if item.itemType == .image || (item.itemType == .file && item.isImageFile) {
+            if item.itemType == .image || item.itemType == .combined || (item.itemType == .file && item.isImageFile) {
                 if let thumbnail = item.thumbnail {
                     Image(nsImage: thumbnail)
                         .resizable()

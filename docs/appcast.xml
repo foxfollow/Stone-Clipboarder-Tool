@@ -11,11 +11,39 @@
         <language>en</language>
 
         <item>
+            <title>Version 1.2.0</title>
+            <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+            <description
+            ><![CDATA[
+                <h2>StoneClipboarderTool 1.2.0</h2>
+                <ul>
+                    <li>⚡ NEW: @MainActor class AppDelegate - Better initialization on login for improved stability</li>
+                    <li>🎨 NEW: Updated Liquid Glass app icons - Native Icon Composer design with modern aesthetic</li>
+                    <li>⭐ FIXED: Favorites persistence - Favorite items are now protected from auto-deletion</li>
+                    <li>📋 NEW: Clipboard Capture Modes - Choose to capture only text, only images, or both (useful for Microsoft Word text-only paste)</li>
+                    <li>🔗 NEW: Combined clipboard items - Save text and image as a single item (BETA)</li>
+                    <li>🔍 NEW: OCR Text Recognition - Extract text from images using Apple Vision framework</li>
+                    <li>🐛 Bug fixes and performance improvements</li>
+                </ul>
+            ]]></description>
+            <pubDate>Wed, 13 Nov 2025 12:00:00 +0000</pubDate>
+            <enclosure
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.2.0/StoneClipboarderTool.zip"
+                sparkle:version="9"
+                sparkle:shortVersionString="1.2.0"
+                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
+                length="FILE_SIZE"
+                type="application/octet-stream"
+            />
+        </item>
+
+        <item>
             <title>Version 1.1.0</title>
             <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
             <sparkle:version>1.1.0</sparkle:version>
-            <sparkle:shortVersionString
-            >1.1.0</sparkle:shortVersionString>
+            <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
             <description
             ><![CDATA[
                 <h2>StoneClipboarderTool 1.1.0</h2>
