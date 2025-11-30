@@ -443,8 +443,21 @@ class CBViewModel: ObservableObject {
         item.isFavorite.toggle()
 
         if item.isFavorite {
-            let maxOrderIndex = items.filter { $0.isFavorite }.map { $0.orderIndex }.max() ?? -1
-            item.orderIndex = maxOrderIndex + 1
+            // Fetch all favorites from database to get accurate max order index
+            let descriptor = FetchDescriptor<CBItem>(
+                predicate: #Predicate { $0.isFavorite }
+            )
+
+            do {
+                let allFavorites = try modelContext.fetch(descriptor)
+                let maxOrderIndex = allFavorites.map { $0.orderIndex }.max() ?? -1
+                item.orderIndex = maxOrderIndex + 1
+            } catch {
+                print("Failed to fetch favorites for order index: \(error)")
+                // Fallback to in-memory items if fetch fails
+                let maxOrderIndex = items.filter { $0.isFavorite }.map { $0.orderIndex }.max() ?? -1
+                item.orderIndex = maxOrderIndex + 1
+            }
         } else {
             item.orderIndex = 0
         }
@@ -473,7 +486,19 @@ class CBViewModel: ObservableObject {
     }
 
     var favoriteItems: [CBItem] {
-        return items.filter { $0.isFavorite }.sorted { $0.orderIndex < $1.orderIndex }
+        guard let modelContext = _modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<CBItem>(
+            predicate: #Predicate { $0.isFavorite },
+            sortBy: [SortDescriptor(\.orderIndex, order: .forward)]
+        )
+
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            print("Failed to fetch favorite items: \(error)")
+            return []
+        }
     }
 
     var recentItems: [CBItem] {
