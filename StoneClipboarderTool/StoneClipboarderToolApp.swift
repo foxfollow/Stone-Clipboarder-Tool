@@ -124,6 +124,7 @@ struct StoneClipboarderToolApp: App {
         let schema = Schema([
             CBItem.self,
             HotkeyConfig.self,
+            ExcludedApp.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -174,8 +175,10 @@ struct StoneClipboarderToolApp: App {
                 SettingsView(updater: updaterController.updater)
                     .environmentObject(settingsManager)
                     .environmentObject(hotkeyManager)
+                    .environmentObject(cbViewModel)
                     .frame(width: 500, height: 500)
             }
+            .modelContainer(sharedModelContainer)
             .windowResizability(.contentSize)
             .windowStyle(.automatic)
 
@@ -183,7 +186,9 @@ struct StoneClipboarderToolApp: App {
                 SettingsView(updater: updaterController.updater)
                     .environmentObject(settingsManager)
                     .environmentObject(hotkeyManager)
+                    .environmentObject(cbViewModel)
             }
+            .modelContainer(sharedModelContainer)
         }
     }
 

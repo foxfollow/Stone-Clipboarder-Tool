@@ -7,6 +7,7 @@
 
 import AppKit
 import Foundation
+import SwiftData
 import UniformTypeIdentifiers
 
 enum ClipboardContent {
@@ -23,9 +24,40 @@ class ClipboardManager: ObservableObject {
 
     var onClipboardChange: ((ClipboardContent) -> Void)?
     weak var settingsManager: SettingsManager?
+    var modelContext: ModelContext?
 
     init() {
         lastChangeCount = pasteboard.changeCount
+    }
+
+    func setModelContext(_ context: ModelContext) {
+        self.modelContext = context
+    }
+
+    private func getActiveAppBundleIdentifier() -> String? {
+        guard let activeApp = NSWorkspace.shared.frontmostApplication else {
+            return nil
+        }
+        return activeApp.bundleIdentifier
+    }
+
+    private func isAppExcluded(_ bundleIdentifier: String) -> Bool {
+        guard let context = modelContext else { return false }
+        guard settingsManager?.enableAppExclusion == true else { return false }
+
+        let descriptor = FetchDescriptor<ExcludedApp>(
+            predicate: #Predicate { app in
+                app.bundleIdentifier == bundleIdentifier
+            }
+        )
+
+        do {
+            let excludedApps = try context.fetch(descriptor)
+            return !excludedApps.isEmpty
+        } catch {
+            print("Error fetching excluded apps: \(error)")
+            return false
+        }
     }
     
     func startMonitoring() {
@@ -43,6 +75,11 @@ class ClipboardManager: ObservableObject {
         guard pasteboard.changeCount != lastChangeCount else { return }
 
         lastChangeCount = pasteboard.changeCount
+
+        // Check if the active app is excluded
+        if let bundleId = getActiveAppBundleIdentifier(), isAppExcluded(bundleId) {
+            return
+        }
 
         let captureMode = settingsManager?.clipboardCaptureMode ?? .textOnly
 

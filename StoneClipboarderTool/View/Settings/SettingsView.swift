@@ -33,7 +33,11 @@ struct SettingsView: View {
                     HotkeySettingsView()
                 }
 
-                Tab("About", systemImage: "info.circle", value: 2) {
+                Tab("Excluded Apps", systemImage: "lock.app.dashed", value: 2) {
+                    ExcludedAppsSettingsView()
+                }
+
+                Tab("About", systemImage: "info.circle", value: 3) {
                     AboutSettingsView(updater: updater)
                 }
             }

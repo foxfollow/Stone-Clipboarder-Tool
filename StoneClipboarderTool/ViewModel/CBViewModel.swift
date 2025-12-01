@@ -38,6 +38,7 @@ class CBViewModel: ObservableObject {
 
     func setModelContext(_ context: ModelContext) {
         self._modelContext = context
+        clipboardManager.setModelContext(context)
         fetchItems()
     }
 
