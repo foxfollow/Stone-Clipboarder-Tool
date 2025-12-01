@@ -37,42 +37,49 @@ struct ExcludedAppsSettingsView: View {
                             .foregroundColor(.secondary)
                             .italic()
                     } else {
-                        List {
-                            ForEach(excludedApps) { app in
-                                HStack {
-                                    if let icon = getAppIcon(for: app.bundleIdentifier) {
-                                        Image(nsImage: icon)
-                                            .resizable()
-                                            .frame(width: 24, height: 24)
-                                    } else {
-                                        Image(systemName: "app")
-                                            .resizable()
-                                            .frame(width: 24, height: 24)
-                                    }
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                ForEach(excludedApps) { app in
+                                    HStack {
+                                        if let icon = getAppIcon(for: app.bundleIdentifier) {
+                                            Image(nsImage: icon)
+                                                .resizable()
+                                                .frame(width: 24, height: 24)
+                                        } else {
+                                            Image(systemName: "app")
+                                                .resizable()
+                                                .frame(width: 24, height: 24)
+                                        }
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(app.appName)
-                                            .font(.body)
-                                        Text(app.bundleIdentifier)
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(app.appName)
+                                                .font(.body)
+                                            Text(app.bundleIdentifier)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
 
-                                    Spacer()
+                                        Spacer()
 
-                                    Button(action: {
-                                        removeApp(app)
-                                    }) {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(.red)
+                                        Button(action: {
+                                            removeApp(app)
+                                        }) {
+                                            Image(systemName: "trash")
+                                                .foregroundColor(.red)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("Remove from excluded apps")
                                     }
-                                    .buttonStyle(.plain)
-                                    .help("Remove from excluded apps")
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 8)
+
+                                    if app.id != excludedApps.last?.id {
+                                        Divider()
+                                    }
                                 }
-                                .padding(.vertical, 4)
                             }
                         }
-                        .frame(minHeight: 200, maxHeight: 300)
+                        .frame(minHeight: 200, maxHeight: 260)
                     }
 
                     HStack {
@@ -95,9 +102,15 @@ struct ExcludedAppsSettingsView: View {
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showingAppPicker) {
-            AppPickerView { selectedBundleId, selectedAppName in
-                addApp(bundleIdentifier: selectedBundleId, appName: selectedAppName)
-            }
+            AppPickerView(
+                excludedApps: excludedApps,
+                onAppSelected: { selectedBundleId, selectedAppName in
+                    addApp(bundleIdentifier: selectedBundleId, appName: selectedAppName)
+                },
+                onAppRemoved: { app in
+                    removeApp(app)
+                }
+            )
         }
     }
 
@@ -157,8 +170,12 @@ struct AppPickerView: View {
     @State private var applications: [AppInfo] = []
     @State private var searchText = ""
     @State private var isLoading = true
+    @State private var showingAlert = false
+    @State private var alertApp: AppInfo?
 
+    let excludedApps: [ExcludedApp]
     let onAppSelected: (String, String) -> Void
+    let onAppRemoved: (ExcludedApp) -> Void
 
     struct AppInfo: Identifiable {
         let id = UUID()
@@ -179,13 +196,17 @@ struct AppPickerView: View {
         }
     }
 
+    private func isAppExcluded(_ app: AppInfo) -> Bool {
+        excludedApps.contains { $0.bundleIdentifier == app.bundleIdentifier }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Text("Select App to Exclude")
                     .font(.headline)
                 Spacer()
-                Button("Cancel") {
+                Button("Close") {
                     dismiss()
                 }
             }
@@ -203,8 +224,12 @@ struct AppPickerView: View {
             } else {
                 List(filteredApps) { app in
                     Button(action: {
-                        onAppSelected(app.bundleIdentifier, app.name)
-                        dismiss()
+                        if isAppExcluded(app) {
+                            alertApp = app
+                            showingAlert = true
+                        } else {
+                            onAppSelected(app.bundleIdentifier, app.name)
+                        }
                     }) {
                         HStack {
                             if let icon = app.icon {
@@ -224,9 +249,21 @@ struct AppPickerView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
+
                             Spacer()
+
+                            if isAppExcluded(app) {
+                                Image(systemName: "lock.app.dashed")
+                                    .foregroundColor(.red)
+                                    .font(.title3)
+                            } else {
+                                Image(systemName: "app.dashed")
+                                    .foregroundColor(.yellow)
+                                    .font(.title3)
+                            }
                         }
                         .padding(.vertical, 4)
+                        .opacity(isAppExcluded(app) ? 0.5 : 1.0)
                     }
                     .buttonStyle(.plain)
                 }
@@ -236,6 +273,16 @@ struct AppPickerView: View {
         .frame(width: 500, height: 600)
         .onAppear {
             loadApplications()
+        }
+        .alert("App Already Excluded", isPresented: $showingAlert, presenting: alertApp) { app in
+            Button("Remove", role: .destructive) {
+                if let excludedApp = excludedApps.first(where: { $0.bundleIdentifier == app.bundleIdentifier }) {
+                    onAppRemoved(excludedApp)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { app in
+            Text("'\(app.name)' is already in the excluded apps list. Do you want to remove it?")
         }
     }
 
