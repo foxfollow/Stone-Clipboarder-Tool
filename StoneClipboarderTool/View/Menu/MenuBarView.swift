@@ -10,7 +10,9 @@ import SwiftUI
 struct MenuBarView: View {
     @EnvironmentObject var cbViewModel: CBViewModel
     @EnvironmentObject var settingsManager: SettingsManager
+    @EnvironmentObject var clipboardManager: ClipboardManager
 
+    @Environment(\.dismiss) private var dismiss
     private var recentItems: [CBItem] {
         Array(cbViewModel.items.prefix(settingsManager.menuBarDisplayLimit))
     }
@@ -19,15 +21,15 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack {
-                Image(systemName: "doc.on.clipboard")
-                    .foregroundStyle(.blue)
+                Image(systemName: clipboardManager.isPaused ? "arrow.trianglehead.2.clockwise.rotate.90.page.on.clipboard" : "doc.on.clipboard")
+                    .foregroundStyle(clipboardManager.isPaused ? .orange : .blue)
                 Text("Clipboard History")
                     .font(.headline)
 
                 Spacer()
 
                 Button(action: {
-                    NSApp.terminate(nil)
+                    dismiss()
                 }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -38,6 +40,11 @@ struct MenuBarView: View {
             .padding(.vertical, 8)
 
             Divider()
+
+            // Pause Timer Section
+            PauseTimerView()
+                .environmentObject(clipboardManager)
+                .environmentObject(settingsManager)
 
             if recentItems.isEmpty {
                 Text("No clipboard history")

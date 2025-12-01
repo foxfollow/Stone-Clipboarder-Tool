@@ -115,6 +115,12 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @Published var lastPauseDuration: Int {
+        didSet {
+            UserDefaults.standard.set(lastPauseDuration, forKey: "lastPauseDuration")
+        }
+    }
+
     //    @Published var autoSelectOnPaste: Bool {
     //        didSet {
     //            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
@@ -140,6 +146,7 @@ class SettingsManager: ObservableObject {
         self.maxInactiveTime =
             UserDefaults.standard.object(forKey: "maxInactiveTime") as? Int ?? 30
         self.enableAppExclusion = UserDefaults.standard.object(forKey: "enableAppExclusion") as? Bool ?? false
+        self.lastPauseDuration = UserDefaults.standard.object(forKey: "lastPauseDuration") as? Int ?? 300 // Default 5 minutes
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = UserDefaults.standard.string(forKey: "clipboardCaptureMode"),

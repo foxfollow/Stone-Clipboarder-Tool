@@ -53,6 +53,10 @@ class CBViewModel: ObservableObject {
         }
     }
 
+    func getClipboardManager() -> ClipboardManager {
+        return clipboardManager
+    }
+
     func fetchItems(limit: Int? = nil, reset: Bool = false) {
         guard let modelContext = _modelContext else { return }
 

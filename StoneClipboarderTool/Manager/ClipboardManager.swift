@@ -26,6 +26,11 @@ class ClipboardManager: ObservableObject {
     weak var settingsManager: SettingsManager?
     var modelContext: ModelContext?
 
+    // Pause timer properties
+    @Published var isPaused: Bool = false
+    @Published var pauseEndDate: Date?
+    private var pauseTimer: Timer?
+
     init() {
         lastChangeCount = pasteboard.changeCount
     }
@@ -75,6 +80,11 @@ class ClipboardManager: ObservableObject {
         guard pasteboard.changeCount != lastChangeCount else { return }
 
         lastChangeCount = pasteboard.changeCount
+
+        // Check if monitoring is paused
+        if isPaused {
+            return
+        }
 
         // Check if the active app is excluded
         if let bundleId = getActiveAppBundleIdentifier(), isAppExcluded(bundleId) {
@@ -393,5 +403,38 @@ class ClipboardManager: ObservableObject {
                 lastChangeCount = pasteboard.changeCount
             }
         }
+    }
+
+    // MARK: - Pause Timer Methods
+
+    /// Pause clipboard monitoring for a specified duration
+    /// - Parameter seconds: Duration in seconds to pause monitoring
+    func pauseMonitoring(for seconds: Int) {
+        // Cancel any existing pause timer
+        pauseTimer?.invalidate()
+
+        // Set pause state
+        isPaused = true
+        pauseEndDate = Date().addingTimeInterval(TimeInterval(seconds))
+
+        // Schedule timer to resume monitoring
+        pauseTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: false) { [weak self] _ in
+            self?.resumeMonitoring()
+        }
+    }
+
+    /// Resume clipboard monitoring immediately
+    func resumeMonitoring() {
+        pauseTimer?.invalidate()
+        pauseTimer = nil
+        isPaused = false
+        pauseEndDate = nil
+    }
+
+    /// Get remaining pause time in seconds
+    var remainingPauseTime: TimeInterval {
+        guard let endDate = pauseEndDate, isPaused else { return 0 }
+        let remaining = endDate.timeIntervalSinceNow
+        return max(0, remaining)
     }
 }

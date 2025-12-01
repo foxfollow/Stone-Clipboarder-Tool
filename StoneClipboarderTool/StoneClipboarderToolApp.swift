@@ -74,7 +74,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsManager: SettingsManager, menuBarManager: MenuBarManager, cbViewModel: CBViewModel
     ) {
         if settingsManager.showInMenubar {
-            menuBarManager.setupMenuBar(cbViewModel: cbViewModel, settingsManager: settingsManager)
+            menuBarManager.setupMenuBar(cbViewModel: cbViewModel, settingsManager: settingsManager, clipboardManager: cbViewModel.getClipboardManager())
 
             // Monitor and refresh menubar state periodically to prevent corruption
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -208,7 +208,7 @@ struct StoneClipboarderToolApp: App {
 
     private func updateMenuBarVisibility() {
         if settingsManager.showInMenubar {
-            menuBarManager.setupMenuBar(cbViewModel: cbViewModel, settingsManager: settingsManager)
+            menuBarManager.setupMenuBar(cbViewModel: cbViewModel, settingsManager: settingsManager, clipboardManager: cbViewModel.getClipboardManager())
 
             // Monitor and refresh menubar state periodically to prevent corruption
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
