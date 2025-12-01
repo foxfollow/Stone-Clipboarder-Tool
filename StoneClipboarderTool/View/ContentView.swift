@@ -11,6 +11,25 @@ import SwiftUI
 import Combine
 import Sparkle
 
+enum ClipboardTab: String, CaseIterable, Identifiable {
+    case recent
+    case favorites
+
+    var id: Self { self }
+
+    var title: String {
+        return self.rawValue.capitalized
+    }
+
+    var icon: String {
+        switch self {
+        case .recent: "clock"
+        case .favorites: "star"
+        }
+    }
+}
+
+
 struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
 
@@ -22,38 +41,53 @@ struct ContentView: View {
     @State private var showingDeleteAllAlert = false
     @State private var selectedItem: CBItem? = nil
     @State private var selectedTab: ClipboardTab = .recent
+    @State private var searchText: String = ""
 
-    enum ClipboardTab: CaseIterable {
-        case recent, favorites
 
-        var title: String {
-            switch self {
-            case .recent: return "Recent"
-            case .favorites: return "Favorites"
-            }
+
+    // Filtered items based on search text
+    private var filteredRecentItems: [CBItem] {
+        if searchText.isEmpty {
+            return cbViewModel.items
+        }
+        return cbViewModel.items.filter { item in
+            matchesSearch(item: item)
+        }
+    }
+
+    private var filteredFavoriteItems: [CBItem] {
+        if searchText.isEmpty {
+            return cbViewModel.favoriteItems
+        }
+        return cbViewModel.favoriteItems.filter { item in
+            matchesSearch(item: item)
+        }
+    }
+
+    private func matchesSearch(item: CBItem) -> Bool {
+        let lowercasedSearch = searchText.lowercased()
+
+        // Search in text content
+        if let content = item.content,
+           content.lowercased().contains(lowercasedSearch) {
+            return true
         }
 
-        var icon: String {
-            switch self {
-            case .recent: return "clock"
-            case .favorites: return "heart"
-            }
+        // Search in file name
+        if let fileName = item.fileName,
+           fileName.lowercased().contains(lowercasedSearch) {
+            return true
         }
+
+        return false
     }
 
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
                 // Tab picker
-                Picker("View", selection: $selectedTab) {
-                    ForEach(ClipboardTab.allCases, id: \.self) { tab in
-                        Label(tab.title, systemImage: tab.icon)
-                            .tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                ClipboardHeader(selectedTab: $selectedTab, searchText: $searchText)
+                
 
                 // Content based on selected tab
                 Group {
@@ -141,38 +175,49 @@ struct ContentView: View {
                 .foregroundStyle(.red)
             }
 
-            ForEach(cbViewModel.items) { item in
-                DetailedCardView(
-                    editingMode: $editingMode,
-                    selectedItem: $selectedItem,
-                    item: item
-                )
-                .onAppear {
-                    cbViewModel.markItemAccessed(item)
-                    if item == cbViewModel.items.last {
-                        cbViewModel.loadMoreItems()
+            if filteredRecentItems.isEmpty && !searchText.isEmpty {
+                ContentUnavailableView {
+                    Label("No Results", systemImage: "magnifyingglass")
+                } description: {
+                    Text("No items match '\(searchText)'")
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(filteredRecentItems) { item in
+                    DetailedCardView(
+                        editingMode: $editingMode,
+                        selectedItem: $selectedItem,
+                        item: item
+                    )
+                    .onAppear {
+                        cbViewModel.markItemAccessed(item)
+                        // Only trigger load more if not searching and this is the last item
+                        if searchText.isEmpty && item == cbViewModel.items.last {
+                            cbViewModel.loadMoreItems()
+                        }
                     }
                 }
-            }
-            .onDelete(perform: deleteItems)
+                .onDelete(perform: deleteItems)
 
-            if cbViewModel.isLoadingMore {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Loading more...")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Spacer()
+                // Only show loading indicator when not searching
+                if cbViewModel.isLoadingMore && searchText.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading more...")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
-                .padding(.vertical, 8)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
             }
         }
         .listStyle(.sidebar)
-        .animation(.easeInOut(duration: 0.2), value: cbViewModel.items.count)
+        .animation(.easeInOut(duration: 0.2), value: filteredRecentItems.count)
     }
 
     @ViewBuilder
@@ -185,8 +230,15 @@ struct ContentView: View {
                     Text("Tap the heart icon on items to add them to favorites")
                 }
                 .listRowBackground(Color.clear)
+            } else if filteredFavoriteItems.isEmpty && !searchText.isEmpty {
+                ContentUnavailableView {
+                    Label("No Results", systemImage: "magnifyingglass")
+                } description: {
+                    Text("No favorite items match '\(searchText)'")
+                }
+                .listRowBackground(Color.clear)
             } else {
-                ForEach(cbViewModel.favoriteItems) { item in
+                ForEach(filteredFavoriteItems) { item in
                     DetailedCardView(
                         editingMode: $editingMode,
                         selectedItem: $selectedItem,
@@ -200,7 +252,7 @@ struct ContentView: View {
             }
         }
         .listStyle(.sidebar)
-        .animation(.easeInOut(duration: 0.3), value: cbViewModel.favoriteItems.count)
+        .animation(.easeInOut(duration: 0.3), value: filteredFavoriteItems.count)
     }
 
     private func addItem(content: String? = nil) {
@@ -313,5 +365,73 @@ struct DetailedCardView: View {
             .help(item.isFavorite ? "Remove from favorites" : "Add to favorites")
         }
         .animation(.easeInOut(duration: 0.2), value: editingMode)
+    }
+}
+
+#Preview {
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: CBItem.self, configurations: config)
+    let viewModel = CBViewModel()
+    let settingsManager = SettingsManager()
+    let hotkeyManager = HotkeyManager()
+
+    ContentView()
+        .environmentObject(viewModel)
+        .environmentObject(settingsManager)
+        .environmentObject(hotkeyManager)
+        .modelContainer(container)
+        .onAppear {
+            viewModel.setModelContext(container.mainContext)
+            viewModel.setSettingsManager(settingsManager)
+        }
+}
+
+
+import SwiftUI
+
+struct ClipboardHeader: View {
+
+    @Binding var selectedTab: ClipboardTab
+    @Binding var searchText: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            // Segmented control with liquid glass effect (macOS 26+)
+            if #available(macOS 26.0, *) {
+                Picker("", selection: $selectedTab) {
+                    ForEach(ClipboardTab.allCases, id: \.self) { tab in
+                        Text(tab.title)
+                            .tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.large)
+                .glassEffect(.regular)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .onChange(of: selectedTab) { oldValue, newValue in
+                    searchText = ""
+                }
+            } else {
+                // Fallback for macOS 15.0 - 25.x
+                Picker("", selection: $selectedTab) {
+                    ForEach(ClipboardTab.allCases, id: \.self) { tab in
+                        Label(tab.title, systemImage: tab.icon)
+                            .tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .onChange(of: selectedTab) { oldValue, newValue in
+                    searchText = ""
+                }
+            }
+
+            // Search bar with consistent styling
+            SearchBarView(searchText: $searchText)
+        }
     }
 }
