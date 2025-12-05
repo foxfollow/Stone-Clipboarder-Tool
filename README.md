@@ -24,13 +24,18 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 
 ## Features
 
+### 🆕 New in Version 1.3.0
+- **🚫 Excluded Apps**: Choose which apps to exclude from clipboard monitoring in Settings - perfect for protecting sensitive data from password managers or banking apps
+- **⏸️ Pause Monitoring**: Temporarily pause clipboard tracking with a customizable timer for enhanced privacy from the menu bar
+
+### Core Features
 - **Automatic Clipboard Monitoring**: Captures everything you copy while the app is running
 - **Clipboard Capture Modes**: Choose to capture only text, only images, or both (useful for Microsoft Word text-only paste)
-- **OCR Text Recognition**: Extract text from images using Apple Vision framework
-- **Combined Clipboard Items**: Save text and image as a single item (BETA)
+- **OCR Text Recognition**: Extract text from images using Apple Vision framework (Added in v1.2.0)
+- **Combined Clipboard Items**: Save text and image as a single item (BETA - Added in v1.2.0)
 - **Global Hotkeys**: System-wide keyboard shortcuts for instant clipboard access (⌃⌥1-0, ⌃⇧1-0)
 - **Quick Picker Window**: Spotlight-like floating panel (⌃⌥Space) for fast item selection
-- **Favorites System**: Pin frequently-used items that won't be auto-deleted
+- **Favorites System**: Pin frequently-used items that are protected from auto-deletion
 - **Menu Bar Integration**: Quick access to recent 10 clipboard items from the menu bar
 - **Native Settings**: Access settings through macOS app menu (⌘,) or menu bar
 - **Persistent Storage**: Uses SwiftData to store clipboard history locally
@@ -93,9 +98,12 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 
 - Items are automatically saved when you copy text from any application
 - The most recent items appear at the top
+- Use the search bar to quickly find specific clipboard items
 - Use the monospaced font preview to quickly identify content
 - Delete unwanted items by enabling edit mode
 - The app continues monitoring clipboard changes while it's running
+- Exclude sensitive apps like password managers in Settings > Excluded Apps (v1.3.0+)
+- Pause monitoring temporarily when working with sensitive data (v1.3.0+)
 
 ## Requirements
 
@@ -109,6 +117,29 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 3. Grant any required permissions for clipboard access
 
 The app uses SwiftUI and SwiftData for a modern, native macOS experience.
+
+## Version History
+
+### Version 1.3.0 (2025) - Latest
+- **🔎 Advanced Search**: New search bar with liquid glass effect (macOS 15+)
+- **🚫 Excluded Apps**: Per-app clipboard monitoring control
+- **⏸️ Pause Monitoring**: Temporary pause with customizable timer
+- **⭐ Favorites Fix**: Load all favorites regardless of position
+- **🎨 UI Enhancements**: Menu bar pause timer display
+
+### Version 1.2.0 (2025)
+- **🖼️ Combined Items**: Text + image clipboard items (BETA)
+- **🔍 OCR Support**: Apple Vision text recognition
+- **📋 Enhanced Capture**: Improved text/image preference logic
+- **⭐ Favorites Protection**: Auto-cleanup now preserves favorites
+- **🎨 Icon Update**: New liquid glass effect icon
+
+### Version 1.1.0 (2025)
+- **🎯 Initial Release**: Core clipboard monitoring
+- **⚡ Global Hotkeys**: System-wide shortcuts
+- **🖥️ Menu Bar**: Quick access interface
+- **⭐ Favorites**: Pin important items
+- **🔄 Auto Updates**: Sparkle framework integration
 
 ## License
 The MIT License (MIT)

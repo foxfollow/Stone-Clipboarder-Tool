@@ -11,6 +11,34 @@
         <language>en</language>
 
         <item>
+            <title>Version 1.3.0</title>
+            <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+            <description
+            ><![CDATA[
+                <h2>StoneClipboarderTool 1.3.0</h2>
+                <ul>
+                    <li>🔎 NEW: Advanced Search - Search through your clipboard history with a modern search bar featuring macOS 15+ liquid glass effect</li>
+                    <li>🚫 NEW: Excluded Apps - Choose which apps to exclude from clipboard monitoring in Settings for enhanced privacy</li>
+                    <li>⏸️ NEW: Pause Monitoring - Temporarily pause clipboard tracking with a customizable timer</li>
+                    <li>⭐ FIXED: Enhanced Favorites - Fixed loading of all favorites even when they're at the bottom of the list</li>
+                    <li>🎨 IMPROVED: Menu bar now displays pause timer with better visual feedback</li>
+                    <li>🐛 Bug fixes and stability improvements</li>
+                </ul>
+            ]]></description>
+            <pubDate>Thu, 05 Dec 2025 12:00:00 +0000</pubDate>
+            <enclosure
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.3.0/StoneClipboarderTool.zip"
+                sparkle:version="10"
+                sparkle:shortVersionString="1.3.0"
+                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
+                length="FILE_SIZE"
+                type="application/octet-stream"
+            />
+        </item>
+
+        <item>
             <title>Version 1.2.0</title>
             <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
             <sparkle:version>9</sparkle:version>

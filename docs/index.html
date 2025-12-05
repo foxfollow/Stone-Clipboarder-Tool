@@ -376,6 +376,29 @@
             color: #e0e0e0 !important;
         }
 
+        /* Version history specific styles */
+        .version-history h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+            transition: color 0.3s ease;
+        }
+
+        .version-history ul {
+            line-height: 1.8;
+            margin: 10px 0;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .version-history h2 {
+                color: #e0e0e0;
+            }
+        }
+
+        body.dark-theme .version-history h2 {
+            color: #e0e0e0 !important;
+        }
+
         body.dark-theme .app-icon {
             box-shadow: 0 4px 20px rgba(255,255,255,0.1) !important;
         }
@@ -475,7 +498,22 @@
 
         <div class="feature">
             <h3>⭐ Smart Favorites</h3>
-            <p>Pin frequently-used items that are protected from auto-deletion.</p>
+            <p>Pin frequently-used items that are protected from auto-deletion. Enhanced in v1.3.0 to load all favorites even when not in memory.</p>
+        </div>
+
+        <div class="feature">
+            <h3>🔎 Advanced Search</h3>
+            <p>NEW in v1.3.0: Search through your clipboard history with a modern search bar featuring macOS 15+ liquid glass effect.</p>
+        </div>
+
+        <div class="feature">
+            <h3>🚫 Excluded Apps</h3>
+            <p>NEW in v1.3.0: Choose which apps to exclude from clipboard monitoring. Perfect for protecting sensitive data from password managers or banking apps.</p>
+        </div>
+
+        <div class="feature">
+            <h3>⏸️ Pause Monitoring</h3>
+            <p>NEW in v1.3.0: Temporarily pause clipboard monitoring with a customizable timer. Great for privacy when working with sensitive information.</p>
         </div>
 
         <div class="feature">
@@ -489,8 +527,13 @@
         </div>
 
         <div class="feature">
+            <h3>🖼️ Combined Items (BETA)</h3>
+            <p>Added in v1.2.0: Save text and images together as a single clipboard item for rich content management.</p>
+        </div>
+
+        <div class="feature">
             <h3>🖥️ Menu Bar Integration</h3>
-            <p>Quick access to clipboard items directly from the menu bar.</p>
+            <p>Quick access to clipboard items directly from the menu bar with pause timer display.</p>
         </div>
 
         <div class="feature">
@@ -500,12 +543,48 @@
 
         <div class="feature">
             <h3>🔒 Privacy Focused</h3>
-            <p>All data stays on your device. No cloud sync or data collection.</p>
+            <p>All data stays on your device. No cloud sync or data collection. Now with app exclusion for enhanced privacy.</p>
+        </div>
+    </div>
+
+    <!-- Version History Section -->
+    <div class="version-history" style="margin: 60px 0 40px;">
+        <h2>📋 Version History</h2>
+
+        <div class="update-info" style="margin-bottom: 20px;">
+            <h3>🎉 Version 1.3.0 - Latest (2025)</h3>
+            <ul>
+                <li><strong>🚫 Excluded Apps:</strong> Choose which apps to exclude from clipboard monitoring in Settings</li>
+                <li><strong>⏸️ Pause Monitoring:</strong> Temporarily pause clipboard tracking with customizable timer</li>
+                <li><strong>🍻 Small improvements:</strong> Various minor enhancements and bug fixes</li>
+            </ul>
+        </div>
+
+        <div class="update-info" style="background: #f0f0f0; margin-bottom: 20px;">
+            <h3>Version 1.2.0 (2025)</h3>
+            <ul>
+                <li><strong>🖼️ Combined Items (BETA):</strong> Save text and images together as single clipboard items</li>
+                <li><strong>🔍 OCR Support:</strong> Extract text from images using Apple Vision framework</li>
+                <li><strong>📋 Enhanced Capture Modes:</strong> Improved logic to prefer text or image based on availability</li>
+                <li><strong>⭐ Favorites Protection:</strong> Favorites are now protected from auto-cleanup</li>
+                <li><strong>🎨 Icon Update:</strong> New app icon with liquid glass effect</li>
+            </ul>
+        </div>
+
+        <div class="update-info" style="background: #f0f0f0;">
+            <h3>Version 1.1.0 (2025)</h3>
+            <ul>
+                <li><strong>🎯 Initial Release:</strong> Core clipboard monitoring functionality</li>
+                <li><strong>⚡ Global Hotkeys:</strong> System-wide shortcuts for quick access</li>
+                <li><strong>🖥️ Menu Bar:</strong> Quick access to recent clipboard items</li>
+                <li><strong>⭐ Favorites System:</strong> Pin frequently-used items</li>
+                <li><strong>🔄 Auto Updates:</strong> Sparkle framework integration</li>
+            </ul>
         </div>
     </div>
 
     <div class="footer">
-        <p><strong>System</p> Requirements:</strong> macOS 15.0 or later</p>
+        <p><strong>System Requirements:</strong> macOS 15.0 or later</p>
         <p>Built with SwiftUI • Powered by Sparkle Updates</p>
         <p>&copy; 2025 Heorhii Savoiskyi</p>
     </div>
