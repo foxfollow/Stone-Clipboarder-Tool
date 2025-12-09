@@ -1,3 +1,17 @@
+# =============================================================================
+# Build and Release Workflow for Unsigned macOS App with Sparkle Updates
+# =============================================================================
+# 
+# This workflow builds a macOS app WITHOUT Apple Developer ID subscription.
+# Uses macOS 26 Tahoe runner with Xcode 26.
+# The app uses ad-hoc code signing to minimize Gatekeeper friction.
+# Users can open the app via:
+#   1. Right-click → Open (easiest)
+#   2. Terminal: xattr -cr /Applications/YourApp.app
+#
+# Sparkle EdDSA signatures are used for secure auto-updates.
+# =============================================================================
+
 name: Build and Release
 
 on:
@@ -5,280 +19,498 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (without v prefix)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
+
+env:
+  APP_NAME: StoneClipboarderTool
+  SCHEME: StoneClipboarderTool
+  PROJECT: StoneClipboarderTool.xcodeproj
 
 jobs:
   build:
-    runs-on: macos-26
-
+    name: Build and Release
+    runs-on: macos-26  # macOS 26 Tahoe with Xcode 26
+    
     steps:
-      - name: Checkout code
+      # =========================================================================
+      # SETUP
+      # =========================================================================
+      
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Validate secrets
-        env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        with:
+          fetch-depth: 0  # Full history for version detection
+          
+      - name: Determine version
+        id: version
         run: |
-          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
-            echo "ERROR: SPARKLE_PRIVATE_KEY secret is required but not set"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+          
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Building version: $VERSION"
+
+      - name: Validate required secrets
+        run: |
+          if [[ -z "${{ secrets.SPARKLE_PRIVATE_KEY }}" ]]; then
+            echo "❌ ERROR: SPARKLE_PRIVATE_KEY secret is required"
+            echo ""
+            echo "Generate a new key pair with:"
+            echo "  ./bin/generate_keys (from Sparkle tools)"
+            echo ""
+            echo "Add the PRIVATE key to GitHub Secrets as SPARKLE_PRIVATE_KEY"
+            echo "Add the PUBLIC key to your app's Info.plist as SUPublicEDKey"
             exit 1
           fi
-          echo "All required secrets are present"
+          echo "✅ Required secrets are configured"
 
-      - name: Setup Xcode
+      - name: Setup Xcode 26
         run: |
           # List available Xcode versions
-          echo "Available Xcode versions:"
-          ls -la /Applications/ | grep Xcode || echo "Xcode paths not found"
-
-          # Use Xcode 26.x
-          if [ -d "/Applications/Xcode_26.1.1.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_26.1.1.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_26.1.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_26.1.app/Contents/Developer
-          elif [ -d "/Applications/Xcode_26.0.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
-          else
-            echo "ERROR: No suitable Xcode 26.x version found"
-            exit 1
+          echo "📱 Available Xcode versions:"
+          ls -d /Applications/Xcode*.app 2>/dev/null || echo "Checking Xcode paths..."
+          
+          # Select Xcode 26 (default on macos-26 runner)
+          # The runner has Xcode 26.0 as default, but we explicitly select it
+          if [[ -d "/Applications/Xcode_26.app" ]]; then
+            sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer
+          elif [[ -d "/Applications/Xcode.app" ]]; then
+            # Default Xcode.app on macos-26 is Xcode 26
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           fi
-
+          
+          echo ""
+          echo "📱 Selected Xcode version:"
           xcodebuild -version
+          echo ""
+          echo "🔧 Swift version:"
           swift --version
+          echo ""
+          echo "📍 Xcode path:"
+          xcode-select -p
 
-      - name: Install Sparkle tools
-        run: |
-          brew install --cask sparkle
-          echo "Sparkle installation completed"
-
-      - name: Find Sparkle sign_update tool
+      - name: Install Sparkle
         id: sparkle
         run: |
-          SIGN_UPDATE_PATH=""
-          for sparkle_dir in /opt/homebrew/Caskroom/sparkle/*/bin /usr/local/Caskroom/sparkle/*/bin; do
-            if [ -f "$sparkle_dir/sign_update" ]; then
-              SIGN_UPDATE_PATH="$sparkle_dir/sign_update"
-              xattr -d com.apple.quarantine "$SIGN_UPDATE_PATH" 2>/dev/null || true
-              chmod +x "$SIGN_UPDATE_PATH"
+          echo "📥 Installing Sparkle via Homebrew..."
+          brew install --cask sparkle
+          
+          # Find sign_update tool
+          SIGN_UPDATE=""
+          for dir in /opt/homebrew/Caskroom/sparkle/*/bin /usr/local/Caskroom/sparkle/*/bin; do
+            if [[ -f "$dir/sign_update" ]]; then
+              SIGN_UPDATE="$dir/sign_update"
               break
             fi
           done
-
-          if [ -z "$SIGN_UPDATE_PATH" ]; then
-            echo "ERROR: sign_update tool not found"
+          
+          if [[ -z "$SIGN_UPDATE" ]]; then
+            echo "❌ ERROR: sign_update tool not found"
             exit 1
           fi
+          
+          # Remove quarantine and make executable
+          xattr -cr "$SIGN_UPDATE" 2>/dev/null || true
+          chmod +x "$SIGN_UPDATE"
+          
+          echo "SIGN_UPDATE=$SIGN_UPDATE" >> $GITHUB_ENV
+          echo "sign_update=$SIGN_UPDATE" >> $GITHUB_OUTPUT
+          echo "✅ Sparkle installed: $SIGN_UPDATE"
 
-          echo "SIGN_UPDATE_PATH=$SIGN_UPDATE_PATH" >> $GITHUB_OUTPUT
-          echo "sign_update_path=$SIGN_UPDATE_PATH" >> $GITHUB_ENV
-
-      - name: Build app (unsigned, no hardened runtime, no sandbox)
+      # =========================================================================
+      # BUILD
+      # =========================================================================
+      
+      - name: Build app
         run: |
-          echo "Building unsigned app for distribution..."
-          xcodebuild archive \
-            -project StoneClipboarderTool.xcodeproj \
-            -scheme StoneClipboarderTool \
+          echo "🔨 Building ${{ env.APP_NAME }} with Xcode 26..."
+          
+          # Create build directory
+          mkdir -p build
+          
+          # Build with xcodebuild - simple release build
+          # We use ad-hoc signing (-) which gives the app a valid signature
+          # structure without requiring Apple Developer ID
+          xcodebuild build \
+            -project "${{ env.PROJECT }}" \
+            -scheme "${{ env.SCHEME }}" \
             -configuration Release \
-            -archivePath build/StoneClipboarderTool.xcarchive \
-            -destination "platform=macOS" \
-            ARCHS="arm64" \
+            -derivedDataPath build/DerivedData \
+            -destination "generic/platform=macOS" \
+            ARCHS="arm64 x86_64" \
             ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM="" \
             ENABLE_HARDENED_RUNTIME=NO \
-            ENABLE_USER_SELECTED_FILES=NO \
-            | tee build.log
-
-          echo "Build completed successfully"
-
-      - name: Export app from archive
-        run: |
-          # Create export options plist for unsigned app
-          cat > build/ExportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>mac-application</string>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>stripSwiftSymbols</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
-
-          # Export the archive
-          xcodebuild -exportArchive \
-            -archivePath build/StoneClipboarderTool.xcarchive \
-            -exportPath build/Release \
-            -exportOptionsPlist build/ExportOptions.plist \
-            | tee -a build.log
-
-          echo "Export completed"
-
-      - name: Verify build
-        run: |
-          APP_PATH="build/Release/StoneClipboarderTool.app"
-
-          if [ ! -d "$APP_PATH" ]; then
-            echo "ERROR: App not found after export"
-            ls -la build/Release/
+            SWIFT_VERSION=6.0 \
+            2>&1 | tee build/build.log
+          
+          # Verify build succeeded
+          if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+            echo "❌ Build failed"
+            tail -100 build/build.log
             exit 1
           fi
+          
+          echo "✅ Build completed"
 
-          MAIN_EXEC="$APP_PATH/Contents/MacOS/StoneClipboarderTool"
-          if [ ! -f "$MAIN_EXEC" ]; then
-            echo "ERROR: Main executable not found"
+      - name: Locate and verify app bundle
+        id: app
+        run: |
+          # Find the built app
+          APP_PATH=$(find build/DerivedData -name "${{ env.APP_NAME }}.app" -type d | head -1)
+          
+          if [[ -z "$APP_PATH" || ! -d "$APP_PATH" ]]; then
+            echo "❌ ERROR: App bundle not found"
+            echo "Contents of build directory:"
+            find build -type d -name "*.app" 2>/dev/null || echo "No .app bundles found"
             exit 1
           fi
+          
+          echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
+          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+          
+          # Verify app structure
+          EXECUTABLE="$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}"
+          if [[ ! -f "$EXECUTABLE" ]]; then
+            echo "❌ ERROR: Main executable not found"
+            ls -la "$APP_PATH/Contents/MacOS/" || true
+            exit 1
+          fi
+          
+          echo "📱 App bundle: $APP_PATH"
+          echo "📄 Info.plist:"
+          cat "$APP_PATH/Contents/Info.plist" | head -50
+          echo ""
+          echo "🔐 Code signature:"
+          codesign -dvv "$APP_PATH" 2>&1 || echo "No signature"
+          echo ""
+          echo "📊 Architecture:"
+          file "$EXECUTABLE"
 
-          echo "✓ App bundle structure verified"
-          echo "✓ Main executable: $(file "$MAIN_EXEC")"
-          echo "✓ Code signature: $(codesign -dv "$APP_PATH" 2>&1 | grep -E 'Signature|Identifier')"
+      - name: Re-sign app with ad-hoc signature
+        run: |
+          echo "🔐 Applying ad-hoc signature..."
+          
+          # Remove any existing signature
+          codesign --remove-signature "${{ env.APP_PATH }}" 2>/dev/null || true
+          
+          # Sign with ad-hoc signature (-)
+          # This creates a valid signature structure without Developer ID
+          codesign --force --deep --sign - "${{ env.APP_PATH }}"
+          
+          # Verify
+          echo ""
+          echo "✅ Signature applied:"
+          codesign -dvv "${{ env.APP_PATH }}" 2>&1
 
-      - name: Create release directory and copy app
+      # =========================================================================
+      # PACKAGE
+      # =========================================================================
+      
+      - name: Create release package
         run: |
           mkdir -p release
-          cp -R build/Release/StoneClipboarderTool.app release/
-
-          echo "App copied to release directory"
+          
+          # Copy app to release directory
+          cp -R "${{ env.APP_PATH }}" "release/${{ env.APP_NAME }}.app"
+          
+          # Create README with installation instructions
+          cat > release/README.txt << 'EOF'
+          ================================================================================
+          ${{ env.APP_NAME }} - Installation Instructions
+          ================================================================================
+          
+          This app is distributed without Apple Developer ID code signing.
+          It uses ad-hoc signing, which is safe but requires a one-time approval.
+          
+          INSTALLATION (Choose ONE method):
+          
+          ┌─────────────────────────────────────────────────────────────────────────────┐
+          │ METHOD 1: Right-Click to Open (Recommended)                                 │
+          │                                                                             │
+          │ 1. Drag ${{ env.APP_NAME }}.app to /Applications                            │
+          │ 2. Right-click (or Control-click) on the app                                │
+          │ 3. Select "Open" from the context menu                                      │
+          │ 4. Click "Open" in the security dialog                                      │
+          │                                                                             │
+          │ You only need to do this once. Future launches work normally.               │
+          └─────────────────────────────────────────────────────────────────────────────┘
+          
+          ┌─────────────────────────────────────────────────────────────────────────────┐
+          │ METHOD 2: Terminal Command                                                  │
+          │                                                                             │
+          │ If Method 1 doesn't work, open Terminal and run:                            │
+          │                                                                             │
+          │   xattr -cr /Applications/${{ env.APP_NAME }}.app                           │
+          │                                                                             │
+          │ This removes the quarantine flag that macOS adds to downloads.              │
+          └─────────────────────────────────────────────────────────────────────────────┘
+          
+          UPDATES:
+          
+          After first launch, the app will automatically check for updates using Sparkle.
+          Updates are signed and verified for security.
+          
+          SOURCE CODE:
+          
+          https://github.com/${{ github.repository }}
+          
+          ================================================================================
+          EOF
+          
+          echo "✅ Release package prepared"
           ls -la release/
 
-      - name: Create installation instructions
+      - name: Create ZIP archive
+        id: zip
         run: |
-          cat > release/INSTALL.txt << 'EOF'
-          StoneClipboarderTool Installation Instructions
-          ==============================================
+          cd release
+          
+          # Create ZIP using ditto (preserves macOS metadata)
+          ZIP_NAME="${{ env.APP_NAME }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "${{ env.APP_NAME }}.app" "$ZIP_NAME"
+          
+          # Add README to ZIP
+          zip -u "$ZIP_NAME" README.txt
+          
+          # Verify ZIP
+          echo "📦 Verifying ZIP archive..."
+          unzip -t "$ZIP_NAME" > /dev/null
+          
+          # Get file size
+          SIZE=$(stat -f%z "$ZIP_NAME")
+          echo "FILE_SIZE=$SIZE" >> $GITHUB_ENV
+          echo "file_size=$SIZE" >> $GITHUB_OUTPUT
+          
+          echo "✅ ZIP created: $ZIP_NAME ($SIZE bytes)"
 
-          This app is unsigned (no Apple Developer ID).
-
-          INSTALLATION (Choose ONE method):
-
-          Method 1 - Right-Click (Easiest):
-          1. Extract StoneClipboarderTool.app from ZIP
-          2. Move to /Applications/
-          3. Right-click → "Open"
-          4. Click "Open" in security dialog
-
-          Method 2 - Terminal:
-          ```bash
-          xattr -cr /Applications/StoneClipboarderTool.app
-          ```
-
-          After first launch, auto-updates via Sparkle will work normally.
-
-          Source: https://github.com/foxfollow/Stone-Clipboarder-Tool
-          EOF
-
-          cat release/INSTALL.txt
-
-      - name: Create ZIP
+      - name: Sign ZIP with Sparkle EdDSA
+        id: sparkle_sign
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           cd release
-
-          # Create ZIP with app and instructions
-          ditto -c -k --sequesterRsrc --keepParent StoneClipboarderTool.app StoneClipboarderTool.zip
-          zip -u StoneClipboarderTool.zip INSTALL.txt
-
-          # Verify ZIP
-          if [ ! -f "StoneClipboarderTool.zip" ]; then
-            echo "ERROR: ZIP creation failed"
+          
+          # Write private key to temp file
+          KEY_FILE=$(mktemp)
+          echo "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+          
+          # Sign the ZIP
+          echo "🔏 Signing ZIP with Sparkle EdDSA..."
+          SIGN_OUTPUT=$("${{ env.SIGN_UPDATE }}" --ed-key-file "$KEY_FILE" "${{ env.APP_NAME }}.zip" 2>&1)
+          SIGN_STATUS=$?
+          
+          # Securely delete key file
+          rm -f "$KEY_FILE"
+          
+          if [[ $SIGN_STATUS -ne 0 ]]; then
+            echo "❌ ERROR: Sparkle signing failed"
+            echo "$SIGN_OUTPUT"
             exit 1
           fi
-
-          unzip -t StoneClipboarderTool.zip > /dev/null || exit 1
-          echo "✓ ZIP created and verified"
-
-          # Get file size
-          SIZE=$(stat -f%z StoneClipboarderTool.zip)
-          echo "File size: $SIZE bytes"
-
-          # Sign with Sparkle
-          SIGNATURE="UNSIGNED_BUILD"
-          if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
-            echo "$SPARKLE_PRIVATE_KEY" > ../sparkle_key.txt
-            SIGN_OUTPUT=$("${{ env.sign_update_path }}" -f ../sparkle_key.txt StoneClipboarderTool.zip 2>&1)
-            if [ $? -eq 0 ]; then
-              if echo "$SIGN_OUTPUT" | grep -q "sparkle:edSignature="; then
-                SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -o 'sparkle:edSignature="[^"]*"' | cut -d'"' -f2)
-              elif echo "$SIGN_OUTPUT" | grep -qE '[A-Za-z0-9+/]+=*$'; then
-                SIGNATURE=$(echo "$SIGN_OUTPUT" | grep -oE '[A-Za-z0-9+/]+=*$' | head -1)
-              fi
-            fi
-            rm -f ../sparkle_key.txt
+          
+          # Extract signature from output
+          # sign_update outputs: sparkle:edSignature="..." length="..."
+          # or just the raw signature on newer versions
+          SIGNATURE=""
+          
+          if echo "$SIGN_OUTPUT" | grep -q 'sparkle:edSignature='; then
+            SIGNATURE=$(echo "$SIGN_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
+          else
+            # Fallback: assume output is just the signature
+            SIGNATURE=$(echo "$SIGN_OUTPUT" | tr -d '[:space:]')
           fi
-
+          
+          if [[ -z "$SIGNATURE" || ${#SIGNATURE} -lt 10 ]]; then
+            echo "❌ ERROR: Could not extract signature"
+            echo "Raw output: $SIGN_OUTPUT"
+            exit 1
+          fi
+          
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
-          echo "FILE_SIZE=$SIZE" >> $GITHUB_ENV
-          echo "Signature: $SIGNATURE"
+          echo "signature=$SIGNATURE" >> $GITHUB_OUTPUT
+          echo "✅ Sparkle signature: ${SIGNATURE:0:20}..."
 
-      - name: Get version
-        id: version
+      # =========================================================================
+      # APPCAST
+      # =========================================================================
+      
+      - name: Update appcast.xml
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Update appcast
-        run: |
-          if [ -f docs/appcast.xml ]; then
-            cp docs/appcast.xml docs/appcast.xml.backup
-
-            if grep -q "SIGNATURE_PLACEHOLDER" docs/appcast.xml || grep -q "FILE_SIZE" docs/appcast.xml; then
-              echo "Updating appcast.xml..."
-              sed -i '' '1,/SIGNATURE_PLACEHOLDER/{s|SIGNATURE_PLACEHOLDER|'"$SPARKLE_SIGNATURE"'|;}' docs/appcast.xml
-              sed -i '' '1,/FILE_SIZE/{s|FILE_SIZE|'"$FILE_SIZE"'|;}' docs/appcast.xml
-              echo "✓ Appcast updated"
-            fi
+          APPCAST_PATH="docs/appcast.xml"
+          
+          if [[ ! -f "$APPCAST_PATH" ]]; then
+            echo "⚠️ No appcast.xml found at $APPCAST_PATH"
+            echo "Creating new appcast.xml..."
+            mkdir -p docs
+            
+            cat > "$APPCAST_PATH" << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>${{ env.APP_NAME }}</title>
+              <link>https://github.com/${{ github.repository }}</link>
+              <description>Most recent changes with links to updates.</description>
+              <language>en</language>
+            </channel>
+          </rss>
+          EOF
           fi
+          
+          # Create new item entry
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/${{ env.APP_NAME }}.zip"
+          RELEASE_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+          
+          NEW_ITEM=$(cat << EOF
+              <item>
+                <title>Version ${{ env.VERSION }}</title>
+                <pubDate>$RELEASE_DATE</pubDate>
+                <sparkle:version>${{ env.VERSION }}</sparkle:version>
+                <sparkle:shortVersionString>${{ env.VERSION }}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+                <enclosure
+                  url="$DOWNLOAD_URL"
+                  length="${{ env.FILE_SIZE }}"
+                  type="application/octet-stream"
+                  sparkle:edSignature="${{ env.SPARKLE_SIGNATURE }}"
+                />
+                <description><![CDATA[
+                  <h2>Version ${{ env.VERSION }}</h2>
+                  <p>See release notes on GitHub for details.</p>
+                ]]></description>
+              </item>
+          EOF
+          )
+          
+          # Insert new item after <channel> opening tags
+          # Using awk for reliable multi-line insertion
+          awk -v item="$NEW_ITEM" '
+            /<\/language>/ { print; print item; next }
+            { print }
+          ' "$APPCAST_PATH" > "${APPCAST_PATH}.new"
+          
+          mv "${APPCAST_PATH}.new" "$APPCAST_PATH"
+          
+          echo "✅ Appcast updated"
+          echo ""
+          cat "$APPCAST_PATH"
 
-      - name: Create Release
+      # =========================================================================
+      # RELEASE
+      # =========================================================================
+      
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/StoneClipboarderTool.zip
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release ${{ steps.version.outputs.version }}
+          tag_name: v${{ env.VERSION }}
+          name: "${{ env.APP_NAME }} v${{ env.VERSION }}"
           draft: false
           prerelease: false
           generate_release_notes: true
+          files: release/${{ env.APP_NAME }}.zip
           body: |
-            ## Installation Instructions (Unsigned App)
-
-            **Right-Click Method (Easiest):**
-            1. Extract and move to /Applications/
-            2. Right-click → "Open"
-            3. Click "Open" in dialog
-
-            **Terminal Method:**
+            ## 📥 Installation
+            
+            This app is distributed without Apple Developer ID (free/indie distribution).
+            
+            ### Method 1: Right-Click to Open (Easiest)
+            
+            1. Download and extract the ZIP
+            2. Drag `${{ env.APP_NAME }}.app` to `/Applications`
+            3. **Right-click** the app → Select **"Open"**
+            4. Click **"Open"** in the dialog
+            
+            > You only need to do this once. Future launches work normally.
+            
+            ### Method 2: Terminal Command
+            
             ```bash
-            xattr -cr /Applications/StoneClipboarderTool.app
+            xattr -cr /Applications/${{ env.APP_NAME }}.app
             ```
-
-            See `INSTALL.txt` in ZIP for details.
+            
+            ---
+            
+            ## 🔄 Auto-Updates
+            
+            After first launch, the app will automatically check for updates.
+            Updates are cryptographically signed for security.
+            
+            ---
+            
+            **Sparkle Signature:** `${{ env.SPARKLE_SIGNATURE }}`  
+            **File Size:** ${{ env.FILE_SIZE }} bytes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Commit updated appcast
+      - name: Commit appcast changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          if ! git diff --quiet docs/appcast.xml; then
-            git fetch origin main
-            git checkout main
-            git pull origin main
-            git add docs/appcast.xml
-            git commit -m "Auto-update appcast.xml for release $VERSION [skip ci]"
-            git push origin main
-            echo "✓ Appcast committed"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if appcast was modified
+          if git diff --quiet docs/appcast.xml 2>/dev/null; then
+            echo "ℹ️ No appcast changes to commit"
+            exit 0
           fi
+          
+          # Get the default branch
+          DEFAULT_BRANCH=$(git remote show origin | grep "HEAD branch" | cut -d: -f2 | tr -d ' ')
+          DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
+          
+          # Fetch and checkout default branch
+          git fetch origin "$DEFAULT_BRANCH"
+          git checkout "$DEFAULT_BRANCH"
+          git pull origin "$DEFAULT_BRANCH"
+          
+          # Stage and commit
+          git add docs/appcast.xml
+          git commit -m "chore: update appcast.xml for v${{ env.VERSION }}" -m "[skip ci]"
+          
+          # Push with retry
+          for i in 1 2 3; do
+            if git push origin "$DEFAULT_BRANCH"; then
+              echo "✅ Appcast changes pushed to $DEFAULT_BRANCH"
+              exit 0
+            fi
+            echo "⚠️ Push failed, retrying ($i/3)..."
+            git pull --rebase origin "$DEFAULT_BRANCH"
+            sleep 2
+          done
+          
+          echo "❌ Failed to push appcast changes after 3 attempts"
+          exit 1
+
+      # =========================================================================
+      # SUMMARY
+      # =========================================================================
+      
+      - name: Build summary
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════════════════════╗"
+          echo "║                           BUILD COMPLETE                                    ║"
+          echo "╠════════════════════════════════════════════════════════════════════════════╣"
+          echo "║ App:        ${{ env.APP_NAME }}                                            "
+          echo "║ Version:    ${{ env.VERSION }}                                             "
+          echo "║ Size:       ${{ env.FILE_SIZE }} bytes                                     "
+          echo "║ Signature:  ${{ env.SPARKLE_SIGNATURE }}                                   "
+          echo "╠════════════════════════════════════════════════════════════════════════════╣"
+          echo "║ Release:    https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION }}"
+          echo "║ Appcast:    https://raw.githubusercontent.com/${{ github.repository }}/main/docs/appcast.xml"
+          echo "╚════════════════════════════════════════════════════════════════════════════╝"
