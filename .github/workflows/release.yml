@@ -170,7 +170,14 @@ jobs:
           find release/StoneClipboarderTool.app -type f -exec chmod 644 {} \;
 
           # Make executables executable
+          echo "Making all executables executable..."
           find release/StoneClipboarderTool.app/Contents/MacOS -type f -exec chmod 755 {} \;
+
+          # Make Sparkle framework executables executable
+          find release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework -type f -perm -u+x -exec chmod 755 {} \;
+          find release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices -type f -exec chmod 755 {} \;
+          find release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate -type f -exec chmod 755 {} \;
+          find release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app -type f -exec chmod 755 {} \;
 
           # Verify main executable exists and is executable
           MAIN_EXEC="release/StoneClipboarderTool.app/Contents/MacOS/StoneClipboarderTool"
@@ -195,6 +202,40 @@ jobs:
 
           ls -la release/
 
+      - name: Create installation instructions
+        run: |
+          cat > release/INSTALL.txt << 'EOF'
+          StoneClipboarderTool Installation Instructions
+          ==============================================
+
+          This app is unsigned (no Apple Developer ID certificate).
+          macOS will block it by default.
+
+          INSTALLATION STEPS:
+
+          1. Extract StoneClipboarderTool.app from the ZIP
+          2. Move it to /Applications/
+          3. Open Terminal and run:
+
+             xattr -cr /Applications/StoneClipboarderTool.app
+
+          4. Now you can open the app normally
+
+          ALTERNATIVE METHOD:
+
+          1. Right-click on StoneClipboarderTool.app
+          2. Select "Open"
+          3. Click "Open" when prompted
+
+          The app is safe and open source:
+          https://github.com/foxfollow/Stone-Clipboarder-Tool
+
+          For auto-updates to work, you must allow the app to run first.
+          EOF
+
+          echo "Installation instructions created"
+          cat release/INSTALL.txt
+
       - name: Create ZIP and handle signing
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
@@ -209,8 +250,11 @@ jobs:
           fi
 
           echo "Creating ZIP archive with ditto..."
-          # FIX: Use --keepParent flag to preserve the app bundle structure
+          # Create ZIP with both the app and installation instructions
           ditto -c -k --sequesterRsrc --keepParent StoneClipboarderTool.app StoneClipboarderTool.zip
+
+          # Add INSTALL.txt to the ZIP
+          zip -u StoneClipboarderTool.zip INSTALL.txt
 
           # Verify ZIP was created successfully
           if [ ! -f "StoneClipboarderTool.zip" ]; then
@@ -380,6 +424,27 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          body: |
+            ## ⚠️ Installation Required (Unsigned App)
+
+            This app is **unsigned** (no Apple Developer ID certificate). macOS will block it by default.
+
+            ### Installation Steps:
+
+            **Option 1: Terminal Command (Recommended)**
+            ```bash
+            # After extracting and moving to /Applications/
+            xattr -cr /Applications/StoneClipboarderTool.app
+            ```
+
+            **Option 2: Right-Click Method**
+            1. Right-click on StoneClipboarderTool.app
+            2. Select "Open"
+            3. Click "Open" when prompted with the security warning
+
+            **Note:** You must complete these steps before Sparkle auto-updates will work.
+
+            See `INSTALL.txt` included in the ZIP for detailed instructions.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
