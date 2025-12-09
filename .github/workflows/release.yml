@@ -169,15 +169,16 @@ jobs:
           find release/StoneClipboarderTool.app -type d -exec chmod 755 {} \;
           find release/StoneClipboarderTool.app -type f -exec chmod 644 {} \;
 
-          # Make executables executable
-          echo "Making all executables executable..."
+          # Make executables executable (ONLY in MacOS directories, not resources!)
+          echo "Making main executable executable..."
           find release/StoneClipboarderTool.app/Contents/MacOS -type f -exec chmod 755 {} \;
 
-          # Make Sparkle framework executables executable
-          find release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework -type f -perm -u+x -exec chmod 755 {} \;
-          find release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices -type f -exec chmod 755 {} \;
-          find release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate -type f -exec chmod 755 {} \;
-          find release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app -type f -exec chmod 755 {} \;
+          # Make ONLY the actual binary executables in Sparkle executable (not plists, nibs, etc.)
+          echo "Making Sparkle binaries executable..."
+          chmod 755 release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate 2>/dev/null || true
+          chmod 755 release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app/Contents/MacOS/Updater 2>/dev/null || true
+          chmod 755 release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc/Contents/MacOS/Downloader 2>/dev/null || true
+          chmod 755 release/StoneClipboarderTool.app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc/Contents/MacOS/Installer 2>/dev/null || true
 
           # Verify main executable exists and is executable
           MAIN_EXEC="release/StoneClipboarderTool.app/Contents/MacOS/StoneClipboarderTool"
