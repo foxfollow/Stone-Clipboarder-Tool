@@ -358,8 +358,9 @@ jobs:
 
               # Replace the first occurrence of SIGNATURE_PLACEHOLDER and FILE_SIZE
               # This targets the most recent release entry
-              sed -i '' "0,/SIGNATURE_PLACEHOLDER/s/SIGNATURE_PLACEHOLDER/$SPARKLE_SIGNATURE/" docs/appcast.xml
-              sed -i '' "0,/FILE_SIZE/s/FILE_SIZE/$SIZE/" docs/appcast.xml
+              # Using | as delimiter to avoid conflicts with / in base64 signatures
+              sed -i '' '1,/SIGNATURE_PLACEHOLDER/{s|SIGNATURE_PLACEHOLDER|'"$SPARKLE_SIGNATURE"'|;}' docs/appcast.xml
+              sed -i '' '1,/FILE_SIZE/{s|FILE_SIZE|'"$SIZE"'|;}' docs/appcast.xml
 
               echo "Updated appcast.xml:"
               cat docs/appcast.xml
