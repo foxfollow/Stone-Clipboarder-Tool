@@ -457,8 +457,14 @@ jobs:
           if git diff --quiet docs/appcast.xml; then
             echo "No changes to appcast.xml"
           else
+            # Fetch and checkout main branch (we're in detached HEAD at the tag)
+            git fetch origin main
+            git checkout main
+            git pull origin main
+
+            # Apply the updated appcast.xml
             git add docs/appcast.xml
             git commit -m "Auto-update appcast.xml for release $VERSION [skip ci]"
-            git push origin HEAD:main
+            git push origin main
             echo "Appcast updated and pushed to main branch"
           fi
