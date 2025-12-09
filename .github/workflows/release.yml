@@ -352,17 +352,14 @@ jobs:
             # Backup original appcast
             cp docs/appcast.xml docs/appcast.xml.backup
 
-            # Check if placeholders exist before replacement
-            if grep -q "VERSION_NUMBER" docs/appcast.xml; then
-              echo "Updating appcast.xml with new release info..."
+            # Replace SIGNATURE_PLACEHOLDER and FILE_SIZE for any version that has them
+            if grep -q "SIGNATURE_PLACEHOLDER" docs/appcast.xml || grep -q "FILE_SIZE" docs/appcast.xml; then
+              echo "Updating appcast.xml with signature and file size..."
 
-              # Replace placeholders directly in the appcast
-              sed -i '' "s|REPO_OWNER|$REPO_OWNER|g" docs/appcast.xml
-              sed -i '' "s|REPO_NAME|$REPO_NAME|g" docs/appcast.xml
-              sed -i '' "s|VERSION_NUMBER|$VERSION|g" docs/appcast.xml
-              sed -i '' "s|SIGNATURE_PLACEHOLDER|$SPARKLE_SIGNATURE|g" docs/appcast.xml
-              sed -i '' "s|FILE_SIZE|$SIZE|g" docs/appcast.xml
-              sed -i '' "s|RELEASE_DATE|$DATE|g" docs/appcast.xml
+              # Replace the first occurrence of SIGNATURE_PLACEHOLDER and FILE_SIZE
+              # This targets the most recent release entry
+              sed -i '' "0,/SIGNATURE_PLACEHOLDER/s/SIGNATURE_PLACEHOLDER/$SPARKLE_SIGNATURE/" docs/appcast.xml
+              sed -i '' "0,/FILE_SIZE/s/FILE_SIZE/$SIZE/" docs/appcast.xml
 
               echo "Updated appcast.xml:"
               cat docs/appcast.xml
