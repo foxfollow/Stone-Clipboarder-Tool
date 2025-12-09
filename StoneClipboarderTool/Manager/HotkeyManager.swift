@@ -398,7 +398,7 @@ class HotkeyManager: ObservableObject {
 
     @MainActor
     private func pasteItemToActiveApplication(_ item: CBItem) {
-        guard let cbViewModel = cbViewModel else {
+        guard cbViewModel != nil else {
             return
         }
 

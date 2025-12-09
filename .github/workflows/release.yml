@@ -104,7 +104,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO \
-            ARCHS="x86_64 arm64" \
+            ARCHS="arm64" \
             | tee build.log
           echo "Build completed"
 

@@ -119,13 +119,7 @@ struct MenuBarView: View {
     }
 
     private func openInPreview(item: CBItem) {
-        Task {
-            do {
-                try await cbViewModel.openInPreview(item: item)
-            } catch {
-                print("Failed to open in Preview: \(error)")
-            }
-        }
+        cbViewModel.openInPreview(item: item)
     }
 
     private func showMainWindow() {

@@ -233,14 +233,10 @@ class ClipboardManager: ObservableObject {
     private func createSavePanel() -> NSSavePanel? {
         // Try to create save panel safely
         let savePanel = NSSavePanel()
-        
+
         // Test if we can access basic properties (will fail in strict sandbox)
-        do {
-            _ = savePanel.canCreateDirectories
-            return savePanel
-        } catch {
-            return nil
-        }
+        _ = savePanel.canCreateDirectories
+        return savePanel
     }
     
     func copyFileToClipboard(data: Data, fileName: String, uti: String) {
