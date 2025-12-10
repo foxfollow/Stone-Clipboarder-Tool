@@ -383,8 +383,10 @@ jobs:
           # Create new item entry
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/${{ env.APP_NAME }}.zip"
           RELEASE_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
-          
-          NEW_ITEM=$(cat << EOF
+
+          # Create temp file with new item
+          NEW_ITEM_FILE=$(mktemp)
+          cat > "$NEW_ITEM_FILE" << EOF
               <item>
                 <title>Version ${{ env.VERSION }}</title>
                 <pubDate>$RELEASE_DATE</pubDate>
@@ -403,14 +405,22 @@ jobs:
                 ]]></description>
               </item>
           EOF
-          )
-          
-          # Insert new item after <channel> opening tags
-          # Using awk for reliable multi-line insertion
-          awk -v item="$NEW_ITEM" '
-            /<\/language>/ { print; print item; next }
+
+          # Insert new item after </language> tag
+          # Read file and insert new item, avoiding awk's issues with multi-line strings
+          awk '
+            /<\/language>/ {
+              print
+              while ((getline line < "'"$NEW_ITEM_FILE"'") > 0) {
+                print line
+              }
+              close("'"$NEW_ITEM_FILE"'")
+              next
+            }
             { print }
           ' "$APPCAST_PATH" > "${APPCAST_PATH}.new"
+
+          rm -f "$NEW_ITEM_FILE"
           
           mv "${APPCAST_PATH}.new" "$APPCAST_PATH"
           
