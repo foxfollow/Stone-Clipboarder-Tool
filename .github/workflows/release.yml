@@ -1,9 +1,9 @@
 # =============================================================================
 # Build and Release Workflow for Unsigned macOS App with Sparkle Updates
 # =============================================================================
-# 
+#
 # This workflow builds a macOS app WITHOUT Apple Developer ID subscription.
-# Uses macOS 26 Tahoe runner with Xcode 26.
+# Uses macOS 26 Tahoe runner with Xcode 26.1.1 (latest stable).
 # The app uses ad-hoc code signing to minimize Gatekeeper friction.
 # Users can open the app via:
 #   1. Right-click → Open (easiest)
@@ -36,7 +36,7 @@ env:
 jobs:
   build:
     name: Build and Release
-    runs-on: macos-26  # macOS 26 Tahoe with Xcode 26
+    runs-on: macos-26  # macOS 26 Tahoe with Xcode 26.1.1
     
     steps:
       # =========================================================================
@@ -77,21 +77,28 @@ jobs:
           fi
           echo "✅ Required secrets are configured"
 
-      - name: Setup Xcode 26
+      - name: Setup Xcode 26.1.1
         run: |
           # List available Xcode versions
           echo "📱 Available Xcode versions:"
           ls -d /Applications/Xcode*.app 2>/dev/null || echo "Checking Xcode paths..."
-          
-          # Select Xcode 26 (default on macos-26 runner)
-          # The runner has Xcode 26.0 as default, but we explicitly select it
-          if [[ -d "/Applications/Xcode_26.app" ]]; then
+
+          # Select Xcode 26.1.1 (latest stable release)
+          # Available versions on macos-26: 26.2 (beta), 26.1.1, 26.0.1 (default), 16.4
+          if [[ -d "/Applications/Xcode_26.1.1.app" ]]; then
+            sudo xcode-select -s /Applications/Xcode_26.1.1.app/Contents/Developer
+            echo "✅ Using Xcode 26.1.1"
+          elif [[ -d "/Applications/Xcode_26.1.app" ]]; then
+            sudo xcode-select -s /Applications/Xcode_26.1.app/Contents/Developer
+            echo "✅ Using Xcode 26.1"
+          elif [[ -d "/Applications/Xcode_26.app" ]]; then
             sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer
+            echo "⚠️ Using Xcode 26 (not 26.1.1)"
           elif [[ -d "/Applications/Xcode.app" ]]; then
-            # Default Xcode.app on macos-26 is Xcode 26
             sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+            echo "⚠️ Using default Xcode (may not be 26.1.1)"
           fi
-          
+
           echo ""
           echo "📱 Selected Xcode version:"
           xcodebuild -version
@@ -136,7 +143,7 @@ jobs:
       
       - name: Build app
         run: |
-          echo "🔨 Building ${{ env.APP_NAME }} with Xcode 26..."
+          echo "🔨 Building ${{ env.APP_NAME }} with Xcode 26.1.1..."
           
           # Create build directory
           mkdir -p build
