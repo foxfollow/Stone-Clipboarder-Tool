@@ -230,6 +230,7 @@ class ClipboardManager: ObservableObject {
         lastChangeCount = pasteboard.changeCount
     }
     
+    @MainActor
     private func createSavePanel() -> NSSavePanel? {
         // Try to create save panel safely
         let savePanel = NSSavePanel()
@@ -260,21 +261,14 @@ class ClipboardManager: ObservableObject {
         }
     }
     
+    @MainActor
     func saveItemToFile(_ item: CBItem) {
-        // Ensure we're on main thread
-        guard Thread.isMainThread else {
-            DispatchQueue.main.async {
-                self.saveItemToFile(item)
-            }
-            return
-        }
-        
         // Try to create save panel - if it crashes, it's likely a sandbox issue
         guard let savePanel = createSavePanel() else {
             print("Cannot create save panel - check app sandbox entitlements")
             return
         }
-        
+
         // Configure save panel based on item type
         switch item.itemType {
         case .text:
@@ -301,13 +295,13 @@ class ClipboardManager: ObservableObject {
             savePanel.nameFieldStringValue = "clipboard_combined"
             savePanel.canCreateDirectories = true
         }
-        
-        // Present save panel
-        savePanel.begin { result in
+
+        // Present save panel with @Sendable closure
+        savePanel.begin { @MainActor result in
             guard result == .OK, let url = savePanel.url else { return }
-            
+
             // Perform file writing on background queue
-            DispatchQueue.global(qos: .userInitiated).async {
+            Task.detached {
                 do {
                     switch item.itemType {
                     case .text:
@@ -352,13 +346,13 @@ class ClipboardManager: ObservableObject {
                             try pngData.write(to: imageFile)
                         }
                     }
-                    
-                    DispatchQueue.main.async {
+
+                    await MainActor.run {
                         print("File saved successfully")
                     }
-                    
+
                 } catch {
-                    DispatchQueue.main.async {
+                    await MainActor.run {
                         print("Error saving file: \(error.localizedDescription)")
                     }
                 }

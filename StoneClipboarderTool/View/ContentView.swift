@@ -283,7 +283,7 @@ struct ContentView: View {
                     forName: NSWorkspace.activeSpaceDidChangeNotification,
                     object: nil,
                     queue: .main
-                ) { _ in
+                ) { @MainActor _ in
                     // Force window to follow to new desktop if it's visible and main window is shown
                     if settingsManager.showMainWindow && window.isVisible {
                         // Temporarily hide and show to force move to current space

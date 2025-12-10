@@ -28,7 +28,7 @@ class CBViewModel: ObservableObject {
     private var currentFetchOffset = 0
 
     // Memory management
-    private var memoryCleanupTimer: Timer?
+    nonisolated(unsafe) private var memoryCleanupTimer: Timer?
     private var lastAccessTimes: [PersistentIdentifier: Date] = [:]
 
     init() {

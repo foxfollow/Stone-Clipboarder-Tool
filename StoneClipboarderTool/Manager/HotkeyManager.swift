@@ -14,9 +14,9 @@ import SwiftData
 class HotkeyManager: ObservableObject {
     @Published var hotkeyConfigs: [HotkeyConfig] = []
 
-    private var registeredHotkeys: [UInt32: EventHotKeyRef] = [:]
-    private var hotkeyActions: [UInt32: () -> Void] = [:]
-    private var eventHandler: EventHandlerRef?
+    nonisolated(unsafe) private var registeredHotkeys: [UInt32: EventHotKeyRef] = [:]
+    nonisolated(unsafe) private var hotkeyActions: [UInt32: () -> Void] = [:]
+    nonisolated(unsafe) private var eventHandler: EventHandlerRef?
     private var cbViewModel: CBViewModel?
     private var modelContext: ModelContext?
     private var settingsManager: SettingsManager?

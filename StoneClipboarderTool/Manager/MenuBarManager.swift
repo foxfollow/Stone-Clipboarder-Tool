@@ -17,6 +17,7 @@ class MenuBarManager: ObservableObject {
     private var clipboardManager: ClipboardManager?
     private var cancellables = Set<AnyCancellable>()
 
+    @MainActor
     func setupMenuBar(cbViewModel: CBViewModel, settingsManager: SettingsManager, clipboardManager: ClipboardManager) {
         // Store references for refresh capability
         self.cbViewModel = cbViewModel
@@ -60,6 +61,7 @@ class MenuBarManager: ObservableObject {
         self.clipboardManager = nil
     }
 
+    @MainActor
     func refreshMenuBar() {
         guard let cbViewModel = cbViewModel,
             let settingsManager = settingsManager,
@@ -87,6 +89,7 @@ class MenuBarManager: ObservableObject {
         popover?.contentViewController = NSHostingController(rootView: menuBarView)
     }
 
+    @MainActor
     @objc private func togglePopover(_ sender: AnyObject?) {
         guard let button = statusBarItem?.button else {
             // Try to refresh if button is nil
@@ -111,6 +114,7 @@ class MenuBarManager: ObservableObject {
     }
 
     /// Update the menu bar icon based on pause state
+    @MainActor
     func updateIcon() {
         guard let button = statusBarItem?.button else { return }
 

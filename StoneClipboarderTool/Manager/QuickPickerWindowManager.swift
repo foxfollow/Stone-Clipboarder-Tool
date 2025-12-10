@@ -73,9 +73,9 @@ class KeyCapturingPanel: NSPanel {
 class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate {
     private var window: NSPanel?
     private weak var cbViewModel: CBViewModel?
-    private var eventMonitor: Any?
-    private var keyMonitor: Any?
-    private var localKeyMonitor: Any?
+    nonisolated(unsafe) private var eventMonitor: Any?
+    nonisolated(unsafe) private var keyMonitor: Any?
+    nonisolated(unsafe) private var localKeyMonitor: Any?
     private var previousApp: NSRunningApplication?
     private var isDragging = false
     private var dragOffset: NSPoint = NSPoint.zero

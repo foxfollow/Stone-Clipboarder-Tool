@@ -40,7 +40,7 @@ class TwoFingerSwipeNSView: NSView {
     private var isTrackingSwipe = false
     private let swipeThreshold: CGFloat = 100
     private let verticalTolerance: CGFloat = 50
-    private var eventMonitor: Any?
+    nonisolated(unsafe) private var eventMonitor: Any?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
