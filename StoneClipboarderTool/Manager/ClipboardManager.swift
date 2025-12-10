@@ -296,6 +296,14 @@ class ClipboardManager: ObservableObject {
             savePanel.canCreateDirectories = true
         }
 
+        // Extract Sendable data from item before async closure
+        let itemType = item.itemType
+        let content = item.content
+        let fileData = item.fileData
+
+        // For images, extract tiff data synchronously
+        let imageTiffData = item.image?.tiffRepresentation
+
         // Present save panel with @Sendable closure
         savePanel.begin { @MainActor result in
             guard result == .OK, let url = savePanel.url else { return }
@@ -303,14 +311,13 @@ class ClipboardManager: ObservableObject {
             // Perform file writing on background queue
             Task.detached {
                 do {
-                    switch item.itemType {
+                    switch itemType {
                     case .text:
-                        let content = item.content ?? ""
-                        try content.write(to: url, atomically: true, encoding: .utf8)
+                        let textContent = content ?? ""
+                        try textContent.write(to: url, atomically: true, encoding: .utf8)
 
                     case .image:
-                        guard let image = item.image,
-                              let tiffData = image.tiffRepresentation,
+                        guard let tiffData = imageTiffData,
                               let bitmapRep = NSBitmapImageRep(data: tiffData) else { return }
 
                         let imageData: Data?
@@ -324,22 +331,21 @@ class ClipboardManager: ObservableObject {
                         try data.write(to: url)
 
                     case .file:
-                        guard let fileData = item.fileData else { return }
-                        try fileData.write(to: url)
+                        guard let data = fileData else { return }
+                        try data.write(to: url)
 
                     case .combined:
                         // Save both text and image in a folder
                         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
 
                         // Save text file
-                        if let content = item.content {
+                        if let textContent = content {
                             let textFile = url.appendingPathComponent("text.txt")
-                            try content.write(to: textFile, atomically: true, encoding: .utf8)
+                            try textContent.write(to: textFile, atomically: true, encoding: .utf8)
                         }
 
                         // Save image file
-                        if let image = item.image,
-                           let tiffData = image.tiffRepresentation,
+                        if let tiffData = imageTiffData,
                            let bitmapRep = NSBitmapImageRep(data: tiffData),
                            let pngData = bitmapRep.representation(using: .png, properties: [:]) {
                             let imageFile = url.appendingPathComponent("image.png")
