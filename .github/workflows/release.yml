@@ -356,6 +356,7 @@ jobs:
         run: |
           APPCAST_PATH="docs/appcast.xml"
 
+          # 1. Ensure appcast.xml exists
           if [[ ! -f "$APPCAST_PATH" ]]; then
             echo "⚠️ No appcast.xml found at $APPCAST_PATH"
             echo "Creating new appcast.xml..."
@@ -374,13 +375,37 @@ jobs:
           EOF
           fi
 
-          # Create new item entry
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/${{ env.APP_NAME }}.zip"
-          RELEASE_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+          # 2. Check for placeholder item to update (for preserving custom release notes)
+          if grep -q "VERSION_NUMBER" "$APPCAST_PATH"; then
+            echo "📝 Found 'VERSION_NUMBER' placeholder. Updating existing item..."
 
-          # Create temp file with new item
-          NEW_ITEM_FILE=$(mktemp)
-          cat > "$NEW_ITEM_FILE" << EOF
+            RELEASE_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+
+            # Extract owner/repo
+            REPO_FULL="${{ github.repository }}"
+            REPO_OWNER="${REPO_FULL%%/*}"
+            REPO_NAME="${REPO_FULL##*/}"
+
+            # Replace placeholders in-place using sed
+            sed -i '' "s/VERSION_NUMBER/${{ env.VERSION }}/g" "$APPCAST_PATH"
+            sed -i '' "s/RELEASE_DATE/$RELEASE_DATE/g" "$APPCAST_PATH"
+            sed -i '' "s/SIGNATURE_PLACEHOLDER/${{ env.SPARKLE_SIGNATURE }}/g" "$APPCAST_PATH"
+            sed -i '' "s/FILE_SIZE/${{ env.FILE_SIZE }}/g" "$APPCAST_PATH"
+            sed -i '' "s/REPO_OWNER/$REPO_OWNER/g" "$APPCAST_PATH"
+            sed -i '' "s/REPO_NAME/$REPO_NAME/g" "$APPCAST_PATH"
+
+            echo "✅ Updated placeholders in $APPCAST_PATH"
+
+          else
+            # 3. Fallback: Prepend new item if no placeholder found
+            echo "ℹ️ No 'VERSION_NUMBER' placeholder found. Appending new item..."
+
+            DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/${{ env.APP_NAME }}.zip"
+            RELEASE_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
+
+            # Create temp file with new item
+            NEW_ITEM_FILE=$(mktemp)
+            cat > "$NEW_ITEM_FILE" << EOF
               <item>
                 <title>Version ${{ env.VERSION }}</title>
                 <pubDate>$RELEASE_DATE</pubDate>
@@ -400,25 +425,25 @@ jobs:
               </item>
           EOF
 
-          # Insert new item after </language> tag
-          # Read file and insert new item, avoiding awk's issues with multi-line strings
-          awk '
-            /<\/language>/ {
-              print
-              while ((getline line < "'"$NEW_ITEM_FILE"'") > 0) {
-                print line
+            # Insert new item after </language> tag
+            awk '
+              /<\/language>/ {
+                print
+                while ((getline line < "'"$NEW_ITEM_FILE"'") > 0) {
+                  print line
+                }
+                close("'"$NEW_ITEM_FILE"'")
+                next
               }
-              close("'"$NEW_ITEM_FILE"'")
-              next
-            }
-            { print }
-          ' "$APPCAST_PATH" > "${APPCAST_PATH}.new"
+              { print }
+            ' "$APPCAST_PATH" > "${APPCAST_PATH}.new"
 
-          rm -f "$NEW_ITEM_FILE"
+            rm -f "$NEW_ITEM_FILE"
+            mv "${APPCAST_PATH}.new" "$APPCAST_PATH"
 
-          mv "${APPCAST_PATH}.new" "$APPCAST_PATH"
+            echo "✅ Appended new item to $APPCAST_PATH"
+          fi
 
-          echo "✅ Appcast updated"
           echo ""
           cat "$APPCAST_PATH"
 
