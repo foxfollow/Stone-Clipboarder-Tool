@@ -77,26 +77,23 @@ jobs:
           fi
           echo "✅ Required secrets are configured"
 
-      - name: Setup Xcode 26.1.1
+      - name: Setup Latest Xcode
         run: |
           # List available Xcode versions
           echo "📱 Available Xcode versions:"
           ls -d /Applications/Xcode*.app 2>/dev/null || echo "Checking Xcode paths..."
 
-          # Select Xcode 26.1.1 (latest stable release)
-          # Available versions on macos-26: 26.2 (beta), 26.1.1, 26.0.1 (default), 16.4
-          if [[ -d "/Applications/Xcode_26.1.1.app" ]]; then
-            sudo xcode-select -s /Applications/Xcode_26.1.1.app/Contents/Developer
-            echo "✅ Using Xcode 26.1.1"
-          elif [[ -d "/Applications/Xcode_26.1.app" ]]; then
-            sudo xcode-select -s /Applications/Xcode_26.1.app/Contents/Developer
-            echo "✅ Using Xcode 26.1"
-          elif [[ -d "/Applications/Xcode_26.app" ]]; then
-            sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer
-            echo "⚠️ Using Xcode 26 (not 26.1.1)"
+          # Find the latest Xcode version dynamically
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1)
+
+          if [[ -n "$LATEST_XCODE" ]]; then
+             sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+             echo "✅ Selected latest Xcode: $LATEST_XCODE"
           elif [[ -d "/Applications/Xcode.app" ]]; then
-            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-            echo "⚠️ Using default Xcode (may not be 26.1.1)"
+             sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+             echo "⚠️ Using default Xcode (specific version not found)"
+          else
+             echo "⚠️ No Xcode found in /Applications, relying on pre-installed environment"
           fi
 
           echo ""
