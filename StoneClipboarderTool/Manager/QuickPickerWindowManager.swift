@@ -106,12 +106,9 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         // Store the currently active app so we can return focus to it later
         previousApp = NSWorkspace.shared.frontmostApplication
         
-        // Hide main window if it's visible to prevent it from appearing
+        // Hide ALL other windows to ensure QuickPicker is the only one visible
         for window in NSApp.windows {
-            if window.title == "Clipboard History" {
-                window.orderOut(nil)
-                break
-            }
+            window.orderOut(nil)
         }
 
         // Create a panel that captures focus without activating the main app
