@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import ApplicationServices
 import SwiftData
 import SwiftUI
 
@@ -185,6 +186,32 @@ struct QuickPickerView: View {
     }
 
     private func simulatePaste() {
+        // Check accessibility permissions
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
+        if !AXIsProcessTrustedWithOptions(options) {
+            DispatchQueue.main.async {
+                // Ensure the app is active and frontmost so the alert appears on top
+                NSApp.activate(ignoringOtherApps: true)
+                
+                let alert = NSAlert()
+                alert.messageText = "Accessibility Access Required"
+                alert.informativeText = "To paste automatically, StoneClipboarder needs accessibility permissions.\n\nPlease grant access in System Settings > Privacy & Security > Accessibility."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "Open Settings")
+                alert.addButton(withTitle: "Cancel")
+                
+                // Force alert window to be above other windows
+                alert.window.level = .floating
+                
+                if alert.runModal() == .alertFirstButtonReturn {
+                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+            return
+        }
+
         guard let source = CGEventSource(stateID: .hidSystemState) else { return }
 
         let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
@@ -197,7 +224,7 @@ struct QuickPickerView: View {
 
         keyDown?.post(tap: location)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             keyUp?.post(tap: location)
         }
     }
