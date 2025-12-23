@@ -118,3 +118,5 @@ ACTIONS_SETUP.md
 test*
 *.xcscheme
 CLAUDE.md
+GEMINI.md
+.gemini/

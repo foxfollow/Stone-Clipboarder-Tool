@@ -21,9 +21,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (without v prefix)'
+        description: "Version number (without v prefix)"
         required: false
-        default: ''
+        default: ""
 
 permissions:
   contents: write
@@ -36,18 +36,18 @@ env:
 jobs:
   build:
     name: Build and Release
-    runs-on: macos-26  # macOS 26 Tahoe with Xcode 26.1.1
-    
+    runs-on: macos-26 # macOS 26 Tahoe with Xcode 26.1.1
+
     steps:
       # =========================================================================
       # SETUP
       # =========================================================================
-      
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for version detection
-          
+          fetch-depth: 0 # Full history for version detection
+
       - name: Determine version
         id: version
         run: |
@@ -58,7 +58,7 @@ jobs:
           else
             VERSION="0.0.0-dev"
           fi
-          
+
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 Building version: $VERSION"
@@ -114,7 +114,7 @@ jobs:
         run: |
           echo "📥 Installing Sparkle via Homebrew..."
           brew install --cask sparkle
-          
+
           # Find sign_update tool
           SIGN_UPDATE=""
           for dir in /opt/homebrew/Caskroom/sparkle/*/bin /usr/local/Caskroom/sparkle/*/bin; do
@@ -123,16 +123,16 @@ jobs:
               break
             fi
           done
-          
+
           if [[ -z "$SIGN_UPDATE" ]]; then
             echo "❌ ERROR: sign_update tool not found"
             exit 1
           fi
-          
+
           # Remove quarantine and make executable
           xattr -cr "$SIGN_UPDATE" 2>/dev/null || true
           chmod +x "$SIGN_UPDATE"
-          
+
           echo "SIGN_UPDATE=$SIGN_UPDATE" >> $GITHUB_ENV
           echo "sign_update=$SIGN_UPDATE" >> $GITHUB_OUTPUT
           echo "✅ Sparkle installed: $SIGN_UPDATE"
@@ -140,14 +140,14 @@ jobs:
       # =========================================================================
       # BUILD
       # =========================================================================
-      
+
       - name: Build app
         run: |
           echo "🔨 Building ${{ env.APP_NAME }} with Xcode 26.1.1..."
-          
+
           # Create build directory
           mkdir -p build
-          
+
           # Build with xcodebuild - simple release build
           # We use ad-hoc signing (-) which gives the app a valid signature
           # structure without requiring Apple Developer ID
@@ -156,24 +156,21 @@ jobs:
             -scheme "${{ env.SCHEME }}" \
             -configuration Release \
             -derivedDataPath build/DerivedData \
-            -destination "generic/platform=macOS" \
-            ARCHS="arm64 x86_64" \
+            -destination "platform=macOS" \
+            MACOSX_DEPLOYMENT_TARGET=15.0 \
             ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGNING_ALLOWED=YES \
-            DEVELOPMENT_TEAM="" \
-            ENABLE_HARDENED_RUNTIME=NO \
-            SWIFT_VERSION=5.0 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee build/build.log
-          
+
           # Verify build succeeded
           if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
             echo "❌ Build failed"
             tail -100 build/build.log
             exit 1
           fi
-          
+
           echo "✅ Build completed"
 
       - name: Locate and verify app bundle
@@ -181,17 +178,17 @@ jobs:
         run: |
           # Find the built app
           APP_PATH=$(find build/DerivedData -name "${{ env.APP_NAME }}.app" -type d | head -1)
-          
+
           if [[ -z "$APP_PATH" || ! -d "$APP_PATH" ]]; then
             echo "❌ ERROR: App bundle not found"
             echo "Contents of build directory:"
             find build -type d -name "*.app" 2>/dev/null || echo "No .app bundles found"
             exit 1
           fi
-          
+
           echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
           echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
-          
+
           # Verify app structure
           EXECUTABLE="$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}"
           if [[ ! -f "$EXECUTABLE" ]]; then
@@ -199,7 +196,7 @@ jobs:
             ls -la "$APP_PATH/Contents/MacOS/" || true
             exit 1
           fi
-          
+
           echo "📱 App bundle: $APP_PATH"
           echo "📄 Info.plist:"
           cat "$APP_PATH/Contents/Info.plist" | head -50
@@ -213,14 +210,14 @@ jobs:
       - name: Re-sign app with ad-hoc signature
         run: |
           echo "🔐 Applying ad-hoc signature..."
-          
+
           # Remove any existing signature
           codesign --remove-signature "${{ env.APP_PATH }}" 2>/dev/null || true
-          
+
           # Sign with ad-hoc signature (-)
           # This creates a valid signature structure without Developer ID
           codesign --force --deep --sign - "${{ env.APP_PATH }}"
-          
+
           # Verify
           echo ""
           echo "✅ Signature applied:"
@@ -229,25 +226,25 @@ jobs:
       # =========================================================================
       # PACKAGE
       # =========================================================================
-      
+
       - name: Create release package
         run: |
           mkdir -p release
-          
+
           # Copy app to release directory
           cp -R "${{ env.APP_PATH }}" "release/${{ env.APP_NAME }}.app"
-          
+
           # Create README with installation instructions
           cat > release/README.txt << 'EOF'
           ================================================================================
           ${{ env.APP_NAME }} - Installation Instructions
           ================================================================================
-          
+
           This app is distributed without Apple Developer ID code signing.
           It uses ad-hoc signing, which is safe but requires a one-time approval.
-          
+
           INSTALLATION (Choose ONE method):
-          
+
           ┌─────────────────────────────────────────────────────────────────────────────┐
           │ METHOD 1: Right-Click to Open (Recommended)                                 │
           │                                                                             │
@@ -258,7 +255,7 @@ jobs:
           │                                                                             │
           │ You only need to do this once. Future launches work normally.               │
           └─────────────────────────────────────────────────────────────────────────────┘
-          
+
           ┌─────────────────────────────────────────────────────────────────────────────┐
           │ METHOD 2: Terminal Command                                                  │
           │                                                                             │
@@ -268,19 +265,19 @@ jobs:
           │                                                                             │
           │ This removes the quarantine flag that macOS adds to downloads.              │
           └─────────────────────────────────────────────────────────────────────────────┘
-          
+
           UPDATES:
-          
+
           After first launch, the app will automatically check for updates using Sparkle.
           Updates are signed and verified for security.
-          
+
           SOURCE CODE:
-          
+
           https://github.com/${{ github.repository }}
-          
+
           ================================================================================
           EOF
-          
+
           echo "✅ Release package prepared"
           ls -la release/
 
@@ -288,23 +285,23 @@ jobs:
         id: zip
         run: |
           cd release
-          
+
           # Create ZIP using ditto (preserves macOS metadata)
           ZIP_NAME="${{ env.APP_NAME }}.zip"
           ditto -c -k --sequesterRsrc --keepParent "${{ env.APP_NAME }}.app" "$ZIP_NAME"
-          
+
           # Add README to ZIP
           zip -u "$ZIP_NAME" README.txt
-          
+
           # Verify ZIP
           echo "📦 Verifying ZIP archive..."
           unzip -t "$ZIP_NAME" > /dev/null
-          
+
           # Get file size
           SIZE=$(stat -f%z "$ZIP_NAME")
           echo "FILE_SIZE=$SIZE" >> $GITHUB_ENV
           echo "file_size=$SIZE" >> $GITHUB_OUTPUT
-          
+
           echo "✅ ZIP created: $ZIP_NAME ($SIZE bytes)"
 
       - name: Sign ZIP with Sparkle EdDSA
@@ -313,43 +310,43 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           cd release
-          
+
           # Write private key to temp file
           KEY_FILE=$(mktemp)
           echo "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
-          
+
           # Sign the ZIP
           echo "🔏 Signing ZIP with Sparkle EdDSA..."
           SIGN_OUTPUT=$("${{ env.SIGN_UPDATE }}" --ed-key-file "$KEY_FILE" "${{ env.APP_NAME }}.zip" 2>&1)
           SIGN_STATUS=$?
-          
+
           # Securely delete key file
           rm -f "$KEY_FILE"
-          
+
           if [[ $SIGN_STATUS -ne 0 ]]; then
             echo "❌ ERROR: Sparkle signing failed"
             echo "$SIGN_OUTPUT"
             exit 1
           fi
-          
+
           # Extract signature from output
           # sign_update outputs: sparkle:edSignature="..." length="..."
           # or just the raw signature on newer versions
           SIGNATURE=""
-          
+
           if echo "$SIGN_OUTPUT" | grep -q 'sparkle:edSignature='; then
             SIGNATURE=$(echo "$SIGN_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
           else
             # Fallback: assume output is just the signature
             SIGNATURE=$(echo "$SIGN_OUTPUT" | tr -d '[:space:]')
           fi
-          
+
           if [[ -z "$SIGNATURE" || ${#SIGNATURE} -lt 10 ]]; then
             echo "❌ ERROR: Could not extract signature"
             echo "Raw output: $SIGN_OUTPUT"
             exit 1
           fi
-          
+
           echo "SPARKLE_SIGNATURE=$SIGNATURE" >> $GITHUB_ENV
           echo "signature=$SIGNATURE" >> $GITHUB_OUTPUT
           echo "✅ Sparkle signature: ${SIGNATURE:0:20}..."
@@ -357,16 +354,16 @@ jobs:
       # =========================================================================
       # APPCAST
       # =========================================================================
-      
+
       - name: Update appcast.xml
         run: |
           APPCAST_PATH="docs/appcast.xml"
-          
+
           if [[ ! -f "$APPCAST_PATH" ]]; then
             echo "⚠️ No appcast.xml found at $APPCAST_PATH"
             echo "Creating new appcast.xml..."
             mkdir -p docs
-            
+
             cat > "$APPCAST_PATH" << EOF
           <?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -379,7 +376,7 @@ jobs:
           </rss>
           EOF
           fi
-          
+
           # Create new item entry
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/${{ env.APP_NAME }}.zip"
           RELEASE_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
@@ -421,9 +418,9 @@ jobs:
           ' "$APPCAST_PATH" > "${APPCAST_PATH}.new"
 
           rm -f "$NEW_ITEM_FILE"
-          
+
           mv "${APPCAST_PATH}.new" "$APPCAST_PATH"
-          
+
           echo "✅ Appcast updated"
           echo ""
           cat "$APPCAST_PATH"
@@ -431,7 +428,7 @@ jobs:
       # =========================================================================
       # RELEASE
       # =========================================================================
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -443,34 +440,34 @@ jobs:
           files: release/${{ env.APP_NAME }}.zip
           body: |
             ## 📥 Installation
-            
+
             This app is distributed without Apple Developer ID (free/indie distribution).
-            
+
             ### Method 1: Right-Click to Open (Easiest)
-            
+
             1. Download and extract the ZIP
             2. Drag `${{ env.APP_NAME }}.app` to `/Applications`
             3. **Right-click** the app → Select **"Open"**
             4. Click **"Open"** in the dialog
-            
+
             > You only need to do this once. Future launches work normally.
-            
+
             ### Method 2: Terminal Command
-            
+
             ```bash
             xattr -cr /Applications/${{ env.APP_NAME }}.app
             ```
-            
+
             ---
-            
+
             ## 🔄 Auto-Updates
-            
+
             After first launch, the app will automatically check for updates.
             Updates are cryptographically signed for security.
-            
+
             ---
-            
-            **Sparkle Signature:** `${{ env.SPARKLE_SIGNATURE }}`  
+
+            **Sparkle Signature:** `${{ env.SPARKLE_SIGNATURE }}`
             **File Size:** ${{ env.FILE_SIZE }} bytes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -479,26 +476,26 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           # Check if appcast was modified
           if git diff --quiet docs/appcast.xml 2>/dev/null; then
             echo "ℹ️ No appcast changes to commit"
             exit 0
           fi
-          
+
           # Get the default branch
           DEFAULT_BRANCH=$(git remote show origin | grep "HEAD branch" | cut -d: -f2 | tr -d ' ')
           DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
-          
+
           # Fetch and checkout default branch
           git fetch origin "$DEFAULT_BRANCH"
           git checkout "$DEFAULT_BRANCH"
           git pull origin "$DEFAULT_BRANCH"
-          
+
           # Stage and commit
           git add docs/appcast.xml
           git commit -m "chore: update appcast.xml for v${{ env.VERSION }}" -m "[skip ci]"
-          
+
           # Push with retry
           for i in 1 2 3; do
             if git push origin "$DEFAULT_BRANCH"; then
@@ -509,14 +506,14 @@ jobs:
             git pull --rebase origin "$DEFAULT_BRANCH"
             sleep 2
           done
-          
+
           echo "❌ Failed to push appcast changes after 3 attempts"
           exit 1
 
       # =========================================================================
       # SUMMARY
       # =========================================================================
-      
+
       - name: Build summary
         run: |
           echo ""

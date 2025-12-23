@@ -74,7 +74,9 @@ struct QuickPickerView: View {
         .shadow(radius: 10)
         .onAppear {
             loadInitialItems()
-            isSearchFocused = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isSearchFocused = true
+            }
         }
         .onKeyPress(.escape) {
             onClose()
