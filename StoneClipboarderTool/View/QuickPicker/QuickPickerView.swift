@@ -72,7 +72,7 @@ struct QuickPickerView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
-        .shadow(radius: 10)
+        .clipped()
         .onAppear {
             loadInitialItems()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
