@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,7 +31,7 @@
             background-position: center;
             border-radius: 22px;
             margin: 0 auto 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
             transition: box-shadow 0.3s ease;
         }
 
@@ -93,12 +94,12 @@
             padding: 20px;
             border-radius: 12px;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .screenshot:hover {
             transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
         .screenshot img {
@@ -106,14 +107,14 @@
             height: auto;
             border-radius: 8px;
             margin-bottom: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             cursor: pointer;
             transition: all 0.3s ease;
         }
 
         .screenshot img:hover {
             transform: scale(1.02);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
         .screenshot p {
@@ -237,6 +238,58 @@
             transition: background-color 0.3s ease;
         }
 
+        .install-box {
+            background: #f1f3f5;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: left;
+            margin: 40px 0;
+            border-left: 5px solid #007AFF;
+        }
+
+        .install-box h3 {
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-size: 14px;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: #e0e0e0;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+
         /* Dark theme */
         @media (prefers-color-scheme: dark) {
             body {
@@ -245,7 +298,7 @@
             }
 
             .app-icon {
-                box-shadow: 0 4px 20px rgba(255,255,255,0.1);
+                box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
             }
 
             .download-btn {
@@ -268,11 +321,11 @@
 
             .screenshot {
                 background: #2a2a2a;
-                box-shadow: 0 2px 10px rgba(255,255,255,0.1);
+                box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
             }
 
             .screenshot:hover {
-                box-shadow: 0 8px 25px rgba(255,255,255,0.15);
+                box-shadow: 0 8px 25px rgba(255, 255, 255, 0.15);
             }
 
             .screenshot p {
@@ -287,6 +340,12 @@
             .update-info {
                 background: #1e3a52;
                 color: #e0e0e0;
+            }
+
+            .install-box {
+                background: #2a2a2a;
+                color: #e0e0e0;
+                border-left-color: #0A84FF;
             }
         }
 
@@ -334,8 +393,13 @@
             color: #333 !important;
         }
 
+        body.light-theme .install-box {
+            background: #f1f3f5 !important;
+            color: #333 !important;
+        }
+
         body.light-theme .app-icon {
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
         }
 
         body.light-theme .screenshots h2 {
@@ -344,11 +408,11 @@
 
         body.light-theme .screenshot {
             background: #f8f9fa !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
         }
 
         body.light-theme .screenshot:hover {
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
         }
 
         body.light-theme .screenshot p {
@@ -376,31 +440,13 @@
             color: #e0e0e0 !important;
         }
 
-        /* Version history specific styles */
-        .version-history h2 {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #333;
-            transition: color 0.3s ease;
-        }
-
-        .version-history ul {
-            line-height: 1.8;
-            margin: 10px 0;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            .version-history h2 {
-                color: #e0e0e0;
-            }
-        }
-
-        body.dark-theme .version-history h2 {
+        body.dark-theme .install-box {
+            background: #2a2a2a !important;
             color: #e0e0e0 !important;
         }
 
         body.dark-theme .app-icon {
-            box-shadow: 0 4px 20px rgba(255,255,255,0.1) !important;
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1) !important;
         }
 
         body.dark-theme .screenshots h2 {
@@ -409,11 +455,11 @@
 
         body.dark-theme .screenshot {
             background: #2a2a2a !important;
-            box-shadow: 0 2px 10px rgba(255,255,255,0.1) !important;
+            box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1) !important;
         }
 
         body.dark-theme .screenshot:hover {
-            box-shadow: 0 8px 25px rgba(255,255,255,0.15) !important;
+            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.15) !important;
         }
 
         body.dark-theme .screenshot p {
@@ -439,6 +485,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Theme toggle button -->
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
@@ -452,14 +499,29 @@
 
         <div class="update-info">
             <h3>Automatic Updates Available</h3>
-            <p>This page serves the update feed for StoneClipboarderTool. The app will automatically check for updates.</p>
+            <p>This page serves the update feed for StoneClipboarderTool. The app will automatically check for updates.
+            </p>
             <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest" class="download-btn">📥 Download Latest</a>
+                <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest" class="download-btn">📥
+                    Download Latest</a>
                 <a href="installation.html" class="download-btn">📋 Installation Guide</a>
                 <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool" class="download-btn">🔗 View on GitHub</a>
+                <a href="version-history.html" class="download-btn">📜 Version History</a>
                 <a href="appcast.xml" class="download-btn">📡 View Update Feed</a>
             </div>
         </div>
+    </div>
+
+    <!-- Homebrew Installation -->
+    <div class="install-box">
+        <h3>🍺 Install via Homebrew</h3>
+        <p>You can easily install StoneClipboarderTool using Homebrew tap:</p>
+        <div class="code-block">
+            brew tap foxfollow/stone<br>
+            brew install stone-clipboarder-tool
+            <button class="copy-btn" onclick="copyInstallCmd(this)">Copy</button>
+        </div>
+        <small>The app will be automatically configured to run without security warnings.</small>
     </div>
 
     <!-- App Screenshots Section -->
@@ -467,19 +529,31 @@
         <h2>📱 App Preview</h2>
         <div class="screenshot-grid">
             <div class="screenshot">
-                <img src="resources/index/StoneClipboarder-Image-01.png" alt="StoneClipboarderTool Images View" onclick="openModal(this, 'How images look in the app with preview and metadata')" />
-                <p>How images look in the app with preview and metadata</p>
+                <img class="theme-image" src="resources/index/sct-light-basicwindow.png"
+                    data-light-src="resources/index/sct-light-basicwindow.png"
+                    data-dark-src="resources/index/sct-dark-basicwindow.png" alt="StoneClipboarderTool Main View"
+                    onclick="openModal(this, 'Main window showing your clipboard history with preview and metadata')" />
+                <p>Main window showing your clipboard history with preview and metadata</p>
             </div>
             <div class="screenshot">
-                <img src="resources/index/StoneClipboarder-Image-02.png" alt="StoneClipboarderTool Files View" onclick="openModal(this, 'How files appear in the clipboard manager interface')" />
-                <p>How files appear in the clipboard manager interface</p>
+                <img class="theme-image" src="resources/index/sct-light-settings.png"
+                    data-light-src="resources/index/sct-light-settings.png"
+                    data-dark-src="resources/index/sct-dark-settings.png" alt="StoneClipboarderTool Settings"
+                    onclick="openModal(this, 'Settings panel for customization and preferences')" />
+                <p>Settings panel for customization and preferences</p>
             </div>
             <div class="screenshot">
-                <img src="resources/index/StoneClipboarder-Image-03.png" alt="StoneClipboarderTool Text View" onclick="openModal(this, 'How copied text content is displayed and organized')" />
-                <p>How copied text content is displayed and organized</p>
+                <img class="theme-image" src="resources/index/sct-light-quickpicker.png"
+                    data-light-src="resources/index/sct-light-quickpicker.png"
+                    data-dark-src="resources/index/sct-dark-quickpicker.png" alt="StoneClipboarderTool Quick Picker"
+                    onclick="openModal(this, 'Quick Picker (Spotlight-like integration) for fast access')" />
+                <p>Quick Picker (Spotlight-like integration) for fast access</p>
             </div>
             <div class="screenshot">
-                <img src="resources/index/StoneClipboarder-Image-Menu.png" alt="StoneClipboarderTool Menu Bar" onclick="openModal(this, 'Menu bar integration for quick access to recent items')" />
+                <img class="theme-image" src="resources/index/sct-light-menubar.png"
+                    data-light-src="resources/index/sct-light-menubar.png"
+                    data-dark-src="resources/index/sct-dark-menubar.png" alt="StoneClipboarderTool Menu Bar"
+                    onclick="openModal(this, 'Menu bar integration for quick access to recent items')" />
                 <p>Menu bar integration for quick access to recent items</p>
             </div>
         </div>
@@ -498,22 +572,26 @@
 
         <div class="feature">
             <h3>⭐ Smart Favorites</h3>
-            <p>Pin frequently-used items that are protected from auto-deletion. Enhanced in v1.3.0 to load all favorites even when not in memory.</p>
+            <p>Pin frequently-used items that are protected from auto-deletion. Enhanced in v1.3.0 to load all favorites
+                even when not in memory.</p>
         </div>
 
         <div class="feature">
             <h3>🔎 Advanced Search</h3>
-            <p>NEW in v1.3.0: Search through your clipboard history with a modern search bar featuring macOS 15+ liquid glass effect.</p>
+            <p>NEW in v1.3.0: Search through your clipboard history with a modern search bar featuring macOS 15+ liquid
+                glass effect.</p>
         </div>
 
         <div class="feature">
             <h3>🚫 Excluded Apps</h3>
-            <p>NEW in v1.3.0: Choose which apps to exclude from clipboard monitoring. Perfect for protecting sensitive data from password managers or banking apps.</p>
+            <p>NEW in v1.3.0: Choose which apps to exclude from clipboard monitoring. Perfect for protecting sensitive
+                data from password managers or banking apps.</p>
         </div>
 
         <div class="feature">
             <h3>⏸️ Pause Monitoring</h3>
-            <p>NEW in v1.3.0: Temporarily pause clipboard monitoring with a customizable timer. Great for privacy when working with sensitive information.</p>
+            <p>NEW in v1.3.0: Temporarily pause clipboard monitoring with a customizable timer. Great for privacy when
+                working with sensitive information.</p>
         </div>
 
         <div class="feature">
@@ -528,7 +606,8 @@
 
         <div class="feature">
             <h3>🖼️ Combined Items (BETA)</h3>
-            <p>Added in v1.2.0: Save text and images together as a single clipboard item for rich content management.</p>
+            <p>Added in v1.2.0: Save text and images together as a single clipboard item for rich content management.
+            </p>
         </div>
 
         <div class="feature">
@@ -543,44 +622,15 @@
 
         <div class="feature">
             <h3>🔒 Privacy Focused</h3>
-            <p>All data stays on your device. No cloud sync or data collection. Now with app exclusion for enhanced privacy.</p>
+            <p>All data stays on your device. No cloud sync or data collection. Now with app exclusion for enhanced
+                privacy.</p>
         </div>
     </div>
 
-    <!-- Version History Section -->
-    <div class="version-history" style="margin: 60px 0 40px;">
-        <h2>📋 Version History</h2>
-
-        <div class="update-info" style="margin-bottom: 20px;">
-            <h3>🎉 Version 1.3.0 - Latest (2025)</h3>
-            <ul>
-                <li><strong>🚫 Excluded Apps:</strong> Choose which apps to exclude from clipboard monitoring in Settings</li>
-                <li><strong>⏸️ Pause Monitoring:</strong> Temporarily pause clipboard tracking with customizable timer</li>
-                <li><strong>🍻 Small improvements:</strong> Various minor enhancements and bug fixes</li>
-            </ul>
-        </div>
-
-        <div class="update-info" style="background: #f0f0f0; margin-bottom: 20px;">
-            <h3>Version 1.2.0 (2025)</h3>
-            <ul>
-                <li><strong>🖼️ Combined Items (BETA):</strong> Save text and images together as single clipboard items</li>
-                <li><strong>🔍 OCR Support:</strong> Extract text from images using Apple Vision framework</li>
-                <li><strong>📋 Enhanced Capture Modes:</strong> Improved logic to prefer text or image based on availability</li>
-                <li><strong>⭐ Favorites Protection:</strong> Favorites are now protected from auto-cleanup</li>
-                <li><strong>🎨 Icon Update:</strong> New app icon with liquid glass effect</li>
-            </ul>
-        </div>
-
-        <div class="update-info" style="background: #f0f0f0;">
-            <h3>Version 1.1.0 (2025)</h3>
-            <ul>
-                <li><strong>🎯 Initial Release:</strong> Core clipboard monitoring functionality</li>
-                <li><strong>⚡ Global Hotkeys:</strong> System-wide shortcuts for quick access</li>
-                <li><strong>🖥️ Menu Bar:</strong> Quick access to recent clipboard items</li>
-                <li><strong>⭐ Favorites System:</strong> Pin frequently-used items</li>
-                <li><strong>🔄 Auto Updates:</strong> Sparkle framework integration</li>
-            </ul>
-        </div>
+    <!-- Version History Link -->
+    <div style="text-align: center; margin: 40px 0;">
+        <a href="version-history.html" class="download-btn" style="background-color: #5856d6;">📜 View Full Version
+            History</a>
     </div>
 
     <div class="footer">
@@ -613,16 +663,73 @@
             // Remove existing theme classes
             body.classList.remove('light-theme', 'dark-theme');
 
-            if (theme === 'light') {
+            let activeTheme = theme;
+            if (activeTheme === 'auto') {
+                activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+
+            if (activeTheme === 'light') {
                 body.classList.add('light-theme');
                 themeIcon.textContent = '🌙';
-            } else if (theme === 'dark') {
+            } else if (activeTheme === 'dark') {
                 body.classList.add('dark-theme');
                 themeIcon.textContent = '☀️';
-            } else {
-                // Auto mode - follow system preference
+            }
+
+            if (theme === 'auto') {
                 themeIcon.textContent = window.matchMedia('(prefers-color-scheme: dark)').matches ? '☀️' : '🌙';
             }
+
+            updateImages(activeTheme);
+        }
+
+        function copyInstallCmd(btn) {
+            const cmd = "brew tap foxfollow/stone\nbrew install stone-clipboarder-tool";
+
+            // Try modern API first
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(cmd).then(() => showCopiedFeedback(btn));
+            } else {
+                // Fallback for non-secure contexts (like file://)
+                const textArea = document.createElement("textarea");
+                textArea.value = cmd;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopiedFeedback(btn);
+                } catch (err) {
+                    console.error('Failed to copy', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showCopiedFeedback(btn) {
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            btn.style.background = 'rgba(40, 167, 69, 0.3)';
+            btn.style.borderColor = '#28a745';
+
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+                btn.style.borderColor = '';
+            }, 2000);
+        }
+
+        function updateImages(theme) {
+            const images = document.querySelectorAll('.theme-image');
+            images.forEach(img => {
+                if (theme === 'dark') {
+                    img.src = img.getAttribute('data-dark-src');
+                } else {
+                    img.src = img.getAttribute('data-light-src');
+                }
+            });
         }
 
         function toggleTheme() {
@@ -679,24 +786,25 @@
         }
 
         // Close modal with Escape key
-        document.addEventListener('keydown', function(event) {
+        document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') {
                 closeModal();
             }
         });
 
         // Initialize theme on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             setTheme(currentTheme);
             checkUpdateFeed();
         });
 
         // Listen for system theme changes
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
             if (currentTheme === 'auto') {
                 setTheme('auto');
             }
         });
     </script>
 </body>
+
 </html>

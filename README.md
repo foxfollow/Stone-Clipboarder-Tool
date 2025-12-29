@@ -15,18 +15,42 @@
 
 A macOS clipboard history manager that automatically saves and organizes everything you copy.
 
-## 🔗 Links
+## Links
 
 - **Live Preview**: [Visit site on GitHub Pages](https://foxfollow.github.io/Stone-Clipboarder-Tool/)
 - **Latest Release**: [Download from GitHub](https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest)
 - **Installation Guide**: [Step-by-step installation instructions](https://foxfollow.github.io/Stone-Clipboarder-Tool/installation)
 
 
+## Installation
+
+### Homebrew (macOS)
+```bash
+brew tap foxfollow/stone
+brew install stone-clipboarder-tool
+```
+
+The app will be automatically configured to run without security warnings.
+
+[Homebrew tap](https://github.com/foxfollow/homebrew-stone)
+
+### Manual Download
+Download the latest `.zip` from [Releases](https://github.com/foxfollow/Stone-Clipboarder-Tool/releases)
+
+If macOS blocks the app on first launch (common for non-App Store apps):
+```bash
+xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
+```
+*See the [Installation Guide](https://foxfollow.github.io/Stone-Clipboarder-Tool/installation) for detailed steps.*
+
 ## Features
 
-### 🆕 New in Version 1.3.0
-- **🚫 Excluded Apps**: Choose which apps to exclude from clipboard monitoring in Settings - perfect for protecting sensitive data from password managers or banking apps
-- **⏸️ Pause Monitoring**: Temporarily pause clipboard tracking with a customizable timer for enhanced privacy from the menu bar
+### 🆕 New in Version 1.3.2
+- **✨ Enhanced Quick Picker**: Improved window isolation and accessibility integration
+- **🎯 Smart Focus**: Search field automatically takes focus for immediate typing
+- **🐛 Bug Fixes**: Stability improvements and optimizations
+
+[View Full Version History](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)
 
 ### Core Features
 - **Automatic Clipboard Monitoring**: Captures everything you copy while the app is running
@@ -44,7 +68,6 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 - **Smart Timestamp Update**: Reused items move to the top with updated timestamp
 - **Smart Deduplication**: Avoids saving duplicate consecutive items
 - **Bulk Operations**: Delete all clipboard history with confirmation dialog
-- **Always Available Edit Mode**: Edit mode always visible for quick item management
 - **Flexible UI Options**: Show/hide main window and menu bar independently
 
 ## How It Works
@@ -62,21 +85,21 @@ A macOS clipboard history manager that automatically saves and organizes everyth
 <table>
   <tr>
     <td align="center">
-      <img src="docs/resources/index/StoneClipboarder-Image-01.png" width="250" alt="Images View"><br>
-      <sub><b>Images View</b><br>How images look in the app with preview</sub>
+      <img src="docs/resources/index/sct-dark-basicwindow.png" width="250" alt="Main Window"><br>
+      <sub><b>Main Window</b><br>Clipboard history with preview</sub>
     </td>
     <td align="center">
-      <img src="docs/resources/index/StoneClipboarder-Image-02.png" width="250" alt="Files View"><br>
-      <sub><b>Files View</b><br>How files appear in clipboard manager</sub>
+      <img src="docs/resources/index/sct-dark-settings.png" width="250" alt="Settings"><br>
+      <sub><b>Settings</b><br>Customization options</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/resources/index/StoneClipboarder-Image-03.png" width="250" alt="Text View"><br>
-      <sub><b>Text View</b><br>How copied text content is displayed</sub>
+      <img src="docs/resources/index/sct-dark-quickpicker.png" width="250" alt="Quick Picker"><br>
+      <sub><b>Quick Picker</b><br>Spotlight-like access (⌃⌥Space)</sub>
     </td>
     <td align="center">
-      <img src="docs/resources/index/StoneClipboarder-Image-Menu.png" width="250" alt="Menu Bar"><br>
+      <img src="docs/resources/index/sct-dark-menubar.png" width="250" alt="Menu Bar"><br>
       <sub><b>Menu Bar</b><br>Quick access to recent items</sub>
     </td>
   </tr>
@@ -120,26 +143,7 @@ The app uses SwiftUI and SwiftData for a modern, native macOS experience.
 
 ## Version History
 
-### Version 1.3.0 (2025) - Latest
-- **🔎 Advanced Search**: New search bar with liquid glass effect (macOS 15+)
-- **🚫 Excluded Apps**: Per-app clipboard monitoring control
-- **⏸️ Pause Monitoring**: Temporary pause with customizable timer
-- **⭐ Favorites Fix**: Load all favorites regardless of position
-- **🎨 UI Enhancements**: Menu bar pause timer display
-
-### Version 1.2.0 (2025)
-- **🖼️ Combined Items**: Text + image clipboard items (BETA)
-- **🔍 OCR Support**: Apple Vision text recognition
-- **📋 Enhanced Capture**: Improved text/image preference logic
-- **⭐ Favorites Protection**: Auto-cleanup now preserves favorites
-- **🎨 Icon Update**: New liquid glass effect icon
-
-### Version 1.1.0 (2025)
-- **🎯 Initial Release**: Core clipboard monitoring
-- **⚡ Global Hotkeys**: System-wide shortcuts
-- **🖥️ Menu Bar**: Quick access interface
-- **⭐ Favorites**: Pin important items
-- **🔄 Auto Updates**: Sparkle framework integration
+[View Full Version History](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)
 
 ## License
 The MIT License (MIT)

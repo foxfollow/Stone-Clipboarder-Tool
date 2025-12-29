@@ -1,616 +1,671 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Installation Guide - Stone Clipboarder Tool</title>
-        <style>
-            body {
-                font-family:
-                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                    sans-serif;
-                line-height: 1.6;
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 20px;
-                background-color: #f5f5f7;
-                color: #1d1d1f;
-            }
 
-            .header {
-                text-align: center;
-                margin-bottom: 40px;
-            }
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Installation Guide - Stone Clipboarder Tool</title>
+    <style>
+        body {
+            font-family:
+                -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+        }
 
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .app-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            margin: 0 auto 20px;
+            display: block;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        @media (-webkit-min-device-pixel-ratio: 2) {
             .app-icon {
-                width: 80px;
-                height: 80px;
-                border-radius: 20px;
-                margin: 0 auto 20px;
-                display: block;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+                content: url("resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png");
             }
+        }
 
-            @media (-webkit-min-device-pixel-ratio: 2) {
-                .app-icon {
-                    content: url("resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png");
-                }
-            }
+        h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin: 0;
+            color: #1d1d1f;
+        }
 
-            h1 {
-                font-size: 2.5em;
-                font-weight: 700;
-                margin: 0;
-                color: #1d1d1f;
-            }
+        .subtitle {
+            font-size: 1.2em;
+            color: #86868b;
+            margin-top: 10px;
+        }
 
-            .subtitle {
-                font-size: 1.2em;
-                color: #86868b;
-                margin-top: 10px;
-            }
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+            color: #856404;
+        }
 
-            .warning-box {
-                background: #fff3cd;
-                border: 1px solid #ffeaa7;
-                border-radius: 8px;
-                padding: 20px;
-                margin: 30px 0;
-                color: #856404;
-            }
+        .warning-box h3 {
+            margin-top: 0;
+            color: #856404;
+        }
 
-            .warning-box h3 {
-                margin-top: 0;
-                color: #856404;
+        .step {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .step h2 {
+            color: #1d1d1f;
+            margin-top: 0;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .step-number {
+            background: #007aff;
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .step-image {
+            width: 100%;
+            max-width: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin: 20px 0;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .step-image:hover {
+            transform: scale(1.02);
+        }
+
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #007aff, #0056cc);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+        }
+
+        .note {
+            background: #e8f4fd;
+            border-left: 4px solid #007aff;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .note strong {
+            color: #0056cc;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.show .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        .modal-close:hover {
+            color: #ccc;
+        }
+
+        .back-btn {
+            display: inline-block;
+            color: #007aff;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .back-btn:hover {
+            text-decoration: underline;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: 2px solid #007aff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .theme-toggle:hover {
+            background: #007aff;
+            transform: scale(1.1);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #000;
+                color: #f5f5f7;
             }
 
             .step {
-                background: white;
-                border-radius: 12px;
-                padding: 30px;
-                margin: 30px 0;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+                background: #1c1c1e;
             }
 
-            .step h2 {
-                color: #1d1d1f;
-                margin-top: 0;
-                font-size: 1.5em;
-                display: flex;
-                align-items: center;
-                gap: 15px;
+            .warning-box {
+                background: #2c1810;
+                border-color: #8b4513;
+                color: #ffd700;
             }
 
-            .step-number {
-                background: #007aff;
-                color: white;
-                border-radius: 50%;
-                width: 32px;
-                height: 32px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: bold;
-                font-size: 1.1em;
-            }
-
-            .step-image {
-                width: 100%;
-                max-width: 600px;
-                border-radius: 8px;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-                margin: 20px 0;
-                cursor: pointer;
-                transition: transform 0.2s ease;
-            }
-
-            .step-image:hover {
-                transform: scale(1.02);
-            }
-
-            .download-btn {
-                display: inline-block;
-                background: linear-gradient(135deg, #007aff, #0056cc);
-                color: white;
-                padding: 15px 30px;
-                text-decoration: none;
-                border-radius: 25px;
-                font-weight: 600;
-                margin: 20px 0;
-                transition: all 0.3s ease;
-                box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
-            }
-
-            .download-btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+            .warning-box h3 {
+                color: #ffd700;
             }
 
             .note {
-                background: #e8f4fd;
-                border-left: 4px solid #007aff;
-                padding: 15px 20px;
-                margin: 20px 0;
-                border-radius: 0 8px 8px 0;
+                background: #1a2332;
+                border-left-color: #64a7ff;
             }
 
             .note strong {
-                color: #0056cc;
-            }
-
-            .modal {
-                display: none;
-                position: fixed;
-                z-index: 1000;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.9);
-                opacity: 0;
-                transition: opacity 0.3s ease;
-            }
-
-            .modal.show {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                opacity: 1;
-            }
-
-            .modal-content {
-                max-width: 90%;
-                max-height: 90%;
-                transform: scale(0.8);
-                transition: transform 0.3s ease;
-            }
-
-            .modal.show .modal-content {
-                transform: scale(1);
-            }
-
-            .modal-image {
-                width: 100%;
-                height: auto;
-                border-radius: 8px;
-            }
-
-            .modal-close {
-                position: absolute;
-                top: 20px;
-                right: 40px;
-                color: white;
-                font-size: 40px;
-                font-weight: bold;
-                cursor: pointer;
-                z-index: 1001;
-            }
-
-            .modal-close:hover {
-                color: #ccc;
-            }
-
-            .back-btn {
-                display: inline-block;
-                color: #007aff;
-                text-decoration: none;
-                margin-bottom: 20px;
-                font-weight: 600;
-            }
-
-            .back-btn:hover {
-                text-decoration: underline;
+                color: #64a7ff;
             }
 
             .theme-toggle {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: transparent;
-                border: 2px solid #007aff;
-                border-radius: 50%;
-                width: 50px;
-                height: 50px;
-                cursor: pointer;
-                font-size: 20px;
-                transition: all 0.3s ease;
-                z-index: 1000;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                border-color: #0a84ff;
             }
 
             .theme-toggle:hover {
-                background: #007aff;
-                transform: scale(1.1);
+                background: #0a84ff;
             }
+        }
 
-            @media (prefers-color-scheme: dark) {
-                body {
-                    background-color: #000;
-                    color: #f5f5f7;
-                }
+        /* Manual theme overrides */
+        body.light-theme {
+            background-color: #f5f5f7 !important;
+            color: #1d1d1f !important;
+        }
 
-                .step {
-                    background: #1c1c1e;
-                }
+        body.light-theme .step {
+            background: white !important;
+        }
 
-                .warning-box {
-                    background: #2c1810;
-                    border-color: #8b4513;
-                    color: #ffd700;
-                }
+        body.light-theme .warning-box {
+            background: #fff3cd !important;
+            border-color: #ffeaa7 !important;
+            color: #856404 !important;
+        }
 
-                .warning-box h3 {
-                    color: #ffd700;
-                }
+        body.light-theme .warning-box h3 {
+            color: #856404 !important;
+        }
 
-                .note {
-                    background: #1a2332;
-                    border-left-color: #64a7ff;
-                }
+        body.light-theme .note {
+            background: #e8f4fd !important;
+            border-left-color: #007aff !important;
+        }
 
-                .note strong {
-                    color: #64a7ff;
-                }
+        body.light-theme .note strong {
+            color: #0056cc !important;
+        }
 
-                .theme-toggle {
-                    border-color: #0a84ff;
-                }
+        body.dark-theme {
+            background-color: #000 !important;
+            color: #f5f5f7 !important;
+        }
 
-                .theme-toggle:hover {
-                    background: #0a84ff;
-                }
-            }
+        body.dark-theme .step {
+            background: #1c1c1e !important;
+        }
 
-            /* Manual theme overrides */
-            body.light-theme {
-                background-color: #f5f5f7 !important;
-                color: #1d1d1f !important;
-            }
+        body.dark-theme .warning-box {
+            background: #2c1810 !important;
+            border-color: #8b4513 !important;
+            color: #ffd700 !important;
+        }
 
-            body.light-theme .step {
-                background: white !important;
-            }
+        body.dark-theme .warning-box h3 {
+            color: #ffd700 !important;
+        }
 
-            body.light-theme .warning-box {
-                background: #fff3cd !important;
-                border-color: #ffeaa7 !important;
-                color: #856404 !important;
-            }
+        body.dark-theme .note {
+            background: #1a2332 !important;
+            border-left-color: #64a7ff !important;
+        }
 
-            body.light-theme .warning-box h3 {
-                color: #856404 !important;
-            }
+        body.dark-theme .note strong {
+            color: #64a7ff !important;
+        }
 
-            body.light-theme .note {
-                background: #e8f4fd !important;
-                border-left-color: #007aff !important;
-            }
-
-            body.light-theme .note strong {
-                color: #0056cc !important;
-            }
-
-            body.dark-theme {
-                background-color: #000 !important;
-                color: #f5f5f7 !important;
-            }
-
-            body.dark-theme .step {
-                background: #1c1c1e !important;
-            }
-
-            body.dark-theme .warning-box {
-                background: #2c1810 !important;
-                border-color: #8b4513 !important;
-                color: #ffd700 !important;
-            }
-
-            body.dark-theme .warning-box h3 {
-                color: #ffd700 !important;
-            }
-
-            body.dark-theme .note {
-                background: #1a2332 !important;
-                border-left-color: #64a7ff !important;
-            }
-
-            body.dark-theme .note strong {
-                color: #64a7ff !important;
-            }
-
-            body.dark-theme .download-btn {
-                background: linear-gradient(
-                    135deg,
+        body.dark-theme .download-btn {
+            background: linear-gradient(135deg,
                     #0a84ff,
-                    #409cff
-                ) !important;
-            }
+                    #409cff) !important;
+        }
 
-            body.dark-theme .download-btn:hover {
-                background: linear-gradient(
-                    135deg,
+        body.dark-theme .download-btn:hover {
+            background: linear-gradient(135deg,
                     #409cff,
-                    #64a7ff
-                ) !important;
+                    #64a7ff) !important;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
             }
 
-            @media (max-width: 768px) {
-                body {
-                    padding: 15px;
+            .step {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: #e0e0e0;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Theme toggle button -->
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="theme-icon">🌙</span>
+    </button>
+
+    <div class="header">
+        <img src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" alt="Stone Clipboarder Tool"
+            class="app-icon" />
+        <h1>Installation Guide</h1>
+        <p class="subtitle">
+            How to install Stone Clipboarder Tool on macOS
+        </p>
+    </div>
+
+    <a href="index.html" class="back-btn">← Back to Main Page</a>
+
+    <div class="warning-box">
+        <h3>⚠️ Important Notice</h3>
+        <p>
+            <strong>This app is not signed with an Apple Developer
+                certificate.</strong>
+            Due to the lack of an Apple Developer subscription, you'll need
+            to manually allow the app to run. This is completely safe - the
+            app is open source and you can review the code on GitHub.
+        </p>
+    </div>
+
+    <div class="step" style="border-left: 5px solid #007aff;">
+        <h2>🍺 Recommended: Install via Homebrew</h2>
+        <p>
+            The easiest way to install and avoid most security warnings is using Homebrew.
+        </p>
+        <div class="code-block">
+            brew tap foxfollow/stone<br>
+            brew install stone-clipboarder-tool
+            <button class="copy-btn" onclick="copyInstallCmd(this)">Copy</button>
+        </div>
+        <p>
+            This automatically configures the app to run without the usual security quarantine.
+        </p>
+    </div>
+
+    <h2 style="text-align: center; margin: 40px 0;">OR</h2>
+    <h3 style="text-align: center; color: #666; margin-bottom: 30px;">Manual Installation Method</h3>
+
+    <div class="step">
+        <h2><span class="step-number">1</span>Download the App</h2>
+        <p>
+            First, download the latest version of Stone Clipboarder Tool
+            from GitHub releases.
+        </p>
+        <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest" class="download-btn"
+            target="_blank">Download Latest Release</a>
+        <img src="resources/installation/install-StoneClipboarder-01-Download.png" alt="Download from GitHub releases"
+            class="step-image" onclick="openModal(this.src)" />
+        <div class="note">
+            <strong>Note:</strong> Look for the latest release and download
+            the <code>.dmg</code> file or <code>.zip</code> archive
+            containing the app.
+        </div>
+    </div>
+
+    <div class="step">
+        <h2><span class="step-number">2</span>Move to Applications</h2>
+        <p>
+            After downloading, extract the app (if it's in a zip file) and
+            drag it to your Applications folder. You can also double-click
+            the .dmg file and drag the app to Applications.
+        </p>
+        <img src="resources/installation/install-StoneClipboarder-02-MoveToApps.png"
+            alt="Move app to Applications folder" class="step-image" onclick="openModal(this.src)" />
+        <div class="note">
+            <strong>Tip:</strong> You can also install the app in any other
+            location, but Applications folder is recommended for easy
+            access.
+        </div>
+    </div>
+
+    <div class="step">
+        <h2><span class="step-number">3</span>First Launch Attempt</h2>
+        <p>
+            Try to open the app by double-clicking it. macOS will show a
+            security warning because the app is not from an identified
+            developer.
+        </p>
+        <img src="resources/installation/install-StoneClipboarder-03-TryToOpen.png" alt="macOS security warning dialog"
+            class="step-image" onclick="openModal(this.src)" />
+        <div class="note">
+            <strong>Expected behavior:</strong> macOS will prevent the app
+            from opening and show a security dialog. This is normal - click
+            "DONE" and proceed to the next step.
+        </div>
+    </div>
+
+    <div class="step">
+        <h2><span class="step-number">4</span>Open System Settings</h2>
+        <p>
+            Go to System Settings → Privacy & Security. Scroll down to find
+            the Security section where you'll see a message about the
+            blocked app.
+        </p>
+        <img src="resources/installation/install-StoneClipboarder-04-PrivacyInSettings.png"
+            alt="Privacy & Security settings" class="step-image" onclick="openModal(this.src)" />
+        <div class="note">
+            <strong>Alternative:</strong> You can also click on "?" in the
+            previous step, than click on "Open Privacy & Security settings
+            for me" from macOS Tips app.
+        </div>
+    </div>
+
+    <div class="step">
+        <h2><span class="step-number">5</span>Allow the App</h2>
+        <p>
+            In the Privacy & Security settings, click "Open Anyway" next to
+            the Stone Clipboarder Tool entry. Confirm your choice when
+            prompted.
+        </p>
+        <img src="resources/installation/install-StoneClipboarder-05-OpenAnyway.png" alt="Click Open Anyway button"
+            class="step-image" onclick="openModal(this.src)" />
+        <div class="note">
+            <strong>Success:</strong> After clicking "Open Anyway", the app
+            will launch and you'll be able to use it normally. You only need
+            to do this once.
+        </div>
+    </div>
+
+    <div class="step">
+        <h2><span class="step-number">6</span>Grant Permissions</h2>
+        <p>When the app first runs, it may request permissions to:</p>
+        <ul>
+            <li>
+                <strong>Accessibility:</strong> To monitor clipboard changes
+            </li>
+            <li>
+                <strong>Screen Recording:</strong> To capture clipboard
+                content (if needed)
+            </li>
+        </ul>
+        <p>
+            Grant these permissions in System Settings → Privacy & Security
+            to ensure the app works properly.
+        </p>
+        <div class="note">
+            <strong>Privacy:</strong> Stone Clipboarder Tool only accesses
+            your clipboard to save and manage copied content locally. No
+            data is sent to external servers.
+        </div>
+    </div>
+
+    <div class="warning-box">
+        <h3>🔒 Security & Privacy</h3>
+        <p>Stone Clipboarder Tool is completely safe to use:</p>
+        <ul>
+            <li>
+                The app is open source - you can review the code on GitHub
+            </li>
+            <li>All clipboard data is stored locally using SwiftData</li>
+            <li>No network connections are made</li>
+            <li>No personal data is collected or transmitted</li>
+        </ul>
+        <p>
+            The only reason for the security warning is the lack of an Apple
+            Developer certificate, which costs $99/year.
+        </p>
+    </div>
+
+    <!-- Modal for image zoom -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div class="modal-content">
+            <img id="modalImage" class="modal-image" src="" alt="" />
+        </div>
+    </div>
+
+    <script>
+        // Theme management
+        let currentTheme = localStorage.getItem("theme") || "auto";
+
+        function setTheme(theme) {
+            currentTheme = theme;
+            localStorage.setItem("theme", theme);
+
+            const body = document.body;
+            const themeIcon = document.getElementById("theme-icon");
+
+            // Remove existing theme classes
+            body.classList.remove("light-theme", "dark-theme");
+
+            if (theme === "light") {
+                body.classList.add("light-theme");
+                themeIcon.textContent = "🌙";
+            } else if (theme === "dark") {
+                body.classList.add("dark-theme");
+                themeIcon.textContent = "☀️";
+            } else {
+                // Auto theme - follow system preference
+                themeIcon.textContent = window.matchMedia(
+                    "(prefers-color-scheme: dark)",
+                ).matches
+                    ? "☀️"
+                    : "🌙";
+            }
+        }
+
+        function toggleTheme() {
+            if (currentTheme === "auto" || currentTheme === "light") {
+                setTheme("dark");
+            } else {
+                setTheme("light");
+            }
+        }
+
+        function openModal(imageSrc) {
+            const modal = document.getElementById("imageModal");
+            const modalImage = document.getElementById("modalImage");
+            modalImage.src = imageSrc;
+            modal.classList.add("show");
+        }
+
+        function closeModal() {
+            const modal = document.getElementById("imageModal");
+            modal.classList.remove("show");
+        }
+
+        // Close modal with Escape key
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closeModal();
+            }
+        });
+
+        function copyInstallCmd(btn) {
+            const cmd = "brew tap foxfollow/stone\nbrew install stone-clipboarder-tool";
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(cmd).then(() => showCopiedFeedback(btn));
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = cmd;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopiedFeedback(btn);
+                } catch (err) {
+                    console.error('Failed to copy', err);
                 }
-
-                .step {
-                    padding: 20px;
-                }
-
-                h1 {
-                    font-size: 2em;
-                }
+                document.body.removeChild(textArea);
             }
-        </style>
-    </head>
-    <body>
-        <!-- Theme toggle button -->
-        <button
-            class="theme-toggle"
-            onclick="toggleTheme()"
-            title="Toggle theme"
-        >
-            <span id="theme-icon">🌙</span>
-        </button>
+        }
 
-        <div class="header">
-            <img
-                src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png"
-                alt="Stone Clipboarder Tool"
-                class="app-icon"
-            />
-            <h1>Installation Guide</h1>
-            <p class="subtitle">
-                How to install Stone Clipboarder Tool on macOS
-            </p>
-        </div>
+        function showCopiedFeedback(btn) {
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            btn.style.background = 'rgba(40, 167, 69, 0.3)';
+            btn.style.borderColor = '#28a745';
 
-        <a href="index.html" class="back-btn">← Back to Main Page</a>
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+                btn.style.borderColor = '';
+            }, 2000);
+        }
 
-        <div class="warning-box">
-            <h3>⚠️ Important Notice</h3>
-            <p>
-                <strong
-                    >This app is not signed with an Apple Developer
-                    certificate.</strong
-                >
-                Due to the lack of an Apple Developer subscription, you'll need
-                to manually allow the app to run. This is completely safe - the
-                app is open source and you can review the code on GitHub.
-            </p>
-        </div>
+        // Initialize theme on page load
+        document.addEventListener("DOMContentLoaded", function () {
+            setTheme(currentTheme);
+        });
 
-        <div class="step">
-            <h2><span class="step-number">1</span>Download the App</h2>
-            <p>
-                First, download the latest version of Stone Clipboarder Tool
-                from GitHub releases.
-            </p>
-            <a
-                href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest"
-                class="download-btn"
-                target="_blank"
-                >Download Latest Release</a
-            >
-            <img
-                src="resources/installation/install-StoneClipboarder-01-Download.png"
-                alt="Download from GitHub releases"
-                class="step-image"
-                onclick="openModal(this.src)"
-            />
-            <div class="note">
-                <strong>Note:</strong> Look for the latest release and download
-                the <code>.dmg</code> file or <code>.zip</code> archive
-                containing the app.
-            </div>
-        </div>
-
-        <div class="step">
-            <h2><span class="step-number">2</span>Move to Applications</h2>
-            <p>
-                After downloading, extract the app (if it's in a zip file) and
-                drag it to your Applications folder. You can also double-click
-                the .dmg file and drag the app to Applications.
-            </p>
-            <img
-                src="resources/installation/install-StoneClipboarder-02-MoveToApps.png"
-                alt="Move app to Applications folder"
-                class="step-image"
-                onclick="openModal(this.src)"
-            />
-            <div class="note">
-                <strong>Tip:</strong> You can also install the app in any other
-                location, but Applications folder is recommended for easy
-                access.
-            </div>
-        </div>
-
-        <div class="step">
-            <h2><span class="step-number">3</span>First Launch Attempt</h2>
-            <p>
-                Try to open the app by double-clicking it. macOS will show a
-                security warning because the app is not from an identified
-                developer.
-            </p>
-            <img
-                src="resources/installation/install-StoneClipboarder-03-TryToOpen.png"
-                alt="macOS security warning dialog"
-                class="step-image"
-                onclick="openModal(this.src)"
-            />
-            <div class="note">
-                <strong>Expected behavior:</strong> macOS will prevent the app
-                from opening and show a security dialog. This is normal - click
-                "DONE" and proceed to the next step.
-            </div>
-        </div>
-
-        <div class="step">
-            <h2><span class="step-number">4</span>Open System Settings</h2>
-            <p>
-                Go to System Settings → Privacy & Security. Scroll down to find
-                the Security section where you'll see a message about the
-                blocked app.
-            </p>
-            <img
-                src="resources/installation/install-StoneClipboarder-04-PrivacyInSettings.png"
-                alt="Privacy & Security settings"
-                class="step-image"
-                onclick="openModal(this.src)"
-            />
-            <div class="note">
-                <strong>Alternative:</strong> You can also click on "?" in the
-                previous step, than click on "Open Privacy & Security settings
-                for me" from macOS Tips app.
-            </div>
-        </div>
-
-        <div class="step">
-            <h2><span class="step-number">5</span>Allow the App</h2>
-            <p>
-                In the Privacy & Security settings, click "Open Anyway" next to
-                the Stone Clipboarder Tool entry. Confirm your choice when
-                prompted.
-            </p>
-            <img
-                src="resources/installation/install-StoneClipboarder-05-OpenAnyway.png"
-                alt="Click Open Anyway button"
-                class="step-image"
-                onclick="openModal(this.src)"
-            />
-            <div class="note">
-                <strong>Success:</strong> After clicking "Open Anyway", the app
-                will launch and you'll be able to use it normally. You only need
-                to do this once.
-            </div>
-        </div>
-
-        <div class="step">
-            <h2><span class="step-number">6</span>Grant Permissions</h2>
-            <p>When the app first runs, it may request permissions to:</p>
-            <ul>
-                <li>
-                    <strong>Accessibility:</strong> To monitor clipboard changes
-                </li>
-                <li>
-                    <strong>Screen Recording:</strong> To capture clipboard
-                    content (if needed)
-                </li>
-            </ul>
-            <p>
-                Grant these permissions in System Settings → Privacy & Security
-                to ensure the app works properly.
-            </p>
-            <div class="note">
-                <strong>Privacy:</strong> Stone Clipboarder Tool only accesses
-                your clipboard to save and manage copied content locally. No
-                data is sent to external servers.
-            </div>
-        </div>
-
-        <div class="warning-box">
-            <h3>🔒 Security & Privacy</h3>
-            <p>Stone Clipboarder Tool is completely safe to use:</p>
-            <ul>
-                <li>
-                    The app is open source - you can review the code on GitHub
-                </li>
-                <li>All clipboard data is stored locally using SwiftData</li>
-                <li>No network connections are made</li>
-                <li>No personal data is collected or transmitted</li>
-            </ul>
-            <p>
-                The only reason for the security warning is the lack of an Apple
-                Developer certificate, which costs $99/year.
-            </p>
-        </div>
-
-        <!-- Modal for image zoom -->
-        <div id="imageModal" class="modal" onclick="closeModal()">
-            <span class="modal-close" onclick="closeModal()">&times;</span>
-            <div class="modal-content">
-                <img id="modalImage" class="modal-image" src="" alt="" />
-            </div>
-        </div>
-
-        <script>
-            // Theme management
-            let currentTheme = localStorage.getItem("theme") || "auto";
-
-            function setTheme(theme) {
-                currentTheme = theme;
-                localStorage.setItem("theme", theme);
-
-                const body = document.body;
-                const themeIcon = document.getElementById("theme-icon");
-
-                // Remove existing theme classes
-                body.classList.remove("light-theme", "dark-theme");
-
-                if (theme === "light") {
-                    body.classList.add("light-theme");
-                    themeIcon.textContent = "🌙";
-                } else if (theme === "dark") {
-                    body.classList.add("dark-theme");
-                    themeIcon.textContent = "☀️";
-                } else {
-                    // Auto theme - follow system preference
-                    themeIcon.textContent = window.matchMedia(
-                        "(prefers-color-scheme: dark)",
-                    ).matches
-                        ? "☀️"
-                        : "🌙";
-                }
-            }
-
-            function toggleTheme() {
-                if (currentTheme === "auto" || currentTheme === "light") {
-                    setTheme("dark");
-                } else {
-                    setTheme("light");
-                }
-            }
-
-            function openModal(imageSrc) {
-                const modal = document.getElementById("imageModal");
-                const modalImage = document.getElementById("modalImage");
-                modalImage.src = imageSrc;
-                modal.classList.add("show");
-            }
-
-            function closeModal() {
-                const modal = document.getElementById("imageModal");
-                modal.classList.remove("show");
-            }
-
-            // Close modal with Escape key
-            document.addEventListener("keydown", function (event) {
-                if (event.key === "Escape") {
-                    closeModal();
+        // Listen for system theme changes
+        window
+            .matchMedia("(prefers-color-scheme: dark)")
+            .addEventListener("change", function (e) {
+                if (currentTheme === "auto") {
+                    setTheme("auto");
                 }
             });
+    </script>
+</body>
 
-            // Initialize theme on page load
-            document.addEventListener("DOMContentLoaded", function () {
-                setTheme(currentTheme);
-            });
-
-            // Listen for system theme changes
-            window
-                .matchMedia("(prefers-color-scheme: dark)")
-                .addEventListener("change", function (e) {
-                    if (currentTheme === "auto") {
-                        setTheme("auto");
-                    }
-                });
-        </script>
-    </body>
 </html>

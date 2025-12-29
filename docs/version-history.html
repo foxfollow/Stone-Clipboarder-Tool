@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Version History - StoneClipboarderTool</title>
+    <style>
+        /* Light theme (default) */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+            background-color: #ffffff;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .app-icon {
+            width: 80px;
+            height: 80px;
+            background-image: url('resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png');
+            background-size: cover;
+            background-position: center;
+            border-radius: 20px;
+            margin: 0 auto 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease;
+        }
+
+        @media (-webkit-min-device-pixel-ratio: 2) {
+            .app-icon {
+                background-image: url('resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png');
+            }
+        }
+
+        .back-btn {
+            display: inline-block;
+            color: #007AFF;
+            text-decoration: none;
+            margin-bottom: 30px;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+
+        .back-btn:hover {
+            transform: translateX(-5px);
+            text-decoration: underline;
+        }
+
+        .version-block {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            transition: background-color 0.3s ease;
+            position: relative;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .latest-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #34c759;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(52, 199, 89, 0.3);
+        }
+
+        .version-header {
+            display: flex;
+            align-items: baseline;
+            gap: 15px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding-bottom: 10px;
+        }
+
+        .version-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin: 0;
+            color: #333;
+        }
+
+        .version-date {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .version-content ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .version-content li {
+            margin-bottom: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+        }
+
+        /* Dark theme */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1a1a1a;
+                color: #e0e0e0;
+            }
+
+            .version-block {
+                background: #2a2a2a;
+                border-color: rgba(255, 255, 255, 0.05);
+            }
+
+            .version-title {
+                color: #e0e0e0;
+            }
+
+            .version-date {
+                color: #999;
+            }
+
+            .header h1 {
+                color: #e0e0e0;
+            }
+
+            .footer {
+                border-top-color: #444;
+                color: #999;
+            }
+
+            .app-icon {
+                box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        /* Theme toggle button */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: 2px solid #007AFF;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            background: #007AFF;
+            transform: scale(1.1);
+        }
+
+        /* Manual theme overrides */
+        body.light-theme {
+            background-color: #ffffff !important;
+            color: #333 !important;
+        }
+
+        body.light-theme .version-block {
+            background: #f8f9fa !important;
+            border-color: rgba(0, 0, 0, 0.05) !important;
+        }
+
+        body.light-theme .version-title {
+            color: #333 !important;
+        }
+
+        body.light-theme .version-date {
+            color: #666 !important;
+        }
+
+        body.dark-theme {
+            background-color: #1a1a1a !important;
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-theme .version-block {
+            background: #2a2a2a !important;
+            border-color: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        body.dark-theme .version-title {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-theme .version-date {
+            color: #999 !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .theme-toggle {
+                border-color: #0A84FF;
+            }
+
+            .theme-toggle:hover {
+                background: #0A84FF;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Theme toggle button -->
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="theme-icon">🌙</span>
+    </button>
+
+    <div class="header">
+        <div class="app-icon"></div>
+        <h1>Version History</h1>
+        <p>Complete release notes for StoneClipboarderTool</p>
+    </div>
+
+    <a href="index.html" class="back-btn">← Back to Main Page</a>
+
+    <div class="version-list">
+        <!-- Version 1.3.2 -->
+        <div class="version-block">
+            <div class="latest-badge">Latest</div>
+            <div class="version-header">
+                <h2 class="version-title">Version 1.3.2</h2>
+                <span class="version-date">Dec 2025</span>
+            </div>
+            <div class="version-content">
+                <ul>
+                    <li>✨ <strong>IMPROVED:</strong> Quick Picker now asks Accessibility for pasting simulation</li>
+                    <li>✨ <strong>IMPROVED:</strong> Quick Picker now isolates itself by hiding all other windows when
+                        launched</li>
+                    <li>🎯 <strong>IMPROVED:</strong> Quick Picker search field now automatically focuses for immediate
+                        typing</li>
+                    <li>🐛 Bug fixes and stability improvements</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Version 1.3.1 -->
+        <div class="version-block">
+            <div class="version-header">
+                <h2 class="version-title">Version 1.3.1</h2>
+                <span class="version-date">Dec 23, 2025</span>
+            </div>
+            <div class="version-content">
+                <ul>
+                    <li>✨ <strong>IMPROVED:</strong> Quick Picker now isolates itself by hiding all other windows when
+                        launched</li>
+                    <li>🎯 <strong>IMPROVED:</strong> Quick Picker search field now automatically focuses for immediate
+                        typing</li>
+                    <li>🐛 Bug fixes and stability improvements</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Version 1.3.0 -->
+        <div class="version-block">
+            <div class="version-header">
+                <h2 class="version-title">Version 1.3.0</h2>
+                <span class="version-date">Dec 05, 2025</span>
+            </div>
+            <div class="version-content">
+                <ul>
+                    <li>🔎 <strong>NEW:</strong> Advanced Search - Search through your clipboard history with a modern
+                        search bar featuring macOS 15+ liquid glass effect</li>
+                    <li>🚫 <strong>NEW:</strong> Excluded Apps - Choose which apps to exclude from clipboard monitoring
+                        in Settings for enhanced privacy</li>
+                    <li>⏸️ <strong>NEW:</strong> Pause Monitoring - Temporarily pause clipboard tracking with a
+                        customizable timer</li>
+                    <li>⭐ <strong>FIXED:</strong> Enhanced Favorites - Fixed loading of all favorites even when they're
+                        at the bottom of the list</li>
+                    <li>🎨 <strong>IMPROVED:</strong> Menu bar now displays pause timer with better visual feedback</li>
+                    <li>🐛 Bug fixes and stability improvements</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Version 1.2.0 -->
+        <div class="version-block">
+            <div class="version-header">
+                <h2 class="version-title">Version 1.2.0</h2>
+                <span class="version-date">Nov 13, 2025</span>
+            </div>
+            <div class="version-content">
+                <ul>
+                    <li>⚡ <strong>NEW:</strong> Better initialization on login for improved stability</li>
+                    <li>🎨 <strong>NEW:</strong> Updated Liquid Glass app icons - Native Icon Composer design with
+                        modern aesthetic</li>
+                    <li>⭐ <strong>FIXED:</strong> Favorites persistence - Favorite items are now protected from
+                        auto-deletion</li>
+                    <li>📋 <strong>NEW:</strong> Clipboard Capture Modes - Choose to capture only text, only images, or
+                        both (useful for Microsoft Word text-only paste)</li>
+                    <li>🔗 <strong>NEW:</strong> Combined clipboard items - Save text and image as a single item (BETA)
+                    </li>
+                    <li>🔍 <strong>NEW:</strong> OCR Text Recognition - Extract text from images using Apple Vision
+                        framework</li>
+                    <li>🐛 Bug fixes and performance improvements</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Version 1.1.0 -->
+        <div class="version-block">
+            <div class="version-header">
+                <h2 class="version-title">Version 1.1.0</h2>
+                <span class="version-date">Aug 26, 2025</span>
+            </div>
+            <div class="version-content">
+                <ul>
+                    <li>🔥 <strong>NEW:</strong> Global Hotkeys System - System-wide keyboard shortcuts for instant
+                        clipboard access</li>
+                    <li>⚡️ <strong>NEW:</strong> Quick Picker Window - Spotlight-like floating panel (Ctrl+Option+Space)
+                    </li>
+                    <li>🎮 <strong>NEW:</strong> Direct Paste to Active Apps - Hotkeys automatically paste to current
+                        application</li>
+                    <li>🪟 <strong>NEW:</strong> Favorites - Save often-used items for quick access</li>
+                    <li>🎯 <strong>NEW:</strong> Quick Access Shortcuts - Ctrl+Option+1-0 for last items, Ctrl+Shift+1-0
+                        for favorites</li>
+                    <li>🏷️ <strong>Enhanced UI:</strong> Visual type indicators and improved file previews</li>
+                    <li>⚙️ <strong>Extended Settings:</strong> Hotkey configuration and advanced preferences</li>
+                    <li>📊 <strong>Better Data Models:</strong> Enhanced clipboard item management with favorites
+                        support</li>
+                    <li>📊 Memory usage optimization</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Version 1.0.0 -->
+        <div class="version-block">
+            <div class="version-header">
+                <h2 class="version-title">Version 1.0.0</h2>
+                <span class="version-date">Aug 10, 2025</span>
+            </div>
+            <div class="version-content">
+                <ul>
+                    <li>🎉 Initial release of StoneClipboarderTool</li>
+                    <li>📊 Full clipboard history tracking with Swift Data</li>
+                    <li>🖥️ Menu bar integration for quick access</li>
+                    <li>🔄 Automatic updates using Sparkle framework</li>
+                    <li>🔒 Privacy-focused - all data stays on your device</li>
+                    <li>✨ Modern SwiftUI interface</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Built with SwiftUI • Powered by Sparkle Updates</p>
+        <p>&copy; 2025 Heorhii Savoiskyi</p>
+    </div>
+
+    <script>
+        // Theme management
+        let currentTheme = localStorage.getItem('theme') || 'auto';
+
+        function setTheme(theme) {
+            currentTheme = theme;
+            localStorage.setItem('theme', theme);
+
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+
+            // Remove existing theme classes
+            body.classList.remove('light-theme', 'dark-theme');
+
+            if (theme === 'light') {
+                body.classList.add('light-theme');
+                themeIcon.textContent = '🌙';
+            } else if (theme === 'dark') {
+                body.classList.add('dark-theme');
+                themeIcon.textContent = '☀️';
+            } else {
+                // Auto mode - follow system preference
+                themeIcon.textContent = window.matchMedia('(prefers-color-scheme: dark)').matches ? '☀️' : '🌙';
+            }
+        }
+
+        function toggleTheme() {
+            if (currentTheme === 'auto' || currentTheme === 'light') {
+                setTheme('dark');
+            } else {
+                setTheme('light');
+            }
+        }
+
+        // Initialize theme on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            setTheme(currentTheme);
+        });
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+            if (currentTheme === 'auto') {
+                setTheme('auto');
+            }
+        });
+    </script>
+</body>
+
+</html>
