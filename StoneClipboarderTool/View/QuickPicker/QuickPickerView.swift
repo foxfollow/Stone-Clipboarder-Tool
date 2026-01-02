@@ -10,6 +10,108 @@ import ApplicationServices
 import SwiftData
 import SwiftUI
 
+// MARK: - Running Cat View
+struct RunningCatView: View {
+    let size: CGFloat
+    var resetId: UUID  // When this changes, the GIF reloads
+    
+    var body: some View {
+        GifImage(fileName: "cat-animation-white",
+                 size: CGSize(width: size*2, height: size))
+        .frame(width: size*2, height: size)
+        .scaledToFit()
+        .id(resetId)  // Force view recreation when ID changes
+    }
+}
+
+// MARK: - Search Bar View
+struct SearchBarQPView: View {
+    @Binding var searchText: String
+    var isSearchFocused: FocusState<Bool>.Binding
+    var onSubmit: () -> Void
+    
+    @State private var catOffset: CGFloat = 0
+    @State private var catOpacity: Double = 0  // Start invisible
+    @State private var isAnimating = false
+    @State private var gifResetId = UUID()  // Triggers GIF reload
+    
+    private let catSize: CGFloat = 80
+    private let animationDuration: Double = 2.0
+    private let delayBeforeMove: Double = 3.05
+    private let totalCycleDuration: Double = 5.0
+    private let fadeInDuration: Double = 0.5
+    
+    var body: some View {
+        GeometryReader { geometry in
+            // Move completely off-screen (past the right edge)
+            let maxOffset = geometry.size.width + catSize/2
+            
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+
+                TextField("Search clipboard...", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .focused(isSearchFocused)
+                    .onSubmit {
+                        onSubmit()
+                    }
+
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(NSColor.controlBackgroundColor))
+            .overlay(alignment: .topLeading) {
+                RunningCatView(size: catSize, resetId: gifResetId)
+                    .offset(x: catOffset, y: -16)
+                    .opacity(catOpacity)
+            }
+            .onAppear {
+                startCatAnimation(maxOffset: maxOffset)
+            }
+        }
+        .frame(height: 52)
+    }
+    
+    private func startCatAnimation(maxOffset: CGFloat) {
+        // Create a repeating animation cycle
+        func runCycle() {
+            // Reset GIF and position instantly
+            gifResetId = UUID()  // Triggers GIF reload
+            catOffset = 250
+            catOpacity = 0  // Start invisible
+            
+            // Fade in the cat
+            withAnimation(.easeIn(duration: fadeInDuration)) {
+                catOpacity = 1
+            }
+            
+            // Wait for still frames, then animate to off-screen
+            DispatchQueue.main.asyncAfter(deadline: .now() + delayBeforeMove) {
+                withAnimation(.linear(duration: animationDuration)) {
+                    catOffset = maxOffset
+                }
+            }
+            
+            // Schedule next cycle
+            DispatchQueue.main.asyncAfter(deadline: .now() + totalCycleDuration) {
+                runCycle()
+            }
+        }
+        
+        runCycle()
+    }
+}
+
+
+
 struct QuickPickerView: View {
     @ObservedObject var viewModel: CBViewModel
     @State private var searchText = ""
@@ -50,7 +152,11 @@ struct QuickPickerView: View {
     var body: some View {
         VStack(spacing: 0) {
             dragHandle
-            searchBar
+            SearchBarQPView(
+                searchText: $searchText,
+                isSearchFocused: $isSearchFocused,
+                onSubmit: { performAction() }
+            )
             Divider()
             QPItemList(
                 filteredItems: filteredItems,
@@ -141,30 +247,6 @@ struct QuickPickerView: View {
         .background(Color.clear)
     }
 
-    @ViewBuilder
-    private var searchBar: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
-
-            TextField("Search clipboard...", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .focused($isSearchFocused)
-                .onSubmit {
-                    performAction()
-                }
-
-            if !searchText.isEmpty {
-                Button(action: { searchText = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
-    }
 
     private func performAction() {
         guard selectedIndex < filteredItems.count else { return }
