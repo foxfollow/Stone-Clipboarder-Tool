@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="uk">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
-        content="Free, open-source clipboard manager for macOS. Save your entire copy-paste history, access it instantly with global hotkeys or Spotlight-like Quick Picker. Features OCR text recognition, smart favorites, and 100% local privacy.">
+        content="Безкоштовний менеджер буфера обміну для macOS з відкритим кодом. Зберігайте всю історію копіювання, отримуйте миттєвий доступ через глобальні гарячі клавіші або Quick Picker у стилі Spotlight. Розпізнавання тексту (OCR), розумні обрані та повна приватність.">
     <meta name="keywords"
-        content="clipboard manager, macOS, clipboard history, copy paste manager, clipboard organizer, productivity tool, free, open source">
-    <title>Stone Clipboarder Tool – Free Clipboard Manager for macOS</title>
+        content="менеджер буфера обміну, macOS, історія буфера обміну, clipboard manager, копіювання вставка, продуктивність, безкоштовно, відкритий код">
+    <title>Stone Clipboarder Tool – Безкоштовний менеджер буфера обміну для macOS</title>
     <style>
         /* Light theme (default) */
         body {
@@ -510,6 +510,16 @@
             background: #409CFF !important;
         }
 
+        body.dark-theme .lang-toggle {
+            border-color: #0A84FF;
+            color: #0A84FF;
+        }
+
+        body.dark-theme .lang-toggle:hover {
+            background: #0A84FF;
+            color: white;
+        }
+
         @media (prefers-color-scheme: dark) {
             .theme-toggle {
                 border-color: #0A84FF;
@@ -528,16 +538,6 @@
                 background: #0A84FF;
                 color: white;
             }
-        }
-
-        body.dark-theme .lang-toggle {
-            border-color: #0A84FF;
-            color: #0A84FF;
-        }
-
-        body.dark-theme .lang-toggle:hover {
-            background: #0A84FF;
-            color: white;
         }
 
         /* Responsive controls */
@@ -567,8 +567,8 @@
 <body>
     <!-- Top controls -->
     <div class="top-controls">
-        <a href="index-ua.html" class="lang-toggle" title="Українська версія">UA 💙💛</a>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <a href="index.html" class="lang-toggle" title="Switch to English">EN</a>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Змінити тему">
             <span id="theme-icon">🌙</span>
         </button>
     </div>
@@ -576,151 +576,154 @@
     <div class="header">
         <div class="app-icon"></div>
         <h1>Stone Clipboarder Tool</h1>
-        <p><strong>Never lose what you copy.</strong> A free, open-source clipboard history manager for macOS with OCR,
-            global hotkeys, and complete privacy.</p>
+        <p><strong>Більше не втрачай скопійоване.</strong> Безкоштовний менеджер історії буфера обміну для macOS з
+            відкритим кодом. OCR, глобальні гарячі клавіші та повна приватність. <span style="opacity: 0.8;">💙💛</span>
+        </p>
 
         <div class="update-info">
-            <h3>Automatic Updates Available</h3>
-            <p>This page serves the update feed for StoneClipboarderTool. The app will automatically check for updates.
+            <h3>Автоматичні оновлення</h3>
+            <p>Ця сторінка надає стрічку оновлень для StoneClipboarderTool. Застосунок автоматично перевіряє наявність
+                оновлень.
             </p>
             <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                 <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest" class="download-btn">📥
-                    Download Latest</a>
-                <a href="installation.html" class="download-btn">📋 Installation Guide</a>
-                <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool" class="download-btn">🔗 View on GitHub</a>
-                <a href="version-history.html" class="download-btn">📜 Version History</a>
-                <a href="appcast.xml" class="download-btn">📡 View Update Feed</a>
+                    Завантажити</a>
+                <a href="installation.html" class="download-btn">📋 Інструкція з встановлення</a>
+                <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool" class="download-btn">🔗 GitHub</a>
+                <a href="version-history.html" class="download-btn">📜 Історія версій</a>
+                <a href="appcast.xml" class="download-btn">📡 Стрічка оновлень</a>
             </div>
         </div>
     </div>
 
     <!-- Homebrew Installation -->
     <div class="install-box">
-        <h3>🍺 Install via <a href="https://brew.sh" target="_blank"
+        <h3>🍺 Встановлення через <a href="https://brew.sh" target="_blank"
                 style="color: inherit; text-decoration: none; border-bottom: 2px solid #007AFF;">Homebrew</a></h3>
-        <p>You can easily install StoneClipboarderTool using Homebrew tap:</p>
+        <p>Ви можете легко встановити StoneClipboarderTool за допомогою Homebrew tap:</p>
         <div class="code-block">
             brew tap foxfollow/stone<br>
             brew install stone-clipboarder-tool
-            <button class="copy-btn" onclick="copyInstallCmd(this)">Copy</button>
+            <button class="copy-btn" onclick="copyInstallCmd(this)">Копіювати</button>
         </div>
-        <small>The app will be automatically configured to run without security warnings.</small>
+        <small>Застосунок буде автоматично налаштований для запуску без попереджень безпеки.</small>
     </div>
 
     <!-- App Screenshots Section -->
     <div class="screenshots">
-        <h2>📱 App Preview</h2>
+        <h2>📱 Огляд застосунку</h2>
         <div class="screenshot-grid">
             <div class="screenshot">
                 <img class="theme-image" src="resources/index/sct-light-basicwindow.png"
                     data-light-src="resources/index/sct-light-basicwindow.png"
-                    data-dark-src="resources/index/sct-dark-basicwindow.png" alt="StoneClipboarderTool Main View"
-                    onclick="openModal(this, 'Main window showing your clipboard history with preview and metadata')" />
-                <p>Main window showing your clipboard history with preview and metadata</p>
+                    data-dark-src="resources/index/sct-dark-basicwindow.png" alt="Головне вікно StoneClipboarderTool"
+                    onclick="openModal(this, 'Головне вікно з історією буфера обміну, попереднім переглядом та метаданими')" />
+                <p>Головне вікно з історією буфера обміну, попереднім переглядом та метаданими</p>
             </div>
             <div class="screenshot">
                 <img class="theme-image" src="resources/index/sct-light-settings.png"
                     data-light-src="resources/index/sct-light-settings.png"
-                    data-dark-src="resources/index/sct-dark-settings.png" alt="StoneClipboarderTool Settings"
-                    onclick="openModal(this, 'Settings panel for customization and preferences')" />
-                <p>Settings panel for customization and preferences</p>
+                    data-dark-src="resources/index/sct-dark-settings.png" alt="Налаштування StoneClipboarderTool"
+                    onclick="openModal(this, 'Панель налаштувань для персоналізації')" />
+                <p>Панель налаштувань для персоналізації</p>
             </div>
             <div class="screenshot">
                 <img class="theme-image" src="resources/index/sct-light-quickpicker.png"
                     data-light-src="resources/index/sct-light-quickpicker.png"
-                    data-dark-src="resources/index/sct-dark-quickpicker.png" alt="StoneClipboarderTool Quick Picker"
-                    onclick="openModal(this, 'Quick Picker (Spotlight-like integration) for fast access')" />
-                <p>Quick Picker (Spotlight-like integration) for fast access</p>
+                    data-dark-src="resources/index/sct-dark-quickpicker.png" alt="Quick Picker StoneClipboarderTool"
+                    onclick="openModal(this, 'Quick Picker (інтеграція у стилі Spotlight) для швидкого доступу')" />
+                <p>Quick Picker (інтеграція у стилі Spotlight) для швидкого доступу</p>
             </div>
             <div class="screenshot">
                 <img class="theme-image" src="resources/index/sct-light-menubar.png"
                     data-light-src="resources/index/sct-light-menubar.png"
-                    data-dark-src="resources/index/sct-dark-menubar.png" alt="StoneClipboarderTool Menu Bar"
-                    onclick="openModal(this, 'Menu bar integration for quick access to recent items')" />
-                <p>Menu bar integration for quick access to recent items</p>
+                    data-dark-src="resources/index/sct-dark-menubar.png" alt="Меню-бар StoneClipboarderTool"
+                    onclick="openModal(this, 'Інтеграція в меню-бар для швидкого доступу до останніх елементів')" />
+                <p>Інтеграція в меню-бар для швидкого доступу до останніх елементів</p>
             </div>
         </div>
     </div>
 
     <div class="feature-list">
         <div class="feature">
-            <h3>📊 Clipboard History</h3>
-            <p>Track and manage your clipboard history with persistent storage using Swift Data.</p>
+            <h3>📊 Історія буфера обміну</h3>
+            <p>Відстежуйте та керуйте історією буфера обміну з постійним зберіганням за допомогою Swift Data.</p>
         </div>
 
         <div class="feature">
-            <h3>🔍 OCR Text Recognition</h3>
-            <p>Extract text from images using Apple Vision framework for easy editing and searching.</p>
+            <h3>🔍 Розпізнавання тексту (OCR)</h3>
+            <p>Витягуйте текст із зображень за допомогою Apple Vision framework для легкого редагування та пошуку.</p>
         </div>
 
         <div class="feature">
-            <h3>⭐ Smart Favorites</h3>
-            <p>Pin frequently-used items that are protected from auto-deletion. Enhanced in v1.3.0 to load all favorites
-                even when not in memory.</p>
+            <h3>⭐ Розумні обрані</h3>
+            <p>Закріплюйте часто використовувані елементи, захищені від автоматичного видалення. Покращено у v1.3.0 для
+                завантаження всіх обраних.</p>
         </div>
 
         <div class="feature">
-            <h3>🔎 Advanced Search</h3>
-            <p>Search through your clipboard history with a modern search bar featuring macOS 15+ liquid
-                glass effect.</p>
+            <h3>🔎 Розширений пошук</h3>
+            <p>Шукайте в історії буфера обміну за допомогою сучасної панелі пошуку з ефектом liquid glass
+                macOS 15+.</p>
         </div>
 
         <div class="feature">
-            <h3>🚫 Excluded Apps</h3>
-            <p>Choose which apps to exclude from clipboard monitoring. Perfect for protecting sensitive
-                data from password managers or banking apps.</p>
+            <h3>🚫 Виключені застосунки</h3>
+            <p>Вибирайте, які застосунки виключити з моніторингу буфера обміну. Ідеально для захисту
+                конфіденційних даних від менеджерів паролів.</p>
         </div>
 
         <div class="feature">
-            <h3>⏸️ Pause Monitoring</h3>
-            <p>Temporarily pause clipboard monitoring with a customizable timer. Great for privacy when
-                working with sensitive information.</p>
+            <h3>⏸️ Призупинення моніторингу</h3>
+            <p>Тимчасово призупиняйте моніторинг буфера обміну з налаштовуваним таймером. Чудово для
+                приватності при роботі з конфіденційною інформацією.</p>
         </div>
 
         <div class="feature">
-            <h3>⚡ Global Hotkeys</h3>
-            <p>System-wide shortcuts (⌃⌥1-0, ⌃⇧1-0) and Quick Picker (⌃⌥Space) for instant access.</p>
+            <h3>⚡ Глобальні гарячі клавіші</h3>
+            <p>Системні комбінації клавіш (⌃⌥1-0, ⌃⇧1-0) та Quick Picker (⌃⌥Space) для миттєвого доступу.</p>
         </div>
 
         <div class="feature">
-            <h3>📋 Capture Modes</h3>
-            <p>Choose to capture only text, only images, or both. Perfect for Microsoft Word workflows.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🖼️ Combined Items (BETA)</h3>
-            <p>Added in v1.2.0: Save text and images together as a single clipboard item for rich content management.
+            <h3>📋 Режими захоплення</h3>
+            <p>Вибирайте захоплення лише тексту, лише зображень або обох. Ідеально для робочих процесів Microsoft Word.
             </p>
         </div>
 
         <div class="feature">
-            <h3>🖥️ Menu Bar Integration</h3>
-            <p>Quick access to clipboard items directly from the menu bar with pause timer display.</p>
+            <h3>🖼️ Комбіновані елементи (БЕТА)</h3>
+            <p>Додано у v1.2.0: Зберігайте текст та зображення разом як один елемент буфера обміну для керування багатим
+                контентом.</p>
         </div>
 
         <div class="feature">
-            <h3>🔄 Auto Updates</h3>
-            <p>Secure automatic updates using Sparkle framework with EdDSA signing.</p>
+            <h3>🖥️ Інтеграція в меню-бар</h3>
+            <p>Швидкий доступ до елементів буфера обміну безпосередньо з меню-бар з відображенням таймера паузи.</p>
         </div>
 
         <div class="feature">
-            <h3>🔒 Privacy Focused</h3>
-            <p>All data stays on your device. No cloud sync or data collection. Now with app exclusion for enhanced
-                privacy.</p>
+            <h3>🔄 Автооновлення</h3>
+            <p>Безпечні автоматичні оновлення за допомогою фреймворку Sparkle з підписом EdDSA.</p>
+        </div>
+
+        <div class="feature">
+            <h3>🔒 Фокус на приватності</h3>
+            <p>Усі дані залишаються на вашому пристрої. Жодної синхронізації з хмарою чи збору даних. Тепер з
+                інших застосунків для підвищеної приватності.</p>
         </div>
     </div>
 
     <!-- Version History Link -->
     <div style="text-align: center; margin: 40px 0;">
-        <a href="version-history.html" class="download-btn" style="background-color: #5856d6;">📜 View Full Version
-            History</a>
+        <a href="version-history.html" class="download-btn" style="background-color: #5856d6;">📜 Переглянути повну
+            історію версій</a>
     </div>
 
     <div class="footer">
-        <p><strong>System Requirements:</strong> macOS 15.0 or later</p>
-        <p>Built with SwiftUI • Powered by Sparkle Updates</p>
-        <p>Feedback: <a href="mailto:d3f0ld@pm.me" style="color: inherit;">d3f0ld@pm.me</a></p>
-        <p>&copy; 2025 Heorhii Savoiskyi 💙💛</p>
+        <p><strong>Системні вимоги:</strong> macOS 15.0 або новіша</p>
+        <p>Створено з SwiftUI • Оновлення через Sparkle</p>
+        <p>Зворотній зв'язок: <a href="mailto:d3f0ld@pm.me" style="color: inherit;">d3f0ld@pm.me</a></p>
+        <p>© 2025 Heorhii Savoiskyi 💙💛</p>
     </div>
 
     <!-- Modal for full-size images -->
@@ -730,7 +733,7 @@
             <img id="modalImage" class="modal-image" src="" alt="" />
             <div id="modalCaption" class="modal-caption"></div>
         </div>
-        <div class="modal-hint">Press ESC to close • Click outside to close</div>
+        <div class="modal-hint">Натисніть ESC для закриття • Клікніть поза зображенням для закриття</div>
     </div>
 
     <script>
@@ -794,7 +797,7 @@
 
         function showCopiedFeedback(btn) {
             const originalText = btn.textContent;
-            btn.textContent = '✓ Copied!';
+            btn.textContent = '✓ Скопійовано!';
             btn.style.background = 'rgba(40, 167, 69, 0.3)';
             btn.style.borderColor = '#28a745';
 
@@ -830,7 +833,7 @@
                 .then(response => {
                     if (response.ok) {
                         document.querySelector('.update-info').style.background = currentTheme === 'dark' ? '#1a4a3a' : '#d4edda';
-                        document.querySelector('.update-info h3').textContent = '✅ Update Feed Active';
+                        document.querySelector('.update-info h3').textContent = '✅ Стрічка оновлень активна';
                     }
                 })
                 .catch(() => {

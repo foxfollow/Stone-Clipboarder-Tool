@@ -13,7 +13,7 @@
 
 </div>
 
-A macOS clipboard history manager that automatically saves and organizes everything you copy.
+**Never lose anything you copy again.** Stone Clipboarder Tool is a free, open-source clipboard manager for macOS that automatically saves your entire copy-paste history. Access previously copied text and images instantly with global hotkeys, a Spotlight-like Quick Picker, or menu bar—all while keeping your data 100% private and stored locally on your device.
 
 ## Links
 
