@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    
+    <!-- Main page (English) -->
+    <url>
+        <loc>https://foxfollow.github.io/Stone-Clipboarder-Tool/</loc>
+        <lastmod>2026-01-05</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+        <xhtml:link rel="alternate" hreflang="en" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/"/>
+        <xhtml:link rel="alternate" hreflang="uk" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/index-ua.html"/>
+    </url>
+    
+    <!-- Main page (Ukrainian) -->
+    <url>
+        <loc>https://foxfollow.github.io/Stone-Clipboarder-Tool/index-ua.html</loc>
+        <lastmod>2026-01-05</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+        <xhtml:link rel="alternate" hreflang="en" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/"/>
+        <xhtml:link rel="alternate" hreflang="uk" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/index-ua.html"/>
+    </url>
+    
+    <!-- Installation guide -->
+    <url>
+        <loc>https://foxfollow.github.io/Stone-Clipboarder-Tool/installation.html</loc>
+        <lastmod>2026-01-05</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    
+    <!-- Version history -->
+    <url>
+        <loc>https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html</loc>
+        <lastmod>2026-01-05</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    
+</urlset>

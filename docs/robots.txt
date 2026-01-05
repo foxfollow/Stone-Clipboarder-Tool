@@ -1,0 +1,12 @@
+# Stone Clipboarder Tool - Robots.txt
+# https://foxfollow.github.io/Stone-Clipboarder-Tool/
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://foxfollow.github.io/Stone-Clipboarder-Tool/sitemap.xml
+
+# Disallow internal/technical files
+Disallow: /appcast.xml
+Disallow: /appcast.xml.example
