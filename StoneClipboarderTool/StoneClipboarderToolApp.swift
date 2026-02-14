@@ -18,7 +18,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var menuBarManager: MenuBarManager?
     var hotkeyManager: HotkeyManager?
     var quickPickerManager: QuickPickerWindowManager?
-    var sharedModelContainer: ModelContainer?
+    var clipboardContainer: ModelContainer?
+    var settingsContainer: ModelContainer?
 
     private var isInitialized = false
 
@@ -35,14 +36,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let menuBarManager,
             let hotkeyManager,
             let quickPickerManager,
-            let sharedModelContainer
+            let clipboardContainer,
+            let settingsContainer
         else {
             return
         }
 
         isInitialized = true
 
-        cbViewModel.setModelContext(sharedModelContainer.mainContext)
+        cbViewModel.setModelContext(clipboardContainer.mainContext)
         cbViewModel.setSettingsManager(settingsManager)
 
         // Ensure recent items are loaded immediately
@@ -50,11 +52,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         cbViewModel.startClipboardMonitoring()
 
-        hotkeyManager.setModelContext(sharedModelContainer.mainContext)
+        // HotkeyManager uses the settings container (HotkeyConfig lives there)
+        hotkeyManager.setModelContext(settingsContainer.mainContext)
         hotkeyManager.setCBViewModel(cbViewModel)
         hotkeyManager.setSettingsManager(settingsManager)
         quickPickerManager.setCBViewModel(cbViewModel)
         hotkeyManager.quickPickerDelegate = quickPickerManager
+
+        // Give ClipboardManager a separate context from the settings container for ExcludedApp queries
+        cbViewModel.getClipboardManager().setSettingsModelContext(settingsContainer.mainContext)
 
         // Connect menubar refresh callback to fix state after QuickPicker operations
         quickPickerManager.setMenuBarRefreshCallback {
@@ -107,6 +113,109 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// MARK: - Container Factory
+/// Creates separate ModelContainers for clipboard history and settings.
+/// Clipboard data is high-churn and corruption-prone; settings are low-churn and must persist.
+/// Separating them prevents clipboard DB corruption from wiping settings.
+enum ModelContainerFactory {
+    private static let logger = ErrorLogger.shared
+
+    /// Clipboard container: stores CBItem only
+    static func makeClipboardContainer() -> ModelContainer {
+        let schema = Schema([CBItem.self])
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let storeURL = appSupport
+            .appendingPathComponent("StoneClipboarderTool")
+            .appendingPathComponent("ClipboardHistory.store")
+
+        // Ensure directory exists
+        try? FileManager.default.createDirectory(
+            at: storeURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        let config = ModelConfiguration("ClipboardHistory", schema: schema, url: storeURL)
+
+        do {
+            return try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            logger.log("Clipboard container creation failed, attempting recovery", category: "SwiftData", error: error)
+
+            // Recovery: delete corrupted DB and retry
+            do {
+                // Remove the main store file and its WAL/SHM companions
+                let storeDir = storeURL.deletingLastPathComponent()
+                let storeName = storeURL.lastPathComponent
+                let fm = FileManager.default
+                if let files = try? fm.contentsOfDirectory(atPath: storeDir.path) {
+                    for file in files where file.hasPrefix(storeName) {
+                        try? fm.removeItem(at: storeDir.appendingPathComponent(file))
+                    }
+                }
+
+                logger.log("Deleted corrupted clipboard DB, creating fresh container", category: "SwiftData")
+                return try ModelContainer(for: schema, configurations: [config])
+            } catch {
+                logger.log("CRITICAL: Cannot create clipboard container even after recovery", category: "SwiftData", error: error)
+                // Last resort: in-memory container so the app doesn't crash
+                let memConfig = ModelConfiguration("ClipboardHistoryMemory", schema: schema, isStoredInMemoryOnly: true)
+                do {
+                    return try ModelContainer(for: schema, configurations: [memConfig])
+                } catch {
+                    // This should never happen but we absolutely must not crash
+                    fatalError("Cannot create even in-memory clipboard container: \(error)")
+                }
+            }
+        }
+    }
+
+    /// Settings container: stores HotkeyConfig and ExcludedApp
+    static func makeSettingsContainer() -> ModelContainer {
+        let schema = Schema([HotkeyConfig.self, ExcludedApp.self])
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let storeURL = appSupport
+            .appendingPathComponent("StoneClipboarderTool")
+            .appendingPathComponent("Settings.store")
+
+        // Ensure directory exists
+        try? FileManager.default.createDirectory(
+            at: storeURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        let config = ModelConfiguration("Settings", schema: schema, url: storeURL)
+
+        do {
+            return try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            logger.log("Settings container creation failed, attempting recovery", category: "SwiftData", error: error)
+
+            // Recovery: delete and retry
+            do {
+                let storeDir = storeURL.deletingLastPathComponent()
+                let storeName = storeURL.lastPathComponent
+                let fm = FileManager.default
+                if let files = try? fm.contentsOfDirectory(atPath: storeDir.path) {
+                    for file in files where file.hasPrefix(storeName) {
+                        try? fm.removeItem(at: storeDir.appendingPathComponent(file))
+                    }
+                }
+
+                logger.log("Deleted corrupted settings DB, creating fresh container", category: "SwiftData")
+                return try ModelContainer(for: schema, configurations: [config])
+            } catch {
+                logger.log("CRITICAL: Cannot create settings container even after recovery", category: "SwiftData", error: error)
+                let memConfig = ModelConfiguration("SettingsMemory", schema: schema, isStoredInMemoryOnly: true)
+                do {
+                    return try ModelContainer(for: schema, configurations: [memConfig])
+                } catch {
+                    fatalError("Cannot create even in-memory settings container: \(error)")
+                }
+            }
+        }
+    }
+}
+
 // MARK: - App
 @main
 struct StoneClipboarderToolApp: App {
@@ -120,20 +229,11 @@ struct StoneClipboarderToolApp: App {
 
     private let updaterController: SPUStandardUpdaterController
 
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            CBItem.self,
-            HotkeyConfig.self,
-            ExcludedApp.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+    /// Clipboard history container (CBItem only — high churn, safe to reset on corruption)
+    var clipboardContainer: ModelContainer = ModelContainerFactory.makeClipboardContainer()
 
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    /// Settings container (HotkeyConfig + ExcludedApp — low churn, must persist)
+    var settingsContainer: ModelContainer = ModelContainerFactory.makeSettingsContainer()
 
     init() {
         updaterController = SPUStandardUpdaterController(
@@ -161,7 +261,7 @@ struct StoneClipboarderToolApp: App {
                         hotkeyManager.refreshHotkeyRegistrations()
                     }
             }
-            .modelContainer(sharedModelContainer)
+            .modelContainer(clipboardContainer)
             .windowResizability(.contentSize)
             .defaultSize(width: 800, height: 600)
             .commands {
@@ -170,7 +270,7 @@ struct StoneClipboarderToolApp: App {
                 }
             }
 
-            // Custom Settings window with ID
+            // Custom Settings window with ID — uses settings container for ExcludedApp + HotkeyConfig
             WindowGroup("Settings", id: "settings") {
                 SettingsView(updater: updaterController.updater)
                     .environmentObject(settingsManager)
@@ -178,7 +278,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(cbViewModel)
                     .frame(width: 500, height: 500)
             }
-            .modelContainer(sharedModelContainer)
+            .modelContainer(settingsContainer)
             .windowResizability(.contentSize)
             .windowStyle(.automatic)
 
@@ -188,7 +288,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
             }
-            .modelContainer(sharedModelContainer)
+            .modelContainer(settingsContainer)
         }
     }
 
@@ -200,7 +300,8 @@ struct StoneClipboarderToolApp: App {
         appDelegate.menuBarManager = menuBarManager
         appDelegate.hotkeyManager = hotkeyManager
         appDelegate.quickPickerManager = quickPickerManager
-        appDelegate.sharedModelContainer = sharedModelContainer
+        appDelegate.clipboardContainer = clipboardContainer
+        appDelegate.settingsContainer = settingsContainer
 
         // Trigger setup (will only run once)
         appDelegate.performSetup()

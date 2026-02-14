@@ -129,6 +129,34 @@ struct SettingsView: View {
                     .help("How long items stay in memory without access")
                 }
             }
+
+            Section("Error Logging") {
+                Toggle("Save errors to log file", isOn: $settingsManager.enableErrorFileLogging)
+                    .help("When enabled, SwiftData and other errors are saved to a .log file for debugging")
+
+                if settingsManager.enableErrorFileLogging {
+                    HStack {
+                        Text("Log file size")
+                        Spacer()
+                        Text(ErrorLogger.shared.logFileSizeString)
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Button("Show in Finder") {
+                            let url = URL(fileURLWithPath: ErrorLogger.shared.logFilePath)
+                            NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: url.deletingLastPathComponent().path)
+                        }
+
+                        Spacer()
+
+                        Button("Clear Log") {
+                            ErrorLogger.shared.clearLog()
+                        }
+                        .foregroundColor(.red)
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .alert("Clean Up Clipboard History", isPresented: $showingCleanupAlert) {

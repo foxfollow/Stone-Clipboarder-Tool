@@ -107,7 +107,7 @@ class CBViewModel: ObservableObject {
                 // Don't automatically load more - only load when user actually scrolls
                 // The 30 items are enough for immediate use
             } catch {
-                print("Failed to fetch recent items: \(error)")
+                ErrorLogger.shared.log("Failed to fetch recent items", category: "SwiftData", error: error)
                 self.items = []
             }
         } else {
@@ -138,7 +138,7 @@ class CBViewModel: ObservableObject {
                     }
                 } catch {
                     await MainActor.run {
-                        print("Failed to fetch items: \(error)")
+                        ErrorLogger.shared.log("Failed to fetch items (pagination)", category: "SwiftData", error: error)
                         self.isLoadingMore = false
                     }
                 }
@@ -156,7 +156,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save item", category: "SwiftData", error: error)
         }
     }
 
@@ -168,7 +169,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to delete item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to delete item", category: "SwiftData", error: error)
         }
     }
 
@@ -182,7 +184,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to delete items: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to delete items", category: "SwiftData", error: error)
         }
     }
 
@@ -240,7 +243,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save text item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save text item", category: "SwiftData", error: error)
         }
     }
 
@@ -265,7 +269,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save image item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save image item", category: "SwiftData", error: error)
         }
     }
 
@@ -291,7 +296,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save combined item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save combined item", category: "SwiftData", error: error)
         }
     }
 
@@ -317,7 +323,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save file item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save file item", category: "SwiftData", error: error)
         }
     }
 
@@ -337,7 +344,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to update item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update item timestamp", category: "SwiftData", error: error)
         }
     }
 
@@ -438,7 +446,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to update item content: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update item content", category: "SwiftData", error: error)
         }
     }
 
@@ -458,7 +467,7 @@ class CBViewModel: ObservableObject {
                 let maxOrderIndex = allFavorites.map { $0.orderIndex }.max() ?? -1
                 item.orderIndex = maxOrderIndex + 1
             } catch {
-                print("Failed to fetch favorites for order index: \(error)")
+                ErrorLogger.shared.log("Failed to fetch favorites for order index", category: "SwiftData", error: error)
                 // Fallback to in-memory items if fetch fails
                 let maxOrderIndex = items.filter { $0.isFavorite }.map { $0.orderIndex }.max() ?? -1
                 item.orderIndex = maxOrderIndex + 1
@@ -471,7 +480,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to toggle favorite: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to toggle favorite", category: "SwiftData", error: error)
         }
     }
 
@@ -486,7 +496,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to update favorite order: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update favorite order", category: "SwiftData", error: error)
         }
     }
 
@@ -501,7 +512,7 @@ class CBViewModel: ObservableObject {
         do {
             return try modelContext.fetch(descriptor)
         } catch {
-            print("Failed to fetch favorite items: \(error)")
+            ErrorLogger.shared.log("Failed to fetch favorite items", category: "SwiftData", error: error)
             return []
         }
     }
@@ -521,7 +532,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to delete all items: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to delete all items", category: "SwiftData", error: error)
         }
     }
 
@@ -537,7 +549,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to clear all favorites: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to clear all favorites", category: "SwiftData", error: error)
         }
     }
 
@@ -666,7 +679,7 @@ class CBViewModel: ObservableObject {
                 )
             }
         } catch {
-            print("Failed to perform item count cleanup: \(error)")
+            ErrorLogger.shared.log("Failed to perform item count cleanup", category: "SwiftData", error: error)
         }
     }
 

@@ -140,7 +140,8 @@ struct ExcludedAppsSettingsView: View {
             modelContext.insert(newApp)
             try modelContext.save()
         } catch {
-            print("Error adding excluded app: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to add excluded app: \(bundleIdentifier)", category: "SwiftData", error: error)
         }
     }
 
@@ -149,7 +150,8 @@ struct ExcludedAppsSettingsView: View {
         do {
             try modelContext.save()
         } catch {
-            print("Error removing excluded app: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to remove excluded app", category: "SwiftData", error: error)
         }
     }
 
@@ -160,7 +162,8 @@ struct ExcludedAppsSettingsView: View {
         do {
             try modelContext.save()
         } catch {
-            print("Error removing all excluded apps: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to remove all excluded apps", category: "SwiftData", error: error)
         }
     }
 }
