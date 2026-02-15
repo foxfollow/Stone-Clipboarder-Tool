@@ -12,6 +12,8 @@
 - ⌨️ Smart spacebar handling: pressing Space opens preview only if search text is empty or ends with a space (avoids interference while typing)
 - ➡️ Smart arrow navigation: right arrow opens preview only when cursor is at the end of the search text
 - ⚡️ Significantly improved performance for large text previews in custom mode (optimized rendering for >10k characters)
+- 👁️ **New**: Option+Enter on an image in QuickPicker extracts text using OCR (Apple Vision) and pastes it instead of the image
+- ⚙️ **New**: Toggle for "⌥ Enter to extract text (OCR)" in Settings > General > Quick Look
 - ⚠️ **Note**: Excluded apps and hotkey configurations will be reset on this update due to the database restructuring
 
 ## appcast.xml item example
@@ -36,6 +38,8 @@
             <li>⌨️ Smart spacebar handling: only previews when search is empty or ends with a space</li>
             <li>➡️ Smart arrow navigation: right arrow previews only at end of search text</li>
             <li>⚡️ Improved performance for large text previews</li>
+            <li>👁️ Option+Enter on image in QuickPicker extracts text via OCR</li>
+            <li>⚙️ New setting to toggle OCR feature</li>
             <li>⚠️ Excluded apps and hotkey configurations will be reset due to database restructuring</li>
         </ul>
     ]]></description>

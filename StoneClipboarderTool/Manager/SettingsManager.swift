@@ -110,6 +110,12 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @Published var enableOCROptionKey: Bool {
+        didSet {
+            UserDefaults.standard.set(enableOCROptionKey, forKey: "enableOCROptionKey")
+        }
+    }
+
     init() {
         self.showInMenubar = UserDefaults.standard.bool(forKey: "showInMenubar")
         self.showMainWindow = UserDefaults.standard.bool(forKey: "showMainWindow")
@@ -145,6 +151,8 @@ class SettingsManager: ObservableObject {
         } else {
             self.quickLookTriggerKey = .space
         }
+
+        self.enableOCROptionKey = UserDefaults.standard.object(forKey: "enableOCROptionKey") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = UserDefaults.standard.string(forKey: "clipboardCaptureMode"),

@@ -74,6 +74,9 @@ struct SettingsView: View {
                 .disabled(settingsManager.quickLookMode == .disabled)
                 .opacity(settingsManager.quickLookMode == .disabled ? 0.5 : 1)
                 .help("Key to open preview in QuickPicker")
+
+                Toggle("⌥ Enter to extract text (Apple Vision)", isOn: $settingsManager.enableOCROptionKey)
+                    .help("When enabled, pressing Option+Enter on an image in QuickPicker will extract and paste text using Apple Vision OCR instead of the image")
             }
 
             Section("Clipboard Behavior") {
