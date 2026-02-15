@@ -56,6 +56,26 @@ struct SettingsView: View {
                     .help("Keep the main window visible in the dock")
             }
 
+            Section("Quick Look") {
+                Picker("Preview mode:", selection: $settingsManager.quickLookMode) {
+                    ForEach(QuickLookMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .help("Choose preview style when pressing the trigger key in QuickPicker")
+
+                Picker("Trigger key:", selection: $settingsManager.quickLookTriggerKey) {
+                    ForEach(QuickLookTriggerKey.allCases, id: \.self) { key in
+                        Text(key.displayName).tag(key)
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(settingsManager.quickLookMode == .disabled)
+                .opacity(settingsManager.quickLookMode == .disabled ? 0.5 : 1)
+                .help("Key to open preview in QuickPicker")
+            }
+
             Section("Clipboard Behavior") {
                 VStack(alignment: .leading, spacing: 4) {
                     Picker("Clipboard capture mode:", selection: $settingsManager.clipboardCaptureMode) {

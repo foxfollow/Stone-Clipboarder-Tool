@@ -72,7 +72,10 @@ class KeyCapturingPanel: NSPanel {
 @MainActor
 class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate {
     private var window: NSPanel?
+    private let quickLookCoordinator = QPQuickLookCoordinator()
+    private let customPreviewManager = QPCustomPreviewManager()
     private weak var cbViewModel: CBViewModel?
+    private weak var settingsManager: SettingsManager?
     nonisolated(unsafe) private var eventMonitor: Any?
     nonisolated(unsafe) private var keyMonitor: Any?
     nonisolated(unsafe) private var localKeyMonitor: Any?
@@ -85,6 +88,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         self.cbViewModel = viewModel
         // Reset position flag on app start for fresh center positioning
         UserDefaults.standard.set(false, forKey: "QuickPickerHasValidPosition")
+    }
+
+    func setSettingsManager(_ manager: SettingsManager) {
+        self.settingsManager = manager
     }
 
     func setMenuBarRefreshCallback(_ callback: @escaping () -> Void) {
@@ -138,9 +145,22 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         ]
 
         // Create content view
-        let contentView = QuickPickerView(viewModel: cbViewModel) { [weak self] in
-            self?.hideQuickPicker()
-        }
+        let contentView = QuickPickerView(
+            viewModel: cbViewModel,
+            settingsManager: settingsManager,
+            onClose: { [weak self] in
+                self?.hideQuickPicker()
+            },
+            onPreviewToggle: { [weak self] item in
+                self?.togglePreviewPanel(for: item)
+            },
+            onPreviewUpdate: { [weak self] item in
+                self?.updatePreviewPanel(for: item)
+            },
+            isPreviewVisible: { [weak self] in
+                self?.isPreviewPanelVisible() ?? false
+            }
+        )
 
         let hostingView = QuickPickerHostingView(rootView: contentView)
         panel.contentView = hostingView
@@ -204,6 +224,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     }
 
     func hideQuickPicker() {
+        hidePreviewPanel()
         removeEventMonitoring()
         removeKeyMonitoring()
         removeLocalKeyMonitoring()
@@ -227,6 +248,52 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.menuBarRefreshCallback?()
         }
+    }
+
+    // MARK: - Preview Panel Management
+
+    private func togglePreviewPanel(for item: CBItem) {
+        guard settingsManager?.quickLookMode != .disabled else { return }
+
+        if isPreviewPanelVisible() {
+            hidePreviewPanel()
+        } else {
+            showPreviewPanel(for: item)
+        }
+    }
+
+    private func showPreviewPanel(for item: CBItem) {
+        let mode = settingsManager?.quickLookMode ?? .native
+        switch mode {
+        case .native:
+            guard quickLookCoordinator.prepareItem(item) else { return }
+            quickLookCoordinator.showPreview()
+        case .custom:
+            let triggerKey = settingsManager?.quickLookTriggerKey ?? .space
+            customPreviewManager.triggerKeyHint = triggerKey == .space ? "⎵ to close" : "→ to close"
+            customPreviewManager.showPreview(for: item, relativeTo: window)
+        case .disabled:
+            break
+        }
+    }
+
+    private func updatePreviewPanel(for item: CBItem) {
+        guard isPreviewPanelVisible() else { return }
+        showPreviewPanel(for: item)
+    }
+
+    func isPreviewPanelVisible() -> Bool {
+        let mode = settingsManager?.quickLookMode ?? .native
+        switch mode {
+        case .native: return quickLookCoordinator.isPreviewVisible
+        case .custom: return customPreviewManager.isPreviewVisible
+        case .disabled: return false
+        }
+    }
+
+    func hidePreviewPanel() {
+        quickLookCoordinator.hidePreview()
+        customPreviewManager.hidePreview()
     }
 
     func handleKeyEvent(_ event: NSEvent) {

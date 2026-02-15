@@ -62,7 +62,6 @@ class CBViewModel: ObservableObject {
 
         if reset {
             currentFetchOffset = 0
-            items.removeAll()
         } else {
             isLoadingMore = true
         }
@@ -96,8 +95,11 @@ class CBViewModel: ObservableObject {
                     }
                 }
                 
-                self.items = uniqueItems
-                self.currentFetchOffset = uniqueItems.count
+                // Defer @Published mutation to avoid publishing during view updates
+                DispatchQueue.main.async {
+                    self.items = uniqueItems
+                    self.currentFetchOffset = uniqueItems.count
+                }
 
                 // Track access times for memory management
                 for item in uniqueItems {
@@ -108,7 +110,9 @@ class CBViewModel: ObservableObject {
                 // The 30 items are enough for immediate use
             } catch {
                 ErrorLogger.shared.log("Failed to fetch recent items", category: "SwiftData", error: error)
-                self.items = []
+                DispatchQueue.main.async {
+                    self.items = []
+                }
             }
         } else {
             // For pagination, use async to avoid blocking UI

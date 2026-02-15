@@ -57,6 +57,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager.setCBViewModel(cbViewModel)
         hotkeyManager.setSettingsManager(settingsManager)
         quickPickerManager.setCBViewModel(cbViewModel)
+        quickPickerManager.setSettingsManager(settingsManager)
         hotkeyManager.quickPickerDelegate = quickPickerManager
 
         // Give ClipboardManager a separate context from the settings container for ExcludedApp queries

@@ -7,6 +7,32 @@
 
 import Foundation
 
+enum QuickLookMode: String, Codable, CaseIterable {
+    case native = "native"
+    case custom = "custom"
+    case disabled = "disabled"
+
+    var displayName: String {
+        switch self {
+        case .native: return "Apple Quick Look"
+        case .custom: return "Custom Preview"
+        case .disabled: return "Disabled"
+        }
+    }
+}
+
+enum QuickLookTriggerKey: String, Codable, CaseIterable {
+    case space = "space"
+    case arrowRight = "arrowRight"
+
+    var displayName: String {
+        switch self {
+        case .space: return "Space"
+        case .arrowRight: return "Arrow Right (→)"
+        }
+    }
+}
+
 enum ClipboardCaptureMode: String, Codable, CaseIterable {
     case textOnly = "textOnly"
     case imageOnly = "imageOnly"
@@ -127,11 +153,17 @@ class SettingsManager: ObservableObject {
         }
     }
 
-    //    @Published var autoSelectOnPaste: Bool {
-    //        didSet {
-    //            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
-    //        }
-    //    }
+    @Published var quickLookMode: QuickLookMode {
+        didSet {
+            UserDefaults.standard.set(quickLookMode.rawValue, forKey: "quickLookMode")
+        }
+    }
+
+    @Published var quickLookTriggerKey: QuickLookTriggerKey {
+        didSet {
+            UserDefaults.standard.set(quickLookTriggerKey.rawValue, forKey: "quickLookTriggerKey")
+        }
+    }
 
     init() {
         self.showInMenubar = UserDefaults.standard.bool(forKey: "showInMenubar")
@@ -154,6 +186,20 @@ class SettingsManager: ObservableObject {
         self.enableAppExclusion = UserDefaults.standard.object(forKey: "enableAppExclusion") as? Bool ?? false
         self.lastPauseDuration = UserDefaults.standard.object(forKey: "lastPauseDuration") as? Int ?? 300 // Default 5 minutes
         self.enableErrorFileLogging = UserDefaults.standard.bool(forKey: ErrorLogger.enableFileLoggingKey) // Default false
+
+        if let savedQLMode = UserDefaults.standard.string(forKey: "quickLookMode"),
+           let mode = QuickLookMode(rawValue: savedQLMode) {
+            self.quickLookMode = mode
+        } else {
+            self.quickLookMode = .native
+        }
+
+        if let savedTrigger = UserDefaults.standard.string(forKey: "quickLookTriggerKey"),
+           let trigger = QuickLookTriggerKey(rawValue: savedTrigger) {
+            self.quickLookTriggerKey = trigger
+        } else {
+            self.quickLookTriggerKey = .space
+        }
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = UserDefaults.standard.string(forKey: "clipboardCaptureMode"),

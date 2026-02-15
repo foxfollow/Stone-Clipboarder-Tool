@@ -21,10 +21,25 @@ struct QuickPickerView: View {
     @FocusState private var isSearchFocused: Bool
 
     let onClose: () -> Void
+    let onPreviewToggle: (CBItem) -> Void
+    let onPreviewUpdate: (CBItem) -> Void
+    let isPreviewVisible: () -> Bool
+    private let settingsManager: SettingsManager?
 
-    init(viewModel: CBViewModel, onClose: @escaping () -> Void) {
+    init(
+        viewModel: CBViewModel,
+        settingsManager: SettingsManager? = nil,
+        onClose: @escaping () -> Void,
+        onPreviewToggle: @escaping (CBItem) -> Void = { _ in },
+        onPreviewUpdate: @escaping (CBItem) -> Void = { _ in },
+        isPreviewVisible: @escaping () -> Bool = { false }
+    ) {
         self.viewModel = viewModel
+        self.settingsManager = settingsManager
         self.onClose = onClose
+        self.onPreviewToggle = onPreviewToggle
+        self.onPreviewUpdate = onPreviewUpdate
+        self.isPreviewVisible = isPreviewVisible
     }
 
     private var filteredItems: [CBItem] {
@@ -80,24 +95,52 @@ struct QuickPickerView: View {
             }
         }
         .onKeyPress(.escape) {
-            onClose()
+            if isPreviewVisible() {
+                onPreviewToggle(filteredItems[safe: selectedIndex] ?? filteredItems[0])
+            } else {
+                onClose()
+            }
             return .handled
         }
         .onKeyPress(.upArrow) {
             if selectedIndex > 0 {
                 selectedIndex -= 1
+                if let item = filteredItems[safe: selectedIndex] {
+                    onPreviewUpdate(item)
+                }
             }
             return .handled
         }
         .onKeyPress(.downArrow) {
             if selectedIndex < filteredItems.count - 1 {
                 selectedIndex += 1
+                if let item = filteredItems[safe: selectedIndex] {
+                    onPreviewUpdate(item)
+                }
             }
             return .handled
         }
         .onKeyPress(.return) {
             performAction()
             return .handled
+        }
+        .onKeyPress(.space) {
+            guard triggerKey == .space else { return .ignored }
+            return handlePreviewTrigger()
+        }
+        .onKeyPress(.rightArrow) {
+            guard triggerKey == .arrowRight else { return .ignored }
+            // Only open QL when cursor is at the end of search text
+            if isSearchFocused && !searchText.isEmpty {
+                if let fieldEditor = NSApp.keyWindow?.firstResponder as? NSTextView {
+                    let sel = fieldEditor.selectedRange()
+                    let cursorEnd = sel.location + sel.length
+                    if cursorEnd < fieldEditor.string.count {
+                        return .ignored // Let cursor move normally
+                    }
+                }
+            }
+            return handlePreviewTrigger()
         }
         .onChange(of: searchText) { _, newValue in
             selectedIndex = 0
@@ -179,6 +222,32 @@ struct QuickPickerView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             simulatePaste()
         }
+    }
+
+    private var triggerKey: QuickLookTriggerKey {
+        settingsManager?.quickLookTriggerKey ?? .space
+    }
+
+    private func handlePreviewTrigger() -> KeyPress.Result {
+        if triggerKey == .space {
+            // Space trigger: allow QL when search is empty OR ends with a space
+            let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || searchText.hasSuffix(" ") {
+                // Don't modify searchText — just consume the key and toggle preview
+                togglePreview()
+                return .handled
+            }
+            return .ignored
+        } else {
+            // Arrow right trigger: always toggle
+            togglePreview()
+            return .handled
+        }
+    }
+
+    private func togglePreview() {
+        guard selectedIndex < filteredItems.count else { return }
+        onPreviewToggle(filteredItems[selectedIndex])
     }
 
     private func copyToPasteboard(_ item: CBItem) {
@@ -336,6 +405,14 @@ struct QuickPickerView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Safe Array Access
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 
