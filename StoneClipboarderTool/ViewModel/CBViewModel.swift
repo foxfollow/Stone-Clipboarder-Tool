@@ -708,14 +708,74 @@ class CBViewModel: ObservableObject {
 
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = item.fileName ?? "unknown_file"
+        // Use a unique name to avoid conflicts
         let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
         let tempFile = tempDir.appendingPathComponent(tempFileName)
 
         try fileData.write(to: tempFile)
         NSWorkspace.shared.open(tempFile)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
+        // Clean up after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
             try? FileManager.default.removeItem(at: tempFile)
+        }
+    }
+
+    func openInPreview(_ item: CBItem) {
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL: URL
+
+        if let image = item.image ?? item.filePreviewImage {
+            // It's an image (or file with image preview)
+            let fileName = "clipboard_image_\(UUID().uuidString).png"
+            fileURL = tempDir.appendingPathComponent(fileName)
+
+            guard let tiffData = image.tiffRepresentation,
+                  let bitmapRep = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+                return
+            }
+
+            try? pngData.write(to: fileURL)
+        } else if item.itemType == .file, let data = item.fileData, let name = item.fileName {
+            // It's a file
+            let tempName = "clipboard_file_\(UUID().uuidString)_\(name)"
+            fileURL = tempDir.appendingPathComponent(tempName)
+            try? data.write(to: fileURL)
+        } else {
+            return
+        }
+
+        NSWorkspace.shared.open(fileURL)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+    }
+
+    func openInTextEdit(_ item: CBItem) {
+        guard let text = item.content, !text.isEmpty else { return }
+
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileName = "clipboard_text_\(UUID().uuidString).txt"
+        let fileURL = tempDir.appendingPathComponent(fileName)
+
+        do {
+            try text.write(to: fileURL, atomically: true, encoding: .utf8)
+            
+            // Try to open specifically with TextEdit, fallback to default for .txt
+            if let textEditURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") {
+                let config = NSWorkspace.OpenConfiguration()
+                NSWorkspace.shared.open([fileURL], withApplicationAt: textEditURL, configuration: config)
+            } else {
+                NSWorkspace.shared.open(fileURL)
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+        } catch {
+            print("Failed to open content in TextEdit: \(error)")
         }
     }
 

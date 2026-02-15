@@ -160,10 +160,17 @@ struct QuickPickerView: View {
                 hasMoreItems: hasMoreItems,
                 onLoadMore: {
                     loadMoreItems()
+                },
+                performAction: {
+                    performAction()
+                },
+                onOpenPreview: { item in
+                    viewModel.openInPreview(item)
+                },
+                onOpenTextEdit: { item in
+                    viewModel.openInTextEdit(item)
                 }
-            ) {
-                performAction()
-            }
+            )
         }
         .frame(width: 500, height: 400)
         .background(Color(NSColor.windowBackgroundColor))

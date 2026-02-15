@@ -14,6 +14,7 @@
 - ⚡️ Significantly improved performance for large text previews in custom mode (optimized rendering for >10k characters)
 - 👁️ **New**: Option+Enter on an image in QuickPicker extracts text using OCR (Apple Vision) and pastes it instead of the image
 - ⚙️ **New**: Toggle for "⌥ Enter to extract text (OCR)" in Settings > General > Quick Look
+- 🖱️ **New**: Context menu in QuickPicker — right-click items to "Open in Preview" or "Open with TextEdit"
 - ⚠️ **Note**: Excluded apps and hotkey configurations will be reset on this update due to the database restructuring
 
 ## appcast.xml item example
@@ -40,6 +41,7 @@
             <li>⚡️ Improved performance for large text previews</li>
             <li>👁️ Option+Enter on image in QuickPicker extracts text via OCR</li>
             <li>⚙️ New setting to toggle OCR feature</li>
+            <li>🖱️ New context menu in QuickPicker: right-click to Open in Preview or TextEdit</li>
             <li>⚠️ Excluded apps and hotkey configurations will be reset due to database restructuring</li>
         </ul>
     ]]></description>
