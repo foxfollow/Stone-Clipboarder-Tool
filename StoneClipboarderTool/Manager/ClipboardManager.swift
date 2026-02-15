@@ -10,13 +10,6 @@ import Foundation
 import SwiftData
 import UniformTypeIdentifiers
 
-enum ClipboardContent {
-    case text(String)
-    case image(NSImage)
-    case file(URL, String, Data) // URL, UTI, Data
-    case combined(String, NSImage) // Text + Image together
-}
-
 class ClipboardManager: ObservableObject {
     private var timer: Timer?
     private var lastChangeCount: Int = 0
