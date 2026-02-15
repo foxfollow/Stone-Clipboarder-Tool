@@ -117,6 +117,43 @@ struct AboutSettingsView: View {
                     .buttonStyle(.borderedProminent)
                 }
             }
+            
+            Section(header: HStack {
+                Image("threads-image")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                Text("Social Networks")
+            }) {
+                Link(destination: URL(string: "https://www.threads.com/@folowfox")!) {
+                    HStack {
+                        Text("Developer 👨💻")
+                        Spacer()
+                        Image(systemName: "link")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .foregroundStyle(.primary)
+                
+                Link(destination: URL(string: "https://www.threads.com/@kyivstar.official")!) {
+                    HStack {
+                        Image(.kyivstar)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                            .cornerRadius(4)
+                        
+                        Text("I promise them to add them to my app")
+                            .font(.caption)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "link")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .foregroundStyle(.primary)
+            }
         }
         .formStyle(.grouped)
     }
