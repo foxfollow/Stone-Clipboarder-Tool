@@ -567,10 +567,13 @@ jobs:
           exit 1
 
       - name: Update Homebrew Tap
-        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
+          if [[ -z "$HOMEBREW_TAP_TOKEN" ]]; then
+            echo "⚠️ HOMEBREW_TAP_TOKEN secret not set. Skipping Homebrew tap update."
+            exit 0
+          fi
           echo "🍺 Updating Homebrew tap..."
 
           # 1. Compute SHA256 of the release ZIP
