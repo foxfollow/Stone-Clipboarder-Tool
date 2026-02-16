@@ -62,7 +62,6 @@ class CBViewModel: ObservableObject {
 
         if reset {
             currentFetchOffset = 0
-            items.removeAll()
         } else {
             isLoadingMore = true
         }
@@ -96,8 +95,11 @@ class CBViewModel: ObservableObject {
                     }
                 }
                 
-                self.items = uniqueItems
-                self.currentFetchOffset = uniqueItems.count
+                // Defer @Published mutation to avoid publishing during view updates
+                DispatchQueue.main.async {
+                    self.items = uniqueItems
+                    self.currentFetchOffset = uniqueItems.count
+                }
 
                 // Track access times for memory management
                 for item in uniqueItems {
@@ -107,8 +109,10 @@ class CBViewModel: ObservableObject {
                 // Don't automatically load more - only load when user actually scrolls
                 // The 30 items are enough for immediate use
             } catch {
-                print("Failed to fetch recent items: \(error)")
-                self.items = []
+                ErrorLogger.shared.log("Failed to fetch recent items", category: "SwiftData", error: error)
+                DispatchQueue.main.async {
+                    self.items = []
+                }
             }
         } else {
             // For pagination, use async to avoid blocking UI
@@ -138,7 +142,7 @@ class CBViewModel: ObservableObject {
                     }
                 } catch {
                     await MainActor.run {
-                        print("Failed to fetch items: \(error)")
+                        ErrorLogger.shared.log("Failed to fetch items (pagination)", category: "SwiftData", error: error)
                         self.isLoadingMore = false
                     }
                 }
@@ -156,7 +160,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save item", category: "SwiftData", error: error)
         }
     }
 
@@ -168,7 +173,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to delete item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to delete item", category: "SwiftData", error: error)
         }
     }
 
@@ -182,7 +188,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to delete items: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to delete items", category: "SwiftData", error: error)
         }
     }
 
@@ -240,7 +247,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save text item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save text item", category: "SwiftData", error: error)
         }
     }
 
@@ -265,7 +273,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save image item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save image item", category: "SwiftData", error: error)
         }
     }
 
@@ -291,7 +300,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save combined item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save combined item", category: "SwiftData", error: error)
         }
     }
 
@@ -317,7 +327,8 @@ class CBViewModel: ObservableObject {
             fetchItems(reset: true)
             performCleanupIfNeeded()
         } catch {
-            print("Failed to save file item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save file item", category: "SwiftData", error: error)
         }
     }
 
@@ -337,7 +348,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to update item: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update item timestamp", category: "SwiftData", error: error)
         }
     }
 
@@ -438,7 +450,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to update item content: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update item content", category: "SwiftData", error: error)
         }
     }
 
@@ -458,7 +471,7 @@ class CBViewModel: ObservableObject {
                 let maxOrderIndex = allFavorites.map { $0.orderIndex }.max() ?? -1
                 item.orderIndex = maxOrderIndex + 1
             } catch {
-                print("Failed to fetch favorites for order index: \(error)")
+                ErrorLogger.shared.log("Failed to fetch favorites for order index", category: "SwiftData", error: error)
                 // Fallback to in-memory items if fetch fails
                 let maxOrderIndex = items.filter { $0.isFavorite }.map { $0.orderIndex }.max() ?? -1
                 item.orderIndex = maxOrderIndex + 1
@@ -471,7 +484,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to toggle favorite: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to toggle favorite", category: "SwiftData", error: error)
         }
     }
 
@@ -486,7 +500,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to update favorite order: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update favorite order", category: "SwiftData", error: error)
         }
     }
 
@@ -501,7 +516,7 @@ class CBViewModel: ObservableObject {
         do {
             return try modelContext.fetch(descriptor)
         } catch {
-            print("Failed to fetch favorite items: \(error)")
+            ErrorLogger.shared.log("Failed to fetch favorite items", category: "SwiftData", error: error)
             return []
         }
     }
@@ -521,7 +536,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to delete all items: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to delete all items", category: "SwiftData", error: error)
         }
     }
 
@@ -537,7 +553,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
         } catch {
-            print("Failed to clear all favorites: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to clear all favorites", category: "SwiftData", error: error)
         }
     }
 
@@ -666,7 +683,7 @@ class CBViewModel: ObservableObject {
                 )
             }
         } catch {
-            print("Failed to perform item count cleanup: \(error)")
+            ErrorLogger.shared.log("Failed to perform item count cleanup", category: "SwiftData", error: error)
         }
     }
 
@@ -691,14 +708,74 @@ class CBViewModel: ObservableObject {
 
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = item.fileName ?? "unknown_file"
+        // Use a unique name to avoid conflicts
         let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
         let tempFile = tempDir.appendingPathComponent(tempFileName)
 
         try fileData.write(to: tempFile)
         NSWorkspace.shared.open(tempFile)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
+        // Clean up after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
             try? FileManager.default.removeItem(at: tempFile)
+        }
+    }
+
+    func openInPreview(_ item: CBItem) {
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL: URL
+
+        if let image = item.image ?? item.filePreviewImage {
+            // It's an image (or file with image preview)
+            let fileName = "clipboard_image_\(UUID().uuidString).png"
+            fileURL = tempDir.appendingPathComponent(fileName)
+
+            guard let tiffData = image.tiffRepresentation,
+                  let bitmapRep = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+                return
+            }
+
+            try? pngData.write(to: fileURL)
+        } else if item.itemType == .file, let data = item.fileData, let name = item.fileName {
+            // It's a file
+            let tempName = "clipboard_file_\(UUID().uuidString)_\(name)"
+            fileURL = tempDir.appendingPathComponent(tempName)
+            try? data.write(to: fileURL)
+        } else {
+            return
+        }
+
+        NSWorkspace.shared.open(fileURL)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+    }
+
+    func openInTextEdit(_ item: CBItem) {
+        guard let text = item.content, !text.isEmpty else { return }
+
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileName = "clipboard_text_\(UUID().uuidString).txt"
+        let fileURL = tempDir.appendingPathComponent(fileName)
+
+        do {
+            try text.write(to: fileURL, atomically: true, encoding: .utf8)
+            
+            // Try to open specifically with TextEdit, fallback to default for .txt
+            if let textEditURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") {
+                let config = NSWorkspace.OpenConfiguration()
+                NSWorkspace.shared.open([fileURL], withApplicationAt: textEditURL, configuration: config)
+            } else {
+                NSWorkspace.shared.open(fileURL)
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+        } catch {
+            print("Failed to open content in TextEdit: \(error)")
         }
     }
 

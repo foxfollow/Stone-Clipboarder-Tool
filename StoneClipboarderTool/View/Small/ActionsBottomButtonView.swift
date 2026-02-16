@@ -62,7 +62,7 @@ struct ActionsBottomButtonView: View {
 
             // OCR button for extracting text from images
             if shouldShowOCRButton {
-                Button("Extract Text (OCR)") {
+                Button("Extract Text (Apple Vision)") {
                     extractTextFromImage()
                 }
                 .buttonStyle(.bordered)

@@ -140,7 +140,8 @@ struct ExcludedAppsSettingsView: View {
             modelContext.insert(newApp)
             try modelContext.save()
         } catch {
-            print("Error adding excluded app: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to add excluded app: \(bundleIdentifier)", category: "SwiftData", error: error)
         }
     }
 
@@ -149,7 +150,8 @@ struct ExcludedAppsSettingsView: View {
         do {
             try modelContext.save()
         } catch {
-            print("Error removing excluded app: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to remove excluded app", category: "SwiftData", error: error)
         }
     }
 
@@ -160,7 +162,8 @@ struct ExcludedAppsSettingsView: View {
         do {
             try modelContext.save()
         } catch {
-            print("Error removing all excluded apps: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to remove all excluded apps", category: "SwiftData", error: error)
         }
     }
 }
@@ -200,6 +203,14 @@ struct AppPickerView: View {
         excludedApps.contains { $0.bundleIdentifier == app.bundleIdentifier }
     }
 
+    private var appsToExclude: [AppInfo] {
+        filteredApps.filter { !isAppExcluded($0) }
+    }
+
+    private var appsToInclude: [AppInfo] {
+        filteredApps.filter { isAppExcluded($0) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -215,6 +226,35 @@ struct AppPickerView: View {
             TextField("Search apps...", text: $searchText)
                 .textFieldStyle(.roundedBorder)
                 .padding(.horizontal)
+                .padding(.bottom, 16)
+
+            if !searchText.isEmpty {
+                HStack {
+                    Button("Exclude All Matching") {
+                        for app in appsToExclude {
+                            onAppSelected(app.bundleIdentifier, app.name)
+                        }
+                    }
+                    .disabled(appsToExclude.isEmpty)
+                    .opacity(appsToExclude.isEmpty ? 0.5 : 1.0)
+
+                    Spacer()
+
+                    Button("Include All Matching") {
+                        for app in appsToInclude {
+                            if let excludedApp = excludedApps.first(where: {
+                                $0.bundleIdentifier == app.bundleIdentifier
+                            }) {
+                                onAppRemoved(excludedApp)
+                            }
+                        }
+                    }
+                    .disabled(appsToInclude.isEmpty)
+                    .opacity(appsToInclude.isEmpty ? 0.5 : 1.0)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
 
             Divider()
 

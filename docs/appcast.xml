@@ -11,6 +11,41 @@
         <language>en</language>
 
     <item>
+        <title>Version 1.4.0</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <sparkle:version>1.4.0</sparkle:version>
+        <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>StoneClipboarderTool 1.4.0</h2>
+            <ul>
+                <li>🛡️ Separated database storage for clipboard history and settings — corruption in one won't affect the other</li>
+                <li>🛡️ Crash protection: automatic recovery from database corruption instead of crashes</li>
+                <li>🛡️ All database operations now safely roll back on errors</li>
+                <li>📝 New optional error logging setting for debugging</li>
+                <li>✨ Native macOS Quick Look support: press Space or Arrow Right to preview clipboard items</li>
+                <li>⚙️ Configurable trigger key and preview mode (Native, Custom, Disabled) in Settings</li>
+                <li>⌨️ Smart spacebar handling: only previews when search is empty or ends with a space</li>
+                <li>➡️ Smart arrow navigation: right arrow previews only at end of search text</li>
+                <li>⚡️ Improved performance for large text previews</li>
+                <li>👁️ Option+Enter on image in QuickPicker extracts text via OCR</li>
+                <li>⚙️ New setting to toggle OCR feature</li>
+                <li>🖱️ New context menu in QuickPicker: right-click to Open in Preview or TextEdit</li>
+                <li>⚠️ Excluded apps and hotkey configurations will be reset due to database restructuring</li>
+            </ul>
+        ]]></description>
+        <pubDate>RELEASE_DATE</pubDate>
+        <enclosure
+            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.4.0/StoneClipboarderTool.zip"
+            sparkle:version="1.4.0"
+            sparkle:shortVersionString="1.4.0"
+            sparkle:edSignature="SIGNATURE_PLACEHOLDER"
+            length="FILE_SIZE"
+            type="application/octet-stream"
+        />
+    </item>
+
+    <item>
         <title>Version 1.3.2</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
         <sparkle:version>12</sparkle:version>

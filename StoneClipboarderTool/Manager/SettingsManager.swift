@@ -7,35 +7,6 @@
 
 import Foundation
 
-enum ClipboardCaptureMode: String, Codable, CaseIterable {
-    case textOnly = "textOnly"
-    case imageOnly = "imageOnly"
-    case both = "both"
-    case bothAsOne = "bothAsOne"
-
-    var displayName: String {
-        switch self {
-        case .textOnly: return "Text Only"
-        case .imageOnly: return "Image Only"
-        case .both: return "Both Text and Image"
-        case .bothAsOne: return "Both as One Item (BETA)"
-        }
-    }
-
-    var description: String {
-        switch self {
-        case .textOnly:
-            return "Prefer text when both available (e.g., Word), but still capture standalone images (screenshots)"
-        case .imageOnly:
-            return "Prefer images when both available, but still capture standalone text"
-        case .both:
-            return "Capture both text and image separately when both are available"
-        case .bothAsOne:
-            return "Capture text and image together as one combined item (see both in preview)"
-        }
-    }
-}
-
 class SettingsManager: ObservableObject {
     @Published var showInMenubar: Bool {
         didSet {
@@ -121,11 +92,29 @@ class SettingsManager: ObservableObject {
         }
     }
 
-    //    @Published var autoSelectOnPaste: Bool {
-    //        didSet {
-    //            UserDefaults.standard.set(autoSelectOnPaste, forKey: "autoSelectOnPaste")
-    //        }
-    //    }
+    @Published var enableErrorFileLogging: Bool {
+        didSet {
+            UserDefaults.standard.set(enableErrorFileLogging, forKey: ErrorLogger.enableFileLoggingKey)
+        }
+    }
+
+    @Published var quickLookMode: QuickLookMode {
+        didSet {
+            UserDefaults.standard.set(quickLookMode.rawValue, forKey: "quickLookMode")
+        }
+    }
+
+    @Published var quickLookTriggerKey: QuickLookTriggerKey {
+        didSet {
+            UserDefaults.standard.set(quickLookTriggerKey.rawValue, forKey: "quickLookTriggerKey")
+        }
+    }
+
+    @Published var enableOCROptionKey: Bool {
+        didSet {
+            UserDefaults.standard.set(enableOCROptionKey, forKey: "enableOCROptionKey")
+        }
+    }
 
     init() {
         self.showInMenubar = UserDefaults.standard.bool(forKey: "showInMenubar")
@@ -147,6 +136,23 @@ class SettingsManager: ObservableObject {
             UserDefaults.standard.object(forKey: "maxInactiveTime") as? Int ?? 30
         self.enableAppExclusion = UserDefaults.standard.object(forKey: "enableAppExclusion") as? Bool ?? false
         self.lastPauseDuration = UserDefaults.standard.object(forKey: "lastPauseDuration") as? Int ?? 300 // Default 5 minutes
+        self.enableErrorFileLogging = UserDefaults.standard.bool(forKey: ErrorLogger.enableFileLoggingKey) // Default false
+
+        if let savedQLMode = UserDefaults.standard.string(forKey: "quickLookMode"),
+           let mode = QuickLookMode(rawValue: savedQLMode) {
+            self.quickLookMode = mode
+        } else {
+            self.quickLookMode = .native
+        }
+
+        if let savedTrigger = UserDefaults.standard.string(forKey: "quickLookTriggerKey"),
+           let trigger = QuickLookTriggerKey(rawValue: savedTrigger) {
+            self.quickLookTriggerKey = trigger
+        } else {
+            self.quickLookTriggerKey = .space
+        }
+
+        self.enableOCROptionKey = UserDefaults.standard.object(forKey: "enableOCROptionKey") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = UserDefaults.standard.string(forKey: "clipboardCaptureMode"),

@@ -10,13 +10,6 @@ import Foundation
 import SwiftData
 import UniformTypeIdentifiers
 
-enum ClipboardContent {
-    case text(String)
-    case image(NSImage)
-    case file(URL, String, Data) // URL, UTI, Data
-    case combined(String, NSImage) // Text + Image together
-}
-
 class ClipboardManager: ObservableObject {
     private var timer: Timer?
     private var lastChangeCount: Int = 0
@@ -25,6 +18,8 @@ class ClipboardManager: ObservableObject {
     var onClipboardChange: ((ClipboardContent) -> Void)?
     weak var settingsManager: SettingsManager?
     var modelContext: ModelContext?
+    /// Separate context for ExcludedApp queries — lives in the settings container
+    private var settingsModelContext: ModelContext?
 
     // Pause timer properties
     @Published var isPaused: Bool = false
@@ -39,6 +34,10 @@ class ClipboardManager: ObservableObject {
         self.modelContext = context
     }
 
+    func setSettingsModelContext(_ context: ModelContext) {
+        self.settingsModelContext = context
+    }
+
     private func getActiveAppBundleIdentifier() -> String? {
         guard let activeApp = NSWorkspace.shared.frontmostApplication else {
             return nil
@@ -47,7 +46,7 @@ class ClipboardManager: ObservableObject {
     }
 
     private func isAppExcluded(_ bundleIdentifier: String) -> Bool {
-        guard let context = modelContext else { return false }
+        guard let context = settingsModelContext ?? modelContext else { return false }
         guard settingsManager?.enableAppExclusion == true else { return false }
 
         let descriptor = FetchDescriptor<ExcludedApp>(
@@ -60,7 +59,7 @@ class ClipboardManager: ObservableObject {
             let excludedApps = try context.fetch(descriptor)
             return !excludedApps.isEmpty
         } catch {
-            print("Error fetching excluded apps: \(error)")
+            ErrorLogger.shared.log("Failed to fetch excluded apps", category: "SwiftData", error: error)
             return false
         }
     }

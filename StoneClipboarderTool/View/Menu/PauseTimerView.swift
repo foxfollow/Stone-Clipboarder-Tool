@@ -7,22 +7,6 @@
 
 import SwiftUI
 
-enum TimeUnit: String, CaseIterable {
-    case seconds = "Seconds"
-    case minutes = "Minutes"
-    case hours = "Hours"
-    case days = "Days"
-
-    var multiplier: Int {
-        switch self {
-        case .seconds: return 1
-        case .minutes: return 60
-        case .hours: return 3600
-        case .days: return 86400
-        }
-    }
-}
-
 struct PauseTimerView: View {
     @EnvironmentObject var clipboardManager: ClipboardManager
     @EnvironmentObject var settingsManager: SettingsManager

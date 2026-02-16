@@ -15,6 +15,8 @@ struct QPItemList: View {
     var hasMoreItems: Bool = true
     let onLoadMore: () -> Void
     let performAction: () -> Void
+    var onOpenPreview: ((CBItem) -> Void)?
+    var onOpenTextEdit: ((CBItem) -> Void)?
 
     var body: some View {
         if filteredItems.isEmpty {
@@ -56,6 +58,28 @@ struct QPItemList: View {
                             .onTapGesture {
                                 selectedIndex = index
                                 performAction()
+                            }
+                            .contextMenu {
+                                // Open in Preview (for images/files)
+                                if let onOpenPreview = onOpenPreview, shouldShowPreview(for: item) {
+                                    Button("Open in Preview") {
+                                        onOpenPreview(item)
+                                    }
+                                }
+
+                                // Open with TextEdit (for text/combined)
+                                if let onOpenTextEdit = onOpenTextEdit, item.content != nil {
+                                    Button("Open with TextEdit") {
+                                        onOpenTextEdit(item)
+                                    }
+                                }
+                                
+                                Divider()
+
+                                Button("Copy") {
+                                    selectedIndex = index
+                                    performAction()
+                                }
                             }
                             .onAppear {
                                 // Trigger load more when near the end
@@ -126,6 +150,28 @@ struct QPItemList: View {
         return hasMoreItems && !isLoading && index >= filteredItems.count - 3
             && filteredItems.count >= 25
     }
+    private func shouldShowPreview(for item: CBItem) -> Bool {
+        switch item.itemType {
+        case .image, .combined:
+            return item.image != nil
+        case .file:
+            // For files, we preview if it's an image file with a preview, OR if it's just a file (we can open it)
+            // Actually, for "Open in Preview", better to stick to images/pdfs that Preview.app handles well.
+            // But ActionsBottomButtonView only checked for images.
+            // Let's allow opening any file in "Preview" logic if it's an image, or fallback to file opening.
+            // But CBViewModel.openInPreview handles generic files too.
+            // Let's just return true for .file to allow trying.
+            // Wait, ActionsBottomButtonView logic:
+            // case .file: return item.isImageFile && item.filePreviewImage != nil
+            // Let's match that for "Preview" specifically?
+            // Actually, users might want to QuickLook any file.
+            // User said "Open with Previewer".
+            // Let's stick to safe logic:
+            return item.itemType == .image || item.itemType == .combined || item.itemType == .file
+        case .text:
+            return false
+        }
+    }
 }
 
 #Preview {
@@ -136,6 +182,8 @@ struct QPItemList: View {
         isLoading: false,
         hasMoreItems: true,
         onLoadMore: {},
-        performAction: {}
+        performAction: {},
+        onOpenPreview: { _ in },
+        onOpenTextEdit: { _ in }
     )
 }

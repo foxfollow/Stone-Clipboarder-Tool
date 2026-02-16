@@ -9,6 +9,7 @@ import AppKit
 import ApplicationServices
 import SwiftData
 import SwiftUI
+import Vision
 
 struct QuickPickerView: View {
     @ObservedObject var viewModel: CBViewModel
@@ -21,10 +22,25 @@ struct QuickPickerView: View {
     @FocusState private var isSearchFocused: Bool
 
     let onClose: () -> Void
+    let onPreviewToggle: (CBItem) -> Void
+    let onPreviewUpdate: (CBItem) -> Void
+    let isPreviewVisible: () -> Bool
+    private let settingsManager: SettingsManager?
 
-    init(viewModel: CBViewModel, onClose: @escaping () -> Void) {
+    init(
+        viewModel: CBViewModel,
+        settingsManager: SettingsManager? = nil,
+        onClose: @escaping () -> Void,
+        onPreviewToggle: @escaping (CBItem) -> Void = { _ in },
+        onPreviewUpdate: @escaping (CBItem) -> Void = { _ in },
+        isPreviewVisible: @escaping () -> Bool = { false }
+    ) {
         self.viewModel = viewModel
+        self.settingsManager = settingsManager
         self.onClose = onClose
+        self.onPreviewToggle = onPreviewToggle
+        self.onPreviewUpdate = onPreviewUpdate
+        self.isPreviewVisible = isPreviewVisible
     }
 
     private var filteredItems: [CBItem] {
@@ -48,6 +64,90 @@ struct QuickPickerView: View {
     }
 
     var body: some View {
+        mainContent
+            .onKeyPress(.escape) {
+                if isPreviewVisible() {
+                    onPreviewToggle(filteredItems[safe: selectedIndex] ?? filteredItems[0])
+                } else {
+                    onClose()
+                }
+                return .handled
+            }
+            .onKeyPress(.upArrow) {
+                if selectedIndex > 0 {
+                    selectedIndex -= 1
+                    if let item = filteredItems[safe: selectedIndex] {
+                        onPreviewUpdate(item)
+                    }
+                }
+                return .handled
+            }
+            .onKeyPress(.downArrow) {
+                if selectedIndex < filteredItems.count - 1 {
+                    selectedIndex += 1
+                    if let item = filteredItems[safe: selectedIndex] {
+                        onPreviewUpdate(item)
+                    }
+                }
+                return .handled
+            }
+            .onKeyPress(keys: [.return]) { keyPress in
+                if keyPress.modifiers.contains(.option),
+                   settingsManager?.enableOCROptionKey == true {
+                    performOCRAction()
+                } else {
+                    performAction()
+                }
+                return .handled
+            }
+            .onKeyPress(.space) {
+                guard triggerKey == .space else { return .ignored }
+                return handlePreviewTrigger()
+            }
+            .onKeyPress(.rightArrow) {
+                guard triggerKey == .arrowRight else { return .ignored }
+                // Only open QL when cursor is at the end of search text
+                if isSearchFocused && !searchText.isEmpty {
+                    if let fieldEditor = NSApp.keyWindow?.firstResponder as? NSTextView {
+                        let sel = fieldEditor.selectedRange()
+                        let cursorEnd = sel.location + sel.length
+                        if cursorEnd < fieldEditor.string.count {
+                            return .ignored // Let cursor move normally
+                        }
+                    }
+                }
+                return handlePreviewTrigger()
+            }
+            .onChange(of: searchText) { _, newValue in
+                selectedIndex = 0
+
+                // Cancel previous search task
+                searchTask?.cancel()
+
+                if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    // Debounce search with 300ms delay
+                    searchTask = Task {
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        if !Task.isCancelled {
+                            await MainActor.run {
+                                performSearch(newValue)
+                            }
+                        }
+                    }
+                } else {
+                    // Reset to showing all items when search is cleared
+                    loadInitialItems()
+                }
+            }
+            .onChange(of: filteredItems.count) { _, newCount in
+                if selectedIndex >= newCount {
+                    selectedIndex = max(0, newCount - 1)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
         VStack(spacing: 0) {
             dragHandle
             searchBar
@@ -60,10 +160,17 @@ struct QuickPickerView: View {
                 hasMoreItems: hasMoreItems,
                 onLoadMore: {
                     loadMoreItems()
+                },
+                performAction: {
+                    performAction()
+                },
+                onOpenPreview: { item in
+                    viewModel.openInPreview(item)
+                },
+                onOpenTextEdit: { item in
+                    viewModel.openInTextEdit(item)
                 }
-            ) {
-                performAction()
-            }
+            )
         }
         .frame(width: 500, height: 400)
         .background(Color(NSColor.windowBackgroundColor))
@@ -77,52 +184,6 @@ struct QuickPickerView: View {
             loadInitialItems()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isSearchFocused = true
-            }
-        }
-        .onKeyPress(.escape) {
-            onClose()
-            return .handled
-        }
-        .onKeyPress(.upArrow) {
-            if selectedIndex > 0 {
-                selectedIndex -= 1
-            }
-            return .handled
-        }
-        .onKeyPress(.downArrow) {
-            if selectedIndex < filteredItems.count - 1 {
-                selectedIndex += 1
-            }
-            return .handled
-        }
-        .onKeyPress(.return) {
-            performAction()
-            return .handled
-        }
-        .onChange(of: searchText) { _, newValue in
-            selectedIndex = 0
-
-            // Cancel previous search task
-            searchTask?.cancel()
-
-            if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                // Debounce search with 300ms delay
-                searchTask = Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                    if !Task.isCancelled {
-                        await MainActor.run {
-                            performSearch(newValue)
-                        }
-                    }
-                }
-            } else {
-                // Reset to showing all items when search is cleared
-                loadInitialItems()
-            }
-        }
-        .onChange(of: filteredItems.count) { _, newCount in
-            if selectedIndex >= newCount {
-                selectedIndex = max(0, newCount - 1)
             }
         }
     }
@@ -181,8 +242,108 @@ struct QuickPickerView: View {
         }
     }
 
+    private var triggerKey: QuickLookTriggerKey {
+        settingsManager?.quickLookTriggerKey ?? .space
+    }
+
+    private func handlePreviewTrigger() -> KeyPress.Result {
+        if triggerKey == .space {
+            // Space trigger: allow QL when search is empty OR ends with a space
+            let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || searchText.hasSuffix(" ") {
+                // Don't modify searchText — just consume the key and toggle preview
+                togglePreview()
+                return .handled
+            }
+            return .ignored
+        } else {
+            // Arrow right trigger: always toggle
+            togglePreview()
+            return .handled
+        }
+    }
+
+    private func togglePreview() {
+        guard selectedIndex < filteredItems.count else { return }
+        onPreviewToggle(filteredItems[selectedIndex])
+    }
+
     private func copyToPasteboard(_ item: CBItem) {
         viewModel.copyAndUpdateItem(item)
+    }
+
+    private func performOCRAction() {
+        guard selectedIndex < filteredItems.count else { return }
+
+        let item = filteredItems[selectedIndex]
+
+        // Determine the image to OCR based on item type
+        let imageToProcess: NSImage?
+        switch item.itemType {
+        case .image:
+            imageToProcess = item.image
+        case .combined:
+            imageToProcess = item.image
+        case .file where item.isImageFile:
+            imageToProcess = item.filePreviewImage
+        default:
+            // Not an image item — fall through to normal paste
+            performAction()
+            return
+        }
+
+        guard let image = imageToProcess,
+              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            // Couldn't get CGImage — fall through to normal paste
+            performAction()
+            return
+        }
+
+        // Close the picker immediately (same UX as normal Enter)
+        viewModel.markItemAccessed(item)
+        onClose()
+
+        // Run OCR on background thread
+        let request = VNRecognizeTextRequest { request, error in
+            if let error = error {
+                print("OCR error: \(error.localizedDescription)")
+                return
+            }
+
+            guard let observations = request.results as? [VNRecognizedTextObservation] else {
+                return
+            }
+
+            let recognizedText = observations.compactMap { observation in
+                observation.topCandidates(1).first?.string
+            }.joined(separator: "\n")
+
+            guard !recognizedText.isEmpty else { return }
+
+            DispatchQueue.main.async {
+                // Copy recognized text to pasteboard
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString(recognizedText, forType: .string)
+
+                // Simulate paste
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    self.simulatePaste()
+                }
+            }
+        }
+
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try handler.perform([request])
+            } catch {
+                print("Failed to perform OCR: \(error.localizedDescription)")
+            }
+        }
     }
 
     private func simulatePaste() {
@@ -336,6 +497,14 @@ struct QuickPickerView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Safe Array Access
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

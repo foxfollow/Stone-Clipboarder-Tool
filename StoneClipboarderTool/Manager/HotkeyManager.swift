@@ -127,7 +127,7 @@ class HotkeyManager: ObservableObject {
             refreshHotkeyRegistrations()
 
         } catch {
-            print("Failed to load hotkey configs: \(error)")
+            ErrorLogger.shared.log("Failed to load hotkey configs", category: "SwiftData", error: error)
             createDefaultHotkeyConfigs()
         }
     }
@@ -145,7 +145,8 @@ class HotkeyManager: ObservableObject {
             try modelContext.save()
             refreshHotkeyRegistrations()
         } catch {
-            print("Failed to create default hotkey configs: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to create default hotkey configs", category: "SwiftData", error: error)
         }
     }
 
@@ -164,7 +165,8 @@ class HotkeyManager: ObservableObject {
             hotkeyConfigs = try modelContext.fetch(descriptor)
             refreshHotkeyRegistrations()
         } catch {
-            print("Failed to update hotkey config: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update hotkey config", category: "SwiftData", error: error)
         }
     }
 

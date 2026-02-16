@@ -121,7 +121,8 @@ struct HotkeySettingsView: View {
             try modelContext.save()
             hotkeyManager.refreshHotkeyRegistrations()
         } catch {
-            print("Failed to reset to defaults: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to reset hotkeys to defaults", category: "SwiftData", error: error)
         }
     }
 }
@@ -483,7 +484,8 @@ struct HotkeyConfigRow: View {
             try modelContext.save()
             hotkeyManager.refreshHotkeyRegistrations()
         } catch {
-            print("Failed to save hotkey: \(error)")
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save hotkey change", category: "SwiftData", error: error)
         }
     }
 }

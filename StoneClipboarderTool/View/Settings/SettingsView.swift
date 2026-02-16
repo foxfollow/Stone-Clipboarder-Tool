@@ -56,6 +56,29 @@ struct SettingsView: View {
                     .help("Keep the main window visible in the dock")
             }
 
+            Section("Quick Look") {
+                Picker("Preview mode:", selection: $settingsManager.quickLookMode) {
+                    ForEach(QuickLookMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .help("Choose preview style when pressing the trigger key in QuickPicker")
+
+                Picker("Trigger key:", selection: $settingsManager.quickLookTriggerKey) {
+                    ForEach(QuickLookTriggerKey.allCases, id: \.self) { key in
+                        Text(key.displayName).tag(key)
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(settingsManager.quickLookMode == .disabled)
+                .opacity(settingsManager.quickLookMode == .disabled ? 0.5 : 1)
+                .help("Key to open preview in QuickPicker")
+
+                Toggle("⌥ Enter to extract text (Apple Vision)", isOn: $settingsManager.enableOCROptionKey)
+                    .help("When enabled, pressing Option+Enter on an image in QuickPicker will extract and paste text using Apple Vision OCR instead of the image")
+            }
+
             Section("Clipboard Behavior") {
                 VStack(alignment: .leading, spacing: 4) {
                     Picker("Clipboard capture mode:", selection: $settingsManager.clipboardCaptureMode) {
@@ -127,6 +150,34 @@ struct SettingsView: View {
                         }
                     }
                     .help("How long items stay in memory without access")
+                }
+            }
+
+            Section("Error Logging") {
+                Toggle("Save errors to log file", isOn: $settingsManager.enableErrorFileLogging)
+                    .help("When enabled, SwiftData and other errors are saved to a .log file for debugging")
+
+                if settingsManager.enableErrorFileLogging {
+                    HStack {
+                        Text("Log file size")
+                        Spacer()
+                        Text(ErrorLogger.shared.logFileSizeString)
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Button("Show in Finder") {
+                            let url = URL(fileURLWithPath: ErrorLogger.shared.logFilePath)
+                            NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: url.deletingLastPathComponent().path)
+                        }
+
+                        Spacer()
+
+                        Button("Clear Log") {
+                            ErrorLogger.shared.clearLog()
+                        }
+                        .foregroundColor(.red)
+                    }
                 }
             }
         }
