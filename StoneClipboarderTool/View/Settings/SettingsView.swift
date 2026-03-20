@@ -20,7 +20,9 @@ struct SettingsView: View {
     let updater: SPUUpdater?
 
     @State private var selectedTab = 0
-    @State private var showingCleanupAlert = false
+    @State private var activeAlert: ClipboardAlert?
+    @State private var showAutoStartPrompt = false
+    @State private var accessibilityGranted = AccessibilityAlertHelper.isAccessibilityGranted
 
     var body: some View {
         VStack {
@@ -37,12 +39,30 @@ struct SettingsView: View {
                     ExcludedAppsSettingsView()
                 }
 
-                Tab("About", systemImage: "info.circle", value: 3) {
+                Tab("Accessibility", systemImage: accessibilityGranted ? "checkmark.shield" : "xmark.shield", value: 3) {
+                    AccessibilitySettingsView(accessibilityGranted: $accessibilityGranted)
+                }
+
+                Tab("About", systemImage: "info.circle", value: 4) {
                     AboutSettingsView(updater: updater)
                 }
             }
         }
         .frame(width: 500, height: 500)
+        .onAppear {
+            if !settingsManager.hasShownAutoStartPrompt {
+                settingsManager.hasShownAutoStartPrompt = true
+                showAutoStartPrompt = true
+            }
+        }
+        .alert("Launch at Login", isPresented: $showAutoStartPrompt) {
+            Button("Enable") {
+                settingsManager.startAtLogin = true
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("Would you like StoneClipboarder to start automatically when you log in?\n\nYou can change this later in Settings > Accessibility or in macOS System Settings > Login Items.")
+        }
     }
 
     @ViewBuilder
@@ -96,6 +116,18 @@ struct SettingsView: View {
             }
             
             Section("Memory Optimization") {
+                HStack(spacing: 4) {
+                    Text("Items:")
+                        .foregroundColor(.secondary)
+                    Text("\(cbViewModel.totalItemCount) on disk")
+                        .foregroundColor(.secondary)
+                    Text("·")
+                        .foregroundColor(.secondary.opacity(0.6))
+                    Text("\(cbViewModel.inMemoryItemCount) in memory")
+                        .foregroundColor(.secondary)
+                }
+                .font(.caption)
+
                 Toggle("Auto-cleanup old items", isOn: $settingsManager.enableAutoCleanup)
                     .help("Automatically remove old clipboard items to maintain performance")
 
@@ -110,10 +142,20 @@ struct SettingsView: View {
                     .help("Maximum number of items to keep before auto-cleanup")
                 }
 
-                Button("Clean Up Now") {
-                    showingCleanupAlert = true
+                HStack {
+                    Button("Clean Up Now") {
+                        activeAlert = .cleanup
+                    }
+                    .help("Manually trigger cleanup to remove old items and free memory")
+
+                    Spacer()
+
+                    Button("Delete All") {
+                        activeAlert = .deleteAll
+                    }
+                    .foregroundColor(.red)
+                    .help("Delete all clipboard history items permanently")
                 }
-                .help("Manually trigger cleanup to remove old items and free memory")
             }
 
             Section("Menu Bar Display") {
@@ -182,16 +224,11 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .alert("Clean Up Clipboard History", isPresented: $showingCleanupAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clean Up", role: .destructive) {
-                cbViewModel.performManualCleanup()
-            }
-        } message: {
-            Text(
-                "This will remove old items beyond the maximum limit and free up memory. Favorites will be preserved."
-            )
-        }
+        .clipboardAlert($activeAlert, onCleanup: {
+            cbViewModel.performManualCleanup()
+        }, onDeleteAll: {
+            cbViewModel.deleteAllItems()
+        })
     }
 }
 //#Preview {

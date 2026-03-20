@@ -120,7 +120,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
         // Create a panel that captures focus without activating the main app
         let panel = KeyCapturingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 430),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -399,7 +399,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         guard position.x != 0 || position.y != 0 else { return false }
 
         // Check if position is completely within screen bounds (no corner hanging)
-        let windowSize = NSSize(width: 500, height: 400)
+        let windowSize = NSSize(width: 500, height: 430)
         let windowRect = NSRect(origin: position, size: windowSize)
 
         return screenFrame.contains(windowRect)

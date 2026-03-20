@@ -15,6 +15,7 @@ struct ActionsBottomButtonView: View {
     @Binding var editedText: String
     @Binding var isEditing: Bool
     @Binding var hasChanges: Bool
+    @Binding var selectedItem: CBItem?
     
     // Computed property to determine if Preview button should be shown
     private var shouldShowPreviewButton: Bool {
@@ -93,6 +94,7 @@ struct ActionsBottomButtonView: View {
             
             Button("Delete", role: .destructive) {
                 withAnimation {
+                    selectedItem = nil
                     cbViewModel.deleteItem(item)
                 }
             }

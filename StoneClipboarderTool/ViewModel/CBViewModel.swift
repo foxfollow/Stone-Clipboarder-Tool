@@ -15,6 +15,9 @@ class CBViewModel: ObservableObject {
     @Published var items: [CBItem] = []
     @Published var selectedItem: CBItem?
     @Published var isLoadingMore = false
+    @Published var totalItemCount: Int = 0
+
+    var inMemoryItemCount: Int { items.count }
 
     private var _modelContext: ModelContext?
 
@@ -99,6 +102,7 @@ class CBViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.items = uniqueItems
                     self.currentFetchOffset = uniqueItems.count
+                    self.refreshItemCounts()
                 }
 
                 // Track access times for memory management
@@ -134,6 +138,7 @@ class CBViewModel: ObservableObject {
                         self.items.append(contentsOf: uniqueNewItems)
                         self.isLoadingMore = false
                         self.currentFetchOffset += newItems.count
+                        self.refreshItemCounts()
 
                         // Track access times for memory management
                         for item in uniqueNewItems {
@@ -167,29 +172,58 @@ class CBViewModel: ObservableObject {
 
     func deleteItem(_ item: CBItem) {
         guard let modelContext = _modelContext else { return }
-        modelContext.delete(item)
 
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to delete item", category: "SwiftData", error: error)
+        // Clear selection if this item is selected
+        if selectedItem?.id == item.id {
+            selectedItem = nil
+            NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+        }
+
+        // Remove from published array so SwiftUI drops the view
+        items.removeAll { $0.id == item.id }
+
+        // Defer context deletion to next run loop so SwiftUI finishes layout first
+        DispatchQueue.main.async { [weak self] in
+            modelContext.delete(item)
+            do {
+                try modelContext.save()
+                self?.refreshItemCounts()
+            } catch {
+                modelContext.rollback()
+                ErrorLogger.shared.log("Failed to delete item", category: "SwiftData", error: error)
+                self?.fetchItems(reset: true)
+            }
         }
     }
 
-    func deleteItems(at offsets: IndexSet, from items: [CBItem]) {
+    func deleteItems(at offsets: IndexSet, from sourceItems: [CBItem]) {
         guard let modelContext = _modelContext else { return }
-        for index in offsets {
-            modelContext.delete(items[index])
+
+        let idsToDelete = Set(offsets.map { sourceItems[$0].id })
+        let itemsToDelete = offsets.map { sourceItems[$0] }
+
+        // Clear selection if deleted item is selected
+        if let sel = selectedItem, idsToDelete.contains(sel.id) {
+            selectedItem = nil
+            NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
         }
 
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to delete items", category: "SwiftData", error: error)
+        // Remove from published array so SwiftUI drops views
+        items.removeAll { idsToDelete.contains($0.id) }
+
+        // Defer context deletion to next run loop
+        DispatchQueue.main.async { [weak self] in
+            for item in itemsToDelete {
+                modelContext.delete(item)
+            }
+            do {
+                try modelContext.save()
+                self?.refreshItemCounts()
+            } catch {
+                modelContext.rollback()
+                ErrorLogger.shared.log("Failed to delete items", category: "SwiftData", error: error)
+                self?.fetchItems(reset: true)
+            }
         }
     }
 
@@ -528,16 +562,28 @@ class CBViewModel: ObservableObject {
     func deleteAllItems() {
         guard let modelContext = _modelContext else { return }
 
-        for item in items {
-            modelContext.delete(item)
-        }
+        // 1. Clear all UI state synchronously so SwiftUI stops referencing items
+        selectedItem = nil
+        items = []
+        NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
 
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to delete all items", category: "SwiftData", error: error)
+        // 2. Defer actual context deletion to the NEXT run loop iteration.
+        //    This gives SwiftUI a full layout pass to drop views that reference
+        //    CBItem objects. Deleting in the same pass causes "backing data
+        //    detached" crashes because views still hold stale references.
+        DispatchQueue.main.async { [weak self] in
+            do {
+                let allItems = try modelContext.fetch(FetchDescriptor<CBItem>())
+                for item in allItems {
+                    modelContext.delete(item)
+                }
+                try modelContext.save()
+                self?.refreshItemCounts()
+            } catch {
+                modelContext.rollback()
+                ErrorLogger.shared.log("Failed to delete all items", category: "SwiftData", error: error)
+                self?.fetchItems(reset: true)
+            }
         }
     }
 
@@ -562,16 +608,26 @@ class CBViewModel: ObservableObject {
         fetchItems()
     }
 
+    func refreshItemCounts() {
+        guard let modelContext = _modelContext else { return }
+        do {
+            totalItemCount = try modelContext.fetchCount(FetchDescriptor<CBItem>())
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch item count", category: "SwiftData", error: error)
+        }
+    }
+
     func performManualCleanup() {
         guard let settingsManager = settingsManager else { return }
 
-        if settingsManager.enableAutoCleanup {
-            performItemCountCleanup()
-        }
+        // Always enforce maxItemsToKeep during manual cleanup, regardless of toggle
+        performItemCountCleanupCore(maxItems: settingsManager.maxItemsToKeep)
 
-        if settingsManager.enableMemoryCleanup {
-            performMemoryCleanup()
-        }
+        // Always run memory cleanup during manual cleanup, regardless of toggle
+        performMemoryCleanupCore()
+
+        // Reset in-memory items to only the most recent batch
+        fetchItems(reset: true)
     }
 
     // MARK: - Memory Management
@@ -597,12 +653,17 @@ class CBViewModel: ObservableObject {
             settingsManager.enableMemoryCleanup
         else { return }
 
+        performMemoryCleanupCore()
+    }
+
+    private func performMemoryCleanupCore() {
+        guard let settingsManager = settingsManager else { return }
+
         let now = Date()
         let maxInactiveTime = TimeInterval(settingsManager.maxInactiveTime * 60)
         var itemsToCleanup: [CBItem] = []
 
         for item in items {
-            // Skip favorites - never cleanup their memory
             if item.isFavorite {
                 continue
             }
@@ -650,17 +711,22 @@ class CBViewModel: ObservableObject {
     }
 
     private func performItemCountCleanup() {
-        guard let modelContext = _modelContext,
-            let settingsManager = settingsManager,
+        guard let settingsManager = settingsManager,
             settingsManager.enableAutoCleanup
         else { return }
+
+        performItemCountCleanupCore(maxItems: settingsManager.maxItemsToKeep)
+    }
+
+    private func performItemCountCleanupCore(maxItems: Int) {
+        guard let modelContext = _modelContext else { return }
 
         let countDescriptor = FetchDescriptor<CBItem>()
         do {
             let totalCount = try modelContext.fetchCount(countDescriptor)
 
-            if totalCount > settingsManager.maxItemsToKeep {
-                let itemsToDelete = totalCount - settingsManager.maxItemsToKeep
+            if totalCount > maxItems {
+                let itemsToDelete = totalCount - maxItems
                 var oldItemsDescriptor = FetchDescriptor<CBItem>(
                     sortBy: [SortDescriptor(\.timestamp, order: .forward)]
                 )
@@ -675,11 +741,10 @@ class CBViewModel: ObservableObject {
 
                 try modelContext.save()
 
-                // Refresh items after cleanup
                 fetchItems(reset: true)
 
                 print(
-                    "Auto-cleanup: Removed \(nonFavoriteOldItems.count) old items, keeping under \(settingsManager.maxItemsToKeep) limit"
+                    "Cleanup: Removed \(nonFavoriteOldItems.count) old items, keeping under \(maxItems) limit"
                 )
             }
         } catch {

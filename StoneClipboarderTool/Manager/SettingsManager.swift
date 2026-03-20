@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import ServiceManagement
 
 class SettingsManager: ObservableObject {
     @Published var showInMenubar: Bool {
@@ -116,6 +117,35 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @Published var startAtLogin: Bool {
+        didSet {
+            UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin")
+            updateLoginItem()
+        }
+    }
+
+    @Published var hasShownAutoStartPrompt: Bool {
+        didSet {
+            UserDefaults.standard.set(hasShownAutoStartPrompt, forKey: "hasShownAutoStartPrompt")
+        }
+    }
+
+    func updateLoginItem() {
+        do {
+            if startAtLogin {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            print("Failed to update login item: \(error.localizedDescription)")
+        }
+    }
+
+    var loginItemStatus: SMAppService.Status {
+        SMAppService.mainApp.status
+    }
+
     init() {
         self.showInMenubar = UserDefaults.standard.bool(forKey: "showInMenubar")
         self.showMainWindow = UserDefaults.standard.bool(forKey: "showMainWindow")
@@ -153,6 +183,8 @@ class SettingsManager: ObservableObject {
         }
 
         self.enableOCROptionKey = UserDefaults.standard.object(forKey: "enableOCROptionKey") as? Bool ?? true
+        self.startAtLogin = UserDefaults.standard.object(forKey: "startAtLogin") as? Bool ?? false
+        self.hasShownAutoStartPrompt = UserDefaults.standard.object(forKey: "hasShownAutoStartPrompt") as? Bool ?? false
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = UserDefaults.standard.string(forKey: "clipboardCaptureMode"),

@@ -19,6 +19,7 @@ struct QuickPickerView: View {
     @State private var isLoadingItems = false
     @State private var hasMoreItems = true
     @State private var searchTask: Task<Void, Never>?
+    @State private var favoriteCount: Int = 0
     @FocusState private var isSearchFocused: Bool
 
     let onClose: () -> Void
@@ -171,8 +172,9 @@ struct QuickPickerView: View {
                     viewModel.openInTextEdit(item)
                 }
             )
+            footerBar
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 500, height: 430)
         .background(Color(NSColor.windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
@@ -182,6 +184,7 @@ struct QuickPickerView: View {
         .clipped()
         .onAppear {
             loadInitialItems()
+            loadFavoriteCount()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isSearchFocused = true
             }
@@ -204,12 +207,13 @@ struct QuickPickerView: View {
 
     @ViewBuilder
     private var searchBar: some View {
-        HStack {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
+                .foregroundColor(.accentColor)
+                .font(.system(size: 14, weight: .medium))
 
             TextField("Search clipboard...", text: $searchText)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
                 .focused($isSearchFocused)
                 .onSubmit {
                     performAction()
@@ -223,8 +227,83 @@ struct QuickPickerView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    @ViewBuilder
+    private var footerBar: some View {
+        Divider()
+        HStack(spacing: 0) {
+            // Left side: item counts
+            HStack(spacing: 4) {
+                Text("\(viewModel.totalItemCount) on disk")
+                Text("·")
+                Text("\(viewModel.inMemoryItemCount) in memory")
+                if favoriteCount > 0 {
+                    Text("·")
+                    Text("\(favoriteCount)")
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.red)
+                }
+            }
+            .font(.system(size: 10))
+            .foregroundStyle(.tertiary)
+
+            Spacer()
+
+            // Right side: keyboard shortcut hints
+            HStack(spacing: 6) {
+                shortcutBadge("ESC", label: "Close")
+                shortcutBadge("⏎", label: "Paste")
+
+                if settingsManager?.quickLookMode != .disabled {
+                    let key = settingsManager?.quickLookTriggerKey ?? .space
+                    shortcutBadge(key == .space ? "⎵" : "→", label: "Preview")
+                }
+
+                if settingsManager?.enableOCROptionKey == true {
+                    shortcutBadge("⌥⏎", label: "OCR")
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    private func shortcutBadge(_ key: String, label: String) -> some View {
+        HStack(spacing: 3) {
+            Text(key)
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+            Text(label)
+                .font(.system(size: 9))
+        }
+        .foregroundStyle(.tertiary)
+    }
+
+    private func loadFavoriteCount() {
+        guard let modelContext = viewModel.modelContext else { return }
+        let descriptor = FetchDescriptor<CBItem>(
+            predicate: #Predicate<CBItem> { $0.isFavorite }
+        )
+        do {
+            favoriteCount = try modelContext.fetchCount(descriptor)
+        } catch {
+            favoriteCount = 0
+        }
     }
 
     private func performAction() {
@@ -347,29 +426,8 @@ struct QuickPickerView: View {
     }
 
     private func simulatePaste() {
-        // Check accessibility permissions
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
-        if !AXIsProcessTrustedWithOptions(options) {
-            DispatchQueue.main.async {
-                // Ensure the app is active and frontmost so the alert appears on top
-                NSApp.activate(ignoringOtherApps: true)
-                
-                let alert = NSAlert()
-                alert.messageText = "Accessibility Access Required"
-                alert.informativeText = "To paste automatically, StoneClipboarder needs accessibility permissions.\n\nPlease grant access in System Settings > Privacy & Security > Accessibility."
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "Open Settings")
-                alert.addButton(withTitle: "Cancel")
-                
-                // Force alert window to be above other windows
-                alert.window.level = .floating
-                
-                if alert.runModal() == .alertFirstButtonReturn {
-                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-            }
+        if !AccessibilityAlertHelper.isAccessibilityGranted {
+            AccessibilityAlertHelper.showAccessibilityAlert()
             return
         }
 
