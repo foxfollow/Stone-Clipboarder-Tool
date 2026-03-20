@@ -12,6 +12,15 @@ struct QPItemRow: View {
     let item: CBItem
     let isSelected: Bool
 
+    private var typeLabel: String {
+        switch item.itemType {
+        case .text: return "Text"
+        case .image: return "Image"
+        case .file: return "File"
+        case .combined: return "Combined"
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             // Icon or thumbnail
@@ -24,8 +33,16 @@ struct QPItemRow: View {
                     .lineLimit(2)
                     .foregroundStyle(.primary)
 
-                HStack {
+                HStack(spacing: 4) {
                     Text(item.timestamp, style: .relative)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    Text("·")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+
+                    Text(typeLabel)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
@@ -40,16 +57,29 @@ struct QPItemRow: View {
             }
 
             Spacer()
+
+            // Paste hint on selected row
+            if isSelected {
+                Text("⏎")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.primary.opacity(0.08))
+                    )
+            }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
         )
     }
 
@@ -68,12 +98,20 @@ struct QPItemRow: View {
                 }
             }
             .frame(width: 40, height: 40)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+            )
         } else {
             Image(systemName: item.itemType.sfSybmolName)
-                .font(.title2)
+                .font(.system(size: 18))
                 .foregroundStyle(item.itemType.sybmolColor)
                 .frame(width: 40, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(item.itemType.sybmolColor.opacity(0.12))
+                )
         }
     }
 }
