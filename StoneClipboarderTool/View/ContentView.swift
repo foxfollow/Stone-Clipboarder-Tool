@@ -36,7 +36,7 @@ struct ContentView: View {
     @EnvironmentObject var hotkeyManager: HotkeyManager
 
     @State private var editingMode: Bool = false
-    @State private var showingDeleteAllAlert = false
+    @State private var activeAlert: ClipboardAlert?
     @State private var selectedItem: CBItem? = nil
     @State private var selectedTab: ClipboardTab = .recent
     @State private var searchText: String = ""
@@ -82,21 +82,17 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            VStack(spacing: 0) {
-                // Tab picker
-                ClipboardHeader(selectedTab: $selectedTab, searchText: $searchText)
-                
-
-                // Content based on selected tab
-                Group {
-                    switch selectedTab {
-                    case .recent:
-                        recentItemsList
-                    case .favorites:
-                        favoritesItemsList
-                    }
+            Group {
+                switch selectedTab {
+                case .recent:
+                    recentItemsList
+                case .favorites:
+                    favoritesItemsList
                 }
-                .clipped()
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                ClipboardHeader(selectedTab: $selectedTab, searchText: $searchText)
+                    .background(.bar)
             }
             .navigationSplitViewColumnWidth(
                 min: 180,
@@ -132,16 +128,9 @@ struct ContentView: View {
                     }
                 }
             }
-            .alert("Delete All Clipboard History", isPresented: $showingDeleteAllAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete All", role: .destructive) {
-                    deleteAllItems()
-                }
-            } message: {
-                Text(
-                    "This will permanently delete all clipboard history items. This action cannot be undone."
-                )
-            }
+            .clipboardAlert($activeAlert, onCleanup: {}, onDeleteAll: {
+                deleteAllItems()
+            })
         } detail: {
             if let selectedItem = selectedItem {
                 ZoomableDetailView(item: selectedItem, selectedItem: $selectedItem)
@@ -159,6 +148,9 @@ struct ContentView: View {
                 selectedItem = item
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .init("ClearClipboardSelection"))) { _ in
+            selectedItem = nil
+        }
         .onAppear {
             setupWindowBehavior()
         }
@@ -169,7 +161,7 @@ struct ContentView: View {
         List {
             if editingMode {
                 Button("Delete All", role: .destructive) {
-                    showingDeleteAllAlert = true
+                    activeAlert = .deleteAll
                 }
                 .foregroundStyle(.red)
             }

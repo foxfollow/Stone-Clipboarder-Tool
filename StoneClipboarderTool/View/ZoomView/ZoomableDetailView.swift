@@ -19,7 +19,12 @@ struct ZoomableDetailView: View {
     @State private var hasChanges = false
     @State private var shouldFitToWindow = false
     
+    private var isItemDeleted: Bool {
+        item.modelContext == nil
+    }
+
     private var itemTypeDisplayName: String {
+        guard !isItemDeleted else { return "" }
         switch item.itemType {
         case .text:
             return "Text"
@@ -31,8 +36,13 @@ struct ZoomableDetailView: View {
             return "Text + Image"
         }
     }
-    
+
     var body: some View {
+        if isItemDeleted {
+            Text("Select an item")
+                .foregroundStyle(.secondary)
+                .onAppear { selectedItem = nil }
+        } else {
         VStack(alignment: .leading, spacing: 16) {
             // Header with timestamp and controls
             HStack {
@@ -188,6 +198,7 @@ struct ZoomableDetailView: View {
             isEditing = false
             hasChanges = false
         }
+        } // else (item not deleted)
     }
     
     @ViewBuilder
