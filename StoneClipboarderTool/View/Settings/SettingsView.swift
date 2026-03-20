@@ -22,6 +22,7 @@ struct SettingsView: View {
     @State private var selectedTab = 0
     @State private var activeAlert: ClipboardAlert?
     @State private var showAutoStartPrompt = false
+    @State private var accessibilityGranted = AccessibilityAlertHelper.isAccessibilityGranted
 
     var body: some View {
         VStack {
@@ -38,8 +39,8 @@ struct SettingsView: View {
                     ExcludedAppsSettingsView()
                 }
 
-                Tab("Accessibility", systemImage: "lock.shield", value: 3) {
-                    AccessibilitySettingsView()
+                Tab("Accessibility", systemImage: accessibilityGranted ? "checkmark.shield" : "xmark.shield", value: 3) {
+                    AccessibilitySettingsView(accessibilityGranted: $accessibilityGranted)
                 }
 
                 Tab("About", systemImage: "info.circle", value: 4) {

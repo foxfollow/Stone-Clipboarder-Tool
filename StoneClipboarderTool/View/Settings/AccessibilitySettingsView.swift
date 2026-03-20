@@ -11,7 +11,7 @@ import SwiftUI
 struct AccessibilitySettingsView: View {
     @EnvironmentObject var settingsManager: SettingsManager
 
-    @State private var accessibilityGranted = false
+    @Binding var accessibilityGranted: Bool
     @State private var refreshTimer: Timer?
 
     var body: some View {
