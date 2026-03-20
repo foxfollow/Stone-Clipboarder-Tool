@@ -11,6 +11,27 @@
         <language>en</language>
 
     <item>
+        <title>Version 1.5.2</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <sparkle:version>14</sparkle:version>
+        <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>Version 1.5.2</h2>
+            <p>See release notes on GitHub for details.</p>
+        ]]></description>
+        <pubDate>Fri, 20 Mar 2026 13:29:52 +0000</pubDate>
+        <enclosure
+            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.5.2/StoneClipboarderTool.zip"
+            sparkle:version="14"
+            sparkle:shortVersionString="1.5.2"
+            sparkle:edSignature="op7hyVkCIt0JMbYiLRDi6sip3Is19/If3W9S5DvKQ2VWoHVJgiw261gRyKgW1Ix69jLQp3itFh2li3lD+NOKBA=="
+            length="4525426"
+            type="application/octet-stream"
+        />
+    </item>
+
+    <item>
         <title>Version 1.4.0</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
         <sparkle:version>13</sparkle:version>
