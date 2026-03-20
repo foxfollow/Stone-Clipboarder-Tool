@@ -21,6 +21,7 @@ struct SettingsView: View {
 
     @State private var selectedTab = 0
     @State private var activeAlert: ClipboardAlert?
+    @State private var showAutoStartPrompt = false
 
     var body: some View {
         VStack {
@@ -37,12 +38,30 @@ struct SettingsView: View {
                     ExcludedAppsSettingsView()
                 }
 
-                Tab("About", systemImage: "info.circle", value: 3) {
+                Tab("Accessibility", systemImage: "lock.shield", value: 3) {
+                    AccessibilitySettingsView()
+                }
+
+                Tab("About", systemImage: "info.circle", value: 4) {
                     AboutSettingsView(updater: updater)
                 }
             }
         }
         .frame(width: 500, height: 500)
+        .onAppear {
+            if !settingsManager.hasShownAutoStartPrompt {
+                settingsManager.hasShownAutoStartPrompt = true
+                showAutoStartPrompt = true
+            }
+        }
+        .alert("Launch at Login", isPresented: $showAutoStartPrompt) {
+            Button("Enable") {
+                settingsManager.startAtLogin = true
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("Would you like StoneClipboarder to start automatically when you log in?\n\nYou can change this later in Settings > Accessibility or in macOS System Settings > Login Items.")
+        }
     }
 
     @ViewBuilder

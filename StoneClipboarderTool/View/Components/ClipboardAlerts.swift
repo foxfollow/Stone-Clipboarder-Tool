@@ -5,6 +5,7 @@
 //  Created by Claude on 20.03.2026.
 //
 
+import AppKit
 import SwiftUI
 
 enum ClipboardAlert: Identifiable {
@@ -85,5 +86,40 @@ extension View {
             onCleanup: onCleanup,
             onDeleteAll: onDeleteAll
         ))
+    }
+}
+
+// MARK: - Accessibility Permission Alert
+
+enum AccessibilityAlertHelper {
+    static func showAccessibilityAlert() {
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+
+            let alert = NSAlert()
+            alert.messageText = "Accessibility Access Required"
+            alert.informativeText = "To paste automatically, StoneClipboarder needs accessibility permissions.\n\nPlease grant access in System Settings > Privacy & Security > Accessibility."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "Cancel")
+
+            alert.window.level = .floating
+
+            if alert.runModal() == .alertFirstButtonReturn {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+    }
+
+    static var isAccessibilityGranted: Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+
+    static func requestAccessibilityPermission() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(options)
     }
 }
