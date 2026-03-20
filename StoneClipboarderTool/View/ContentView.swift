@@ -96,6 +96,7 @@ struct ContentView: View {
                         favoritesItemsList
                     }
                 }
+                .clipped()
             }
             .navigationSplitViewColumnWidth(
                 min: 180,
@@ -215,6 +216,7 @@ struct ContentView: View {
             }
         }
         .listStyle(.sidebar)
+        .contentMargins(.top, 4, for: .scrollContent)
         .animation(.easeInOut(duration: 0.2), value: filteredRecentItems.count)
     }
 
@@ -250,6 +252,7 @@ struct ContentView: View {
             }
         }
         .listStyle(.sidebar)
+        .contentMargins(.top, 4, for: .scrollContent)
         .animation(.easeInOut(duration: 0.3), value: filteredFavoriteItems.count)
     }
 
