@@ -11,7 +11,8 @@ import AppKit
 struct ZoomableDetailView: View {
     @EnvironmentObject var cbViewModel: CBViewModel
     let item: CBItem
-    
+    @Binding var selectedItem: CBItem?
+
     @State private var zoomScale: CGFloat = 1.0
     @State private var isEditing = false
     @State private var editedText: String = ""
@@ -170,7 +171,8 @@ struct ZoomableDetailView: View {
                 item: item,
                 editedText: $editedText,
                 isEditing: $isEditing,
-                hasChanges: $hasChanges
+                hasChanges: $hasChanges,
+                selectedItem: $selectedItem
             )
         }
         .padding()

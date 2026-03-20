@@ -167,29 +167,40 @@ class CBViewModel: ObservableObject {
 
     func deleteItem(_ item: CBItem) {
         guard let modelContext = _modelContext else { return }
+
+        // Remove from published array first so SwiftUI drops the view
+        // before SwiftData detaches the backing data
+        items.removeAll { $0.id == item.id }
         modelContext.delete(item)
 
         do {
             try modelContext.save()
-            fetchItems(reset: true)
         } catch {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to delete item", category: "SwiftData", error: error)
+            fetchItems(reset: true)
         }
     }
 
-    func deleteItems(at offsets: IndexSet, from items: [CBItem]) {
+    func deleteItems(at offsets: IndexSet, from sourceItems: [CBItem]) {
         guard let modelContext = _modelContext else { return }
+
+        let idsToDelete = Set(offsets.map { sourceItems[$0].id })
+
+        // Remove from published array first so SwiftUI drops the views
+        // before SwiftData detaches the backing data
+        items.removeAll { idsToDelete.contains($0.id) }
+
         for index in offsets {
-            modelContext.delete(items[index])
+            modelContext.delete(sourceItems[index])
         }
 
         do {
             try modelContext.save()
-            fetchItems(reset: true)
         } catch {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to delete items", category: "SwiftData", error: error)
+            fetchItems(reset: true)
         }
     }
 
@@ -528,16 +539,22 @@ class CBViewModel: ObservableObject {
     func deleteAllItems() {
         guard let modelContext = _modelContext else { return }
 
-        for item in items {
+        // Capture items before clearing the published array.
+        // Clearing first ensures SwiftUI removes views before
+        // SwiftData detaches the backing data (prevents crash).
+        let itemsToDelete = items
+        items = []
+
+        for item in itemsToDelete {
             modelContext.delete(item)
         }
 
         do {
             try modelContext.save()
-            fetchItems(reset: true)
         } catch {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to delete all items", category: "SwiftData", error: error)
+            fetchItems(reset: true)
         }
     }
 

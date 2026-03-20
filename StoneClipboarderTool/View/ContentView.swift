@@ -144,7 +144,7 @@ struct ContentView: View {
             }
         } detail: {
             if let selectedItem = selectedItem {
-                ZoomableDetailView(item: selectedItem)
+                ZoomableDetailView(item: selectedItem, selectedItem: $selectedItem)
                     .environmentObject(cbViewModel)
             } else {
                 Text("Select an item")
@@ -263,14 +263,19 @@ struct ContentView: View {
     }
 
     private func deleteAllItems() {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        selectedItem = nil
+        editingMode = false
+        withTransaction(Transaction(animation: nil)) {
             cbViewModel.deleteAllItems()
-            editingMode = false
         }
     }
 
     private func deleteItems(offsets: IndexSet) {
         withAnimation(.easeInOut(duration: 0.3)) {
+            let itemsToDelete = offsets.map { filteredRecentItems[$0] }
+            if let selected = selectedItem, itemsToDelete.contains(where: { $0.id == selected.id }) {
+                selectedItem = nil
+            }
             cbViewModel.deleteItems(at: offsets, from: cbViewModel.items)
         }
     }
@@ -330,7 +335,7 @@ struct DetailedCardView: View {
     var body: some View {
         HStack {
             if editingMode {
-                DeleteButtonView(item: item)
+                DeleteButtonView(item: item, selectedItem: $selectedItem)
                     .transition(.scale.combined(with: .opacity))
             }
 
