@@ -45,12 +45,12 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.4.0
-- **🛡️ Database Safety**: Separated storage for clipboard history and settings with crash protection and automatic recovery
-- **✨ Quick Look Preview**: Native macOS Quick Look support — press Space or Arrow Right to preview clipboard items
-- **👁️ OCR in QuickPicker**: Option+Enter on an image extracts text via Apple Vision and pastes it
-- **🖱️ Context Menu**: Right-click items in QuickPicker to open in Preview or TextEdit
-- **📝 Error Logging**: Optional debug logging setting
+### 🆕 New in Version 1.5.x
+- **🛡️ Accessibility Settings Tab**: New settings tab showing accessibility permission status with direct link to System Settings
+- **🚀 Launch at Login**: Toggle auto-start at login via SMAppService, with first-launch prompt
+- **🎨 Improved Quick Picker**: Better item row layout, footer bar with keyboard shortcut hints, pagination and search improvements
+- **🧹 Unified Alerts**: Consolidated clipboard alerts into a shared component for consistency
+- **🐛 Bug Fixes**: Fixed GUI layout issue (#5), fixed deleted items still visible after deletion (#6), prevented crashes on delete
 
 [View Full Version History](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)
 

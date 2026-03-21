@@ -17,8 +17,18 @@
         <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
         <description
         ><![CDATA[
-            <h2>Version 1.5.2</h2>
-            <p>See release notes on GitHub for details.</p>
+            <h2>StoneClipboarderTool 1.5.2</h2>
+            <ul>
+                <li>🛡️ NEW: Accessibility settings tab — view permission status and open System Settings directly</li>
+                <li>🚀 NEW: Launch at Login toggle using SMAppService with first-launch prompt</li>
+                <li>🎨 NEW: Dynamic tab icon reflects accessibility permission status</li>
+                <li>🎨 IMPROVED: Quick Picker item row layout with footer bar and keyboard shortcut hints</li>
+                <li>🧹 IMPROVED: Unified clipboard alerts into a shared component</li>
+                <li>🛡️ IMPROVED: Stabilized deletion logic — items properly removed from UI and database</li>
+                <li>🐛 FIXED: GUI layout issue (#5)</li>
+                <li>🐛 FIXED: Deleted items still visible after deletion (#6)</li>
+                <li>🐛 FIXED: Prevented crashes on delete operations</li>
+            </ul>
         ]]></description>
         <pubDate>Fri, 20 Mar 2026 13:29:52 +0000</pubDate>
         <enclosure
