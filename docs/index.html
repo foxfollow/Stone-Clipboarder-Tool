@@ -1,901 +1,588 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <meta name="description"
-        content="Free, open-source clipboard manager for macOS. Save your entire copy-paste history, access it instantly with global hotkeys or Spotlight-like Quick Picker. Features OCR text recognition, smart favorites, and 100% local privacy.">
+        content="Free, open-source clipboard manager for macOS. Save your entire copy-paste history, access it instantly with global hotkeys or Spotlight-like Quick Picker. Features OCR text recognition, smart favorites, and 100% local privacy." />
     <meta name="keywords"
-        content="clipboard manager, macOS, clipboard history, copy paste manager, clipboard organizer, productivity tool, free, open source">
+        content="clipboard manager, macOS, clipboard history, copy paste manager, clipboard organizer, productivity tool, free, open source" />
     <title>Stone Clipboarder Tool – Free Clipboard Manager for macOS</title>
-    <link rel="icon" type="image/png" href="resources/index/StoneClipboarderIcon2-iOS-Default-64x64.png">
-    <link rel="apple-touch-icon" href="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png">
+    <link rel="icon" type="image/png" href="resources/index/StoneClipboarderIcon2-iOS-Default-64x64.png" />
+    <link rel="apple-touch-icon" href="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        dark: { 900: '#0a0a0a', 800: '#171717', 700: '#262626', 600: '#404040' },
+                        primary: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* Light theme (default) */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-            color: #333;
-            background-color: #ffffff;
-            transition: background-color 0.3s ease, color 0.3s ease;
+            font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
+        .glass-nav {
+            background: rgba(23, 23, 23, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .app-icon {
-            width: 128px;
-            height: 128px;
-            background-image: url('resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png');
-            background-size: cover;
-            background-position: center;
-            border-radius: 22px;
-            margin: 0 auto 20px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            transition: box-shadow 0.3s ease;
+        .card-gradient {
+            background: linear-gradient(145deg, rgba(38, 38, 38, 0.6) 0%, rgba(23, 23, 23, 0.8) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .download-btn {
-            background: #007AFF;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            display: inline-block;
-            margin: 10px;
-            transition: background 0.2s ease;
-        }
+        /* Anchor offset for fixed nav */
+        [id] { scroll-margin-top: 80px; }
 
-        .download-btn:hover {
-            background: #0056CC;
-        }
-
-        .feature-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
-        }
-
-        .feature {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #007AFF;
-            transition: background-color 0.3s ease;
-        }
-
-        .screenshots {
-            margin: 40px 0;
-            text-align: center;
-        }
-
-        .screenshots h2 {
-            margin-bottom: 30px;
-            color: #333;
-            transition: color 0.3s ease;
-        }
-
-        .screenshot-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin: 30px 0;
-        }
-
-        .screenshot {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 12px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .screenshot:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        }
-
-        .screenshot img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .screenshot img:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .screenshot p {
-            margin: 0;
-            color: #666;
-            font-size: 14px;
-            line-height: 1.4;
-            transition: color 0.3s ease;
-        }
-
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal.show {
-            display: flex;
-            opacity: 1;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .modal-content {
-            position: relative;
-            max-width: 90vw;
-            max-height: 90vh;
-            transform: scale(0.8);
-            transition: transform 0.3s ease;
-        }
-
-        .modal.show .modal-content {
-            transform: scale(1);
-        }
-
-        .modal-image {
-            width: 100%;
-            height: auto;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-close {
-            position: absolute;
-            top: -15px;
-            right: -15px;
-            background: #ff4757;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
+        /* Screenshot card */
+        .screenshot-card {
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
-        }
-
-        .modal-close:hover {
-            background: #ff3838;
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(255, 71, 87, 0.6);
-        }
-
-        .modal-caption {
-            position: absolute;
-            bottom: -50px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 16px;
-            text-align: center;
-            backdrop-filter: blur(10px);
-            white-space: nowrap;
-        }
-
-        /* Modal keyboard hint */
-        .modal-hint {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            backdrop-filter: blur(10px);
-            opacity: 0.8;
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            color: #666;
-            transition: color 0.3s ease, border-color 0.3s ease;
-        }
-
-        .update-info {
-            background: #e8f4fd;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            transition: background-color 0.3s ease;
-        }
-
-        .install-box {
-            background: #f1f3f5;
             padding: 20px;
-            border-radius: 12px;
-            text-align: left;
-            margin: 40px 0;
-            border-left: 5px solid #007AFF;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .screenshot-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 35px 60px -12px rgba(0, 0, 0, 0.6);
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .screenshot-card img {
+            transition: transform 0.4s ease;
+            border-radius: 10px;
+            max-height: 380px;
+            width: auto;
+            max-width: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.3));
+        }
+        .screenshot-card:hover img {
+            transform: scale(1.03);
         }
 
-        .install-box h3 {
-            margin-top: 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        /* Light theme overrides */
+        html:not(.dark) body { background-color: #ffffff; color: #1a1a1a; }
+        html:not(.dark) .glass-nav { background: rgba(255, 255, 255, 0.85); border-bottom-color: rgba(0, 0, 0, 0.1); }
+        html:not(.dark) .glass-nav .nav-brand { color: #1a1a1a; }
+        html:not(.dark) .glass-nav .nav-link { color: #555; }
+        html:not(.dark) .glass-nav .nav-link:hover { color: #000 !important; }
+        html:not(.dark) .glass-nav .nav-btn { border-color: rgba(0,0,0,0.15); background: rgba(0,0,0,0.05); color: #555; }
+        html:not(.dark) .glass-nav .nav-btn:hover { background: rgba(0,0,0,0.1); }
+        html:not(.dark) .hero-title { background: linear-gradient(to bottom, #1a1a1a, #555) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+        html:not(.dark) .hero-sub { color: #666 !important; }
+        html:not(.dark) .hero-badge { border-color: rgba(59,130,246,0.3); background: rgba(59,130,246,0.08); }
+        html:not(.dark) .btn-secondary { border-color: rgba(0,0,0,0.15) !important; background: rgba(0,0,0,0.05) !important; color: #1a1a1a !important; }
+        html:not(.dark) .btn-secondary:hover { background: rgba(0,0,0,0.1) !important; }
+        html:not(.dark) .sub-link { color: #888 !important; }
+        html:not(.dark) .sub-link:hover { color: #1a1a1a !important; }
+        html:not(.dark) .section-title { color: #1a1a1a; }
+        html:not(.dark) .section-sub { color: #666; }
+        html:not(.dark) .card-gradient { background: linear-gradient(145deg, #f8f8f8 0%, #f0f0f0 100%); border-color: rgba(0, 0, 0, 0.08); }
+        html:not(.dark) .card-gradient h3, html:not(.dark) .card-gradient h4 { color: #1a1a1a; }
+        html:not(.dark) .card-gradient p, html:not(.dark) .card-gradient .text-gray-400 { color: #555 !important; }
+        html:not(.dark) .card-gradient code { color: #1a1a1a !important; }
+        html:not(.dark) .card-gradient .code-box { background: #1e1e1e !important; }
+        html:not(.dark) .card-gradient .code-box code { color: #60a5fa !important; }
+        html:not(.dark) .screenshot-card { box-shadow: 0 15px 40px -12px rgba(0, 0, 0, 0.12); background: rgba(0, 0, 0, 0.02); border-color: rgba(0, 0, 0, 0.06); }
+        html:not(.dark) .screenshot-card:hover { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.18); background: rgba(0, 0, 0, 0.04); }
+        html:not(.dark) .screenshot-card img { filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.12)); }
+        html:not(.dark) .feat-card:hover { background: rgba(0,0,0,0.03) !important; }
+        html:not(.dark) table { color: #1a1a1a; }
+        html:not(.dark) table th { color: #888; }
+        html:not(.dark) table td { color: #333; }
+        html:not(.dark) table .text-gray-500 { color: #888 !important; }
+        html:not(.dark) .footer-section { border-top-color: rgba(0,0,0,0.1); }
+        html:not(.dark) .footer-section h5 { color: #1a1a1a; }
+        html:not(.dark) .footer-section p, html:not(.dark) .footer-section a, html:not(.dark) .footer-section li a { color: #666 !important; }
+        html:not(.dark) .footer-section li a:hover { color: #1a1a1a !important; }
+        html:not(.dark) .footer-bottom { border-top-color: rgba(0,0,0,0.05); color: #999; }
+        html:not(.dark) .lang-dropdown { background: #fff; border-color: rgba(0,0,0,0.1); }
+        html:not(.dark) .lang-dropdown a { color: #333; }
+        html:not(.dark) .lang-dropdown a:hover { background: rgba(0,0,0,0.05); }
 
-        .code-block {
-            background: #2d2d2d;
-            color: #f8f8f2;
-            padding: 15px;
-            border-radius: 8px;
-            font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+        /* Carousel - horizontal scroll */
+        .carousel-container {
             overflow-x: auto;
-            margin: 15px 0;
-            font-size: 14px;
-            position: relative;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding-bottom: 4px;
         }
-
-        .copy-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 4px;
-            color: #e0e0e0;
-            padding: 5px 10px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        .carousel-container::-webkit-scrollbar { display: none; }
+        .carousel-track {
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: calc((100% - 48px) / 3);
+            gap: 24px;
         }
-
-        .copy-btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: translateY(-1px);
+        @media (max-width: 1024px) {
+            .carousel-track { grid-auto-columns: calc((100% - 24px) / 2); }
         }
-
-        .copy-btn:active {
-            transform: translateY(0);
+        @media (max-width: 640px) {
+            .carousel-track { grid-auto-columns: 85%; }
         }
-
-        /* Dark theme */
-        @media (prefers-color-scheme: dark) {
-            body {
-                background-color: #1a1a1a;
-                color: #e0e0e0;
-            }
-
-            .app-icon {
-                box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
-            }
-
-            .download-btn {
-                background: #0A84FF;
-            }
-
-            .download-btn:hover {
-                background: #409CFF;
-            }
-
-            .feature {
-                background: #2a2a2a;
-                border-left-color: #0A84FF;
-                color: #e0e0e0;
-            }
-
-            .screenshots h2 {
-                color: #e0e0e0;
-            }
-
-            .screenshot {
-                background: #2a2a2a;
-                box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
-            }
-
-            .screenshot:hover {
-                box-shadow: 0 8px 25px rgba(255, 255, 255, 0.15);
-            }
-
-            .screenshot p {
-                color: #999;
-            }
-
-            .footer {
-                border-top-color: #444;
-                color: #999;
-            }
-
-            .update-info {
-                background: #1e3a52;
-                color: #e0e0e0;
-            }
-
-            .install-box {
-                background: #2a2a2a;
-                color: #e0e0e0;
-                border-left-color: #0A84FF;
-            }
+        /* Scroll progress bar */
+        .scroll-progress {
+            height: 3px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            margin-top: 24px;
+            overflow: hidden;
+            max-width: 200px;
+            margin-left: auto;
+            margin-right: auto;
         }
-
-        /* Top controls */
-        .top-controls {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-            z-index: 100;
+        .scroll-progress-bar {
+            height: 100%;
+            border-radius: 3px;
+            background: #3b82f6;
+            transition: width 0.15s ease;
+            min-width: 20%;
         }
+        html:not(.dark) .scroll-progress { background: rgba(0,0,0,0.08); }
 
-        /* Theme toggle button */
-        .theme-toggle {
-            background: transparent;
-            border: 2px solid #007AFF;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            cursor: pointer;
-            font-size: 20px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .theme-toggle:hover {
-            background: #007AFF;
-            transform: scale(1.1);
-        }
-
-        /* Language toggle button */
-        .lang-toggle {
-            background: transparent;
-            border: 2px solid #007AFF;
-            border-radius: 25px;
-            padding: 0 15px;
-            height: 50px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            color: #007AFF;
-            text-decoration: none;
-        }
-
-        .lang-toggle:hover {
-            background: #007AFF;
-            color: white;
-            transform: scale(1.05);
-        }
-
-        /* Manual theme overrides */
-        body.light-theme {
-            background-color: #ffffff !important;
-            color: #333 !important;
-        }
-
-        body.light-theme .feature {
-            background: #f8f9fa !important;
-            color: #333 !important;
-        }
-
-        body.light-theme .footer {
-            color: #666 !important;
-            border-top-color: #eee !important;
-        }
-
-        body.light-theme .update-info {
-            background: #e8f4fd !important;
-            color: #333 !important;
-        }
-
-        body.light-theme .install-box {
-            background: #f1f3f5 !important;
-            color: #333 !important;
-        }
-
-        body.light-theme .app-icon {
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
-        }
-
-        body.light-theme .screenshots h2 {
-            color: #333 !important;
-        }
-
-        body.light-theme .screenshot {
-            background: #f8f9fa !important;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
-        }
-
-        body.light-theme .screenshot:hover {
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
-        }
-
-        body.light-theme .screenshot p {
-            color: #666 !important;
-        }
-
-        body.dark-theme {
-            background-color: #1a1a1a !important;
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-theme .feature {
-            background: #2a2a2a !important;
-            border-left-color: #0A84FF !important;
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-theme .footer {
-            border-top-color: #444 !important;
-            color: #999 !important;
-        }
-
-        body.dark-theme .update-info {
-            background: #1e3a52 !important;
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-theme .install-box {
-            background: #2a2a2a !important;
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-theme .app-icon {
-            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1) !important;
-        }
-
-        body.dark-theme .screenshots h2 {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-theme .screenshot {
-            background: #2a2a2a !important;
-            box-shadow: 0 2px 10px rgba(255, 255, 255, 0.1) !important;
-        }
-
-        body.dark-theme .screenshot:hover {
-            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.15) !important;
-        }
-
-        body.dark-theme .screenshot p {
-            color: #999 !important;
-        }
-
-        body.dark-theme .download-btn {
-            background: #0A84FF !important;
-        }
-
-        body.dark-theme .download-btn:hover {
-            background: #409CFF !important;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            .theme-toggle {
-                border-color: #0A84FF;
-            }
-
-            .theme-toggle:hover {
-                background: #0A84FF;
-            }
-
-            .lang-toggle {
-                border-color: #0A84FF;
-                color: #0A84FF;
-            }
-
-            .lang-toggle:hover {
-                background: #0A84FF;
-                color: white;
-            }
-        }
-
-        body.dark-theme .lang-toggle {
-            border-color: #0A84FF;
-            color: #0A84FF;
-        }
-
-        body.dark-theme .lang-toggle:hover {
-            background: #0A84FF;
-            color: white;
-        }
-
-        /* Responsive controls */
-        @media (max-width: 500px) {
-            .top-controls {
-                top: 10px;
-                right: 10px;
-            }
-
-            .theme-toggle,
-            .lang-toggle {
-                height: 40px;
-                font-size: 12px;
-            }
-
-            .theme-toggle {
-                width: 40px;
-            }
-
-            .lang-toggle {
-                padding: 0 10px;
-            }
-        }
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.92); opacity: 0; transition: opacity 0.3s ease; }
+        .modal.show { display: flex; opacity: 1; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px 80px; }
+        .modal-content { position: relative; display: flex; flex-direction: column; align-items: center; max-width: 90vw; max-height: calc(100vh - 140px); transform: scale(0.8); transition: transform 0.3s ease; }
+        .modal.show .modal-content { transform: scale(1); }
+        .modal-image { max-width: 100%; max-height: calc(100vh - 180px); width: auto; height: auto; object-fit: contain; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+        .modal-close { position: absolute; top: -15px; right: -15px; background: #ff4757; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4); z-index: 1001; }
+        .modal-close:hover { background: #ff3838; transform: scale(1.1); }
+        .modal-caption { margin-top: 16px; background: rgba(255, 255, 255, 0.12); color: white; padding: 10px 24px; border-radius: 25px; font-size: 15px; text-align: center; backdrop-filter: blur(10px); white-space: nowrap; }
+        .modal-hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.6); padding: 8px 16px; border-radius: 20px; font-size: 13px; backdrop-filter: blur(10px); }
     </style>
 </head>
 
-<body>
-    <!-- Top controls -->
-    <div class="top-controls">
-        <a href="index-ua.html" class="lang-toggle" title="Українська версія">UA 💙💛</a>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-            <span id="theme-icon">🌙</span>
-        </button>
-    </div>
+<body class="bg-dark-900 text-white antialiased">
+    <!-- Navigation -->
+    <header class="fixed top-0 w-full z-50 glass-nav">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <a href="#" class="flex items-center gap-2 no-underline" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">
+                <img alt="Stone Clipboarder Logo" class="w-8 h-8 rounded-lg object-contain"
+                    src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+                <span class="text-lg font-semibold tracking-tight nav-brand">Stone Clipboarder Tool</span>
+            </a>
+            <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
+                <a class="nav-link text-gray-400 hover:text-white transition-colors" href="#features">Features</a>
+                <a class="nav-link text-gray-400 hover:text-white transition-colors" href="installation.html">Installation</a>
+                <a class="nav-link text-gray-400 hover:text-white transition-colors" href="version-history.html">Version History</a>
+                <a class="nav-link text-gray-400 hover:text-white transition-colors"
+                    href="https://github.com/foxfollow/Stone-Clipboarder-Tool">GitHub</a>
+            </nav>
+            <div class="flex items-center gap-3">
+                <div class="relative group" id="language-picker">
+                    <button class="nav-btn flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-xs font-medium">
+                        <span>EN</span>
+                        <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                    </button>
+                    <div class="lang-dropdown absolute right-0 mt-2 w-40 rounded-xl border border-white/10 bg-dark-800 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all py-2 z-50">
+                        <a class="block px-4 py-2 hover:bg-white/5 text-sm font-medium" href="index.html">English</a>
+                        <a class="block px-4 py-2 hover:bg-white/5 text-sm" href="index-ua.html">Українська</a>
+                    </div>
+                </div>
+                <button aria-label="Toggle Theme" id="theme-toggle"
+                    class="nav-btn p-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
+                    onclick="toggleTheme()">
+                    <i class="fa-solid fa-sun text-sm text-yellow-400" id="theme-icon-fa"></i>
+                </button>
+            </div>
+        </div>
+    </header>
 
-    <div class="header">
-        <div class="app-icon"></div>
-        <h1>Stone Clipboarder Tool</h1>
-        <p><strong>Never lose what you copy.</strong> A free, open-source clipboard history manager for macOS with OCR,
-            global hotkeys, and complete privacy.</p>
-
-        <div class="update-info">
-            <h3>Automatic Updates Available</h3>
-            <p>This page serves the update feed for StoneClipboarderTool. The app will automatically check for updates.
+    <main class="pt-32">
+        <!-- Hero Section -->
+        <section class="max-w-7xl mx-auto px-4 text-center mb-24">
+            <div class="hero-badge inline-flex items-center px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-medium mb-8 font-mono tracking-wide">
+                Free · Open Source · macOS 15+
+            </div>
+            <h1 class="hero-title font-mono text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
+                Never lose what you copy.
+            </h1>
+            <p class="hero-sub text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+                A free, open-source clipboard history manager for macOS with OCR, global hotkeys, and complete privacy.
             </p>
-            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest" class="download-btn">📥
-                    Download Latest</a>
-                <a href="installation.html" class="download-btn">📋 Installation Guide</a>
-                <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool" class="download-btn">🔗 View on GitHub</a>
-                <a href="version-history.html" class="download-btn">📜 Version History</a>
-                <a href="appcast.xml" class="download-btn">📡 View Update Feed</a>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+                <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest"
+                    class="bg-primary hover:bg-blue-600 px-8 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 text-white no-underline">
+                    <i class="fa-solid fa-download"></i>
+                    Download Latest
+                </a>
+                <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool"
+                    class="btn-secondary border border-white/10 bg-white/5 hover:bg-white/10 px-8 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all no-underline">
+                    <i class="fa-brands fa-github text-xl"></i>
+                    View on GitHub
+                </a>
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-3 mb-20">
+                <a href="installation.html" class="sub-link text-sm text-gray-400 hover:text-white transition-colors no-underline">
+                    <i class="fa-solid fa-book mr-1"></i> Installation Guide
+                </a>
+                <span class="text-gray-600">·</span>
+                <a href="version-history.html" class="sub-link text-sm text-gray-400 hover:text-white transition-colors no-underline">
+                    <i class="fa-solid fa-clock-rotate-left mr-1"></i> Version History
+                </a>
+                <span class="text-gray-600">·</span>
+                <a href="appcast.xml" class="sub-link text-sm text-gray-400 hover:text-white transition-colors no-underline">
+                    <i class="fa-solid fa-rss mr-1"></i> Update Feed
+                </a>
+            </div>
+        </section>
+
+        <!-- Screenshot Showcase -->
+        <section class="max-w-6xl mx-auto px-4 mb-32" id="screenshots">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold mb-4">App Preview</h2>
+                <p class="section-sub text-gray-400">Fits perfectly into your macOS workflow.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Main Window')">
+                    <img alt="Main Window" class="theme-image"
+                        data-light-src="resources/index/sct-light-basicwindow.png"
+                        data-dark-src="resources/index/sct-dark-basicwindow.png"
+                        src="resources/index/sct-dark-basicwindow.png" />
+                </div>
+                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Quick Picker')">
+                    <img alt="Quick Picker" class="theme-image"
+                        data-light-src="resources/index/sct-light-quickpicker.png"
+                        data-dark-src="resources/index/sct-dark-quickpicker.png"
+                        src="resources/index/sct-dark-quickpicker.png" />
+                </div>
+                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Menu Bar')">
+                    <img alt="Menu Bar" class="theme-image"
+                        data-light-src="resources/index/sct-light-menubar.png"
+                        data-dark-src="resources/index/sct-dark-menubar.png"
+                        src="resources/index/sct-dark-menubar.png" />
+                </div>
+            </div>
+        </section>
+
+        <!-- Homebrew Installation -->
+        <section class="max-w-4xl mx-auto px-4 mb-32">
+            <div class="card-gradient p-8 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center border border-white/10">
+                        <i class="fa-solid fa-terminal text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-lg">Install via Homebrew</h3>
+                        <p class="text-sm text-gray-400">The easiest way to install and keep updated.</p>
+                    </div>
+                </div>
+                <div class="code-box w-full md:w-auto flex items-center justify-between gap-4 bg-[#1e1e1e] p-4 rounded-xl border border-white/10 font-mono text-[13px]">
+                    <div class="leading-relaxed">
+                        <code class="text-blue-400">brew tap foxfollow/stone</code><br />
+                        <code class="text-blue-400">brew install stone-clipboarder-tool</code>
+                    </div>
+                    <button class="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 flex-shrink-0" id="copy-btn" onclick="copyInstallCmd()">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Carousel -->
+        <section class="max-w-7xl mx-auto px-4 mb-32" id="features">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold mb-4">Everything You Need</h2>
+                <p class="section-sub text-gray-400">Powerful features, zero cost, complete privacy.</p>
+            </div>
+            <div class="carousel-container" id="featureCarousel">
+                <div class="carousel-track">
+                    <!-- Slide 1 -->
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-clipboard-list text-3xl text-blue-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Clipboard History</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Track and manage your clipboard history with persistent storage using Swift Data.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-expand text-3xl text-green-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">OCR Text Recognition</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Extract text from images using Apple Vision framework for easy editing and searching.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-star text-3xl text-yellow-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Smart Favorites</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Pin frequently-used items that are protected from auto-deletion. Load all favorites even when not in memory.</p>
+                        </div>
+                    </div>
+                    <!-- Slide 2 -->
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-magnifying-glass text-3xl text-pink-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Advanced Search</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Search through your clipboard history with a modern search bar featuring macOS 15+ liquid glass effect.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-ban text-3xl text-red-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Excluded Apps</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Choose which apps to exclude from clipboard monitoring. Perfect for protecting sensitive data from password managers.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-pause text-3xl text-cyan-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Pause Monitoring</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Temporarily pause clipboard monitoring with a customizable timer. Great for privacy with sensitive info.</p>
+                        </div>
+                    </div>
+                    <!-- Slide 3 -->
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-keyboard text-3xl text-orange-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Global Hotkeys</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">System-wide shortcuts
+                                (<kbd class="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">&#x2303;&#x2325;1-0</kbd>,
+                                <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">&#x2303;&#x21E7;1-0</kbd>)
+                                and Quick Picker for instant access.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-sliders text-3xl text-violet-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Capture Modes</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Choose to capture only text, only images, or both. Perfect for Microsoft Word workflows.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-layer-group text-3xl text-teal-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Combined Items (BETA)</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Save text and images together as a single clipboard item for rich content management.</p>
+                        </div>
+                    </div>
+                    <!-- Slide 4 -->
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-bars text-3xl text-indigo-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Menu Bar Integration</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Quick access to clipboard items directly from the menu bar with pause timer display.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-rocket text-3xl text-amber-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Launch at Login</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Start StoneClipboarder automatically when you log in. Manage via Accessibility settings or macOS System Settings.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-universal-access text-3xl text-lime-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Accessibility Settings</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Dedicated settings tab showing permission status with quick access to grant accessibility for auto-paste and global hotkeys.</p>
+                        </div>
+                    </div>
+                    <!-- Slide 5 -->
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-arrows-rotate text-3xl text-emerald-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Auto Updates</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Secure automatic updates using Sparkle framework with EdDSA signing.</p>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                            <div class="mb-6"><i class="fa-solid fa-eye-slash text-3xl text-purple-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">Privacy Focused</h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">All data stays on your device. No cloud sync or data collection. App exclusion for enhanced privacy.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="scroll-progress"><div class="scroll-progress-bar" id="scrollProgress"></div></div>
+        </section>
+
+        <!-- Comparison Section -->
+        <section class="max-w-5xl mx-auto px-4 mb-32">
+            <div class="text-center mb-16">
+                <h2 class="section-title text-3xl font-bold mb-4">Why Choose Stone Clipboarder?</h2>
+                <p class="section-sub text-gray-400">More features. No cost. No compromises.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="text-left border-b border-white/10">
+                            <th class="py-4 px-6 text-gray-500 font-medium text-sm">Feature</th>
+                            <th class="py-4 px-6 text-blue-400 font-bold text-sm bg-blue-500/5 rounded-t-xl">Stone Clipboarder</th>
+                            <th class="py-4 px-6 text-gray-500 font-medium text-sm">Paid Alternatives</th>
+                            <th class="py-4 px-6 text-gray-500 font-medium text-sm">Free Alternatives</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <tr class="border-b border-white/5"><td class="py-4 px-6">Price</td><td class="py-4 px-6 font-bold bg-blue-500/5">Free</td><td class="py-4 px-6 text-gray-500">$20+/year</td><td class="py-4 px-6 text-gray-500">Free</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-4 px-6">Open Source</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td><td class="py-4 px-6 text-gray-500">Sometimes</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-4 px-6">OCR</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td></tr>
+                        <tr class="border-b border-white/5"><td class="py-4 px-6">Privacy</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6 text-gray-500">Cloud Sync</td><td class="py-4 px-6 text-gray-500">Cloud Sync</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-4 px-6">Global Hotkeys</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6 text-gray-500">Limited</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-4 px-6">App Exclusions</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6 text-gray-500">Sometimes</td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td></tr>
+                        <tr class="border-b border-white/5"><td class="py-4 px-6">Native macOS</td><td class="py-4 px-6 bg-blue-500/5 rounded-b-xl"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer-section border-t border-white/10 pt-16 pb-8">
+        <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+            <div>
+                <div class="flex items-center gap-2 mb-6">
+                    <img alt="Logo" class="w-6 h-6 rounded-md" src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+                    <span class="font-semibold">Stone Clipboarder Tool</span>
+                </div>
+                <p class="text-sm text-gray-400 leading-relaxed">Your trusted companion for clipboard management on macOS. Built with performance and privacy in mind.</p>
+            </div>
+            <div>
+                <h5 class="font-semibold mb-6">Resources</h5>
+                <ul class="space-y-4 text-sm text-gray-400">
+                    <li><a class="hover:text-white transition-colors" href="installation.html">Installation Guide</a></li>
+                    <li><a class="hover:text-white transition-colors" href="version-history.html">Version History</a></li>
+                    <li><a class="hover:text-white transition-colors" href="appcast.xml">Update Feed</a></li>
+                </ul>
+            </div>
+            <div>
+                <h5 class="font-semibold mb-6">Links</h5>
+                <ul class="space-y-4 text-sm text-gray-400">
+                    <li><a class="hover:text-white transition-colors" href="https://github.com/foxfollow/Stone-Clipboarder-Tool">GitHub</a></li>
+                    <li><a class="hover:text-white transition-colors" href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest">Download</a></li>
+                    <li><a class="hover:text-white transition-colors" href="https://github.com/foxfollow/homebrew-stone">Homebrew Tap</a></li>
+                    <li><a class="hover:text-white transition-colors" href="https://github.com/foxfollow/Stone-Clipboarder-Tool/blob/main/LICENSE.md">License</a></li>
+                </ul>
+            </div>
+            <div>
+                <h5 class="font-semibold mb-6">Contact</h5>
+                <ul class="space-y-4 text-sm text-gray-400">
+                    <li><a class="hover:text-white transition-colors" href="mailto:d3f0ld@pm.me">d3f0ld@pm.me</a></li>
+                </ul>
             </div>
         </div>
-    </div>
-
-    <!-- Homebrew Installation -->
-    <div class="install-box">
-        <h3>🍺 Install via <a href="https://brew.sh" target="_blank"
-                style="color: inherit; text-decoration: none; border-bottom: 2px solid #007AFF;">Homebrew</a></h3>
-        <p>You can easily install StoneClipboarderTool using Homebrew tap:</p>
-        <div class="code-block">
-            brew tap foxfollow/stone<br>
-            brew install stone-clipboarder-tool
-            <button class="copy-btn" onclick="copyInstallCmd(this)">Copy</button>
+        <div class="footer-bottom max-w-7xl mx-auto px-4 border-t border-white/5 pt-8 text-center text-[11px] text-gray-500">
+            <p><strong>System Requirements:</strong> macOS 15.0 or later · Built with SwiftUI · Powered by Sparkle Updates</p>
+            <p class="mt-2">&copy; 2025 Heorhii Savoiskyi</p>
         </div>
-        <small>The app will be automatically configured to run without security warnings.</small>
-    </div>
+    </footer>
 
-    <!-- App Screenshots Section -->
-    <div class="screenshots">
-        <h2>📱 App Preview</h2>
-        <div class="screenshot-grid">
-            <div class="screenshot">
-                <img class="theme-image" src="resources/index/sct-light-basicwindow.png"
-                    data-light-src="resources/index/sct-light-basicwindow.png"
-                    data-dark-src="resources/index/sct-dark-basicwindow.png" alt="StoneClipboarderTool Main View"
-                    onclick="openModal(this, 'Main window showing your clipboard history with preview and metadata')" />
-                <p>Main window showing your clipboard history with preview and metadata</p>
-            </div>
-            <div class="screenshot">
-                <img class="theme-image" src="resources/index/sct-light-settings.png"
-                    data-light-src="resources/index/sct-light-settings.png"
-                    data-dark-src="resources/index/sct-dark-settings.png" alt="StoneClipboarderTool Settings"
-                    onclick="openModal(this, 'Settings panel for customization and preferences')" />
-                <p>Settings panel for customization and preferences</p>
-            </div>
-            <div class="screenshot">
-                <img class="theme-image" src="resources/index/sct-light-quickpicker.png"
-                    data-light-src="resources/index/sct-light-quickpicker.png"
-                    data-dark-src="resources/index/sct-dark-quickpicker.png" alt="StoneClipboarderTool Quick Picker"
-                    onclick="openModal(this, 'Quick Picker (Spotlight-like integration) for fast access')" />
-                <p>Quick Picker (Spotlight-like integration) for fast access</p>
-            </div>
-            <div class="screenshot">
-                <img class="theme-image" src="resources/index/sct-light-menubar.png"
-                    data-light-src="resources/index/sct-light-menubar.png"
-                    data-dark-src="resources/index/sct-dark-menubar.png" alt="StoneClipboarderTool Menu Bar"
-                    onclick="openModal(this, 'Menu bar integration for quick access to recent items')" />
-                <p>Menu bar integration for quick access to recent items</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="feature-list">
-        <div class="feature">
-            <h3>📊 Clipboard History</h3>
-            <p>Track and manage your clipboard history with persistent storage using Swift Data.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🔍 OCR Text Recognition</h3>
-            <p>Extract text from images using Apple Vision framework for easy editing and searching.</p>
-        </div>
-
-        <div class="feature">
-            <h3>⭐ Smart Favorites</h3>
-            <p>Pin frequently-used items that are protected from auto-deletion. Enhanced in v1.3.0 to load all favorites
-                even when not in memory.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🔎 Advanced Search</h3>
-            <p>Search through your clipboard history with a modern search bar featuring macOS 15+ liquid
-                glass effect.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🚫 Excluded Apps</h3>
-            <p>Choose which apps to exclude from clipboard monitoring. Perfect for protecting sensitive
-                data from password managers or banking apps.</p>
-        </div>
-
-        <div class="feature">
-            <h3>⏸️ Pause Monitoring</h3>
-            <p>Temporarily pause clipboard monitoring with a customizable timer. Great for privacy when
-                working with sensitive information.</p>
-        </div>
-
-        <div class="feature">
-            <h3>⚡ Global Hotkeys</h3>
-            <p>System-wide shortcuts (⌃⌥1-0, ⌃⇧1-0) and Quick Picker (⌃⌥Space) for instant access.</p>
-        </div>
-
-        <div class="feature">
-            <h3>📋 Capture Modes</h3>
-            <p>Choose to capture only text, only images, or both. Perfect for Microsoft Word workflows.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🖼️ Combined Items (BETA)</h3>
-            <p>Added in v1.2.0: Save text and images together as a single clipboard item for rich content management.
-            </p>
-        </div>
-
-        <div class="feature">
-            <h3>🖥️ Menu Bar Integration</h3>
-            <p>Quick access to clipboard items directly from the menu bar with pause timer display.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🚀 Launch at Login</h3>
-            <p>Start StoneClipboarder automatically when you log in. Manage via the Accessibility settings tab or macOS
-                System Settings.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🛡️ Accessibility Settings</h3>
-            <p>Dedicated settings tab showing permission status with quick access to grant accessibility for auto-paste
-                and global hotkeys.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🔄 Auto Updates</h3>
-            <p>Secure automatic updates using Sparkle framework with EdDSA signing.</p>
-        </div>
-
-        <div class="feature">
-            <h3>🔒 Privacy Focused</h3>
-            <p>All data stays on your device. No cloud sync or data collection. Now with app exclusion for enhanced
-                privacy.</p>
-        </div>
-    </div>
-
-    <!-- Version History Link -->
-    <div style="text-align: center; margin: 40px 0;">
-        <a href="version-history.html" class="download-btn" style="background-color: #5856d6;">📜 View Full Version
-            History</a>
-    </div>
-
-    <div class="footer">
-        <p><strong>System Requirements:</strong> macOS 15.0 or later</p>
-        <p>Built with SwiftUI • Powered by Sparkle Updates</p>
-        <p>Feedback: <a href="mailto:d3f0ld@pm.me" style="color: inherit;">d3f0ld@pm.me</a></p>
-        <p>&copy; 2025 Heorhii Savoiskyi 💙💛</p>
-    </div>
-
-    <!-- Modal for full-size images -->
+    <!-- Modal -->
     <div id="imageModal" class="modal" onclick="closeModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <button class="modal-close" onclick="closeModal()">&times;</button>
             <img id="modalImage" class="modal-image" src="" alt="" />
             <div id="modalCaption" class="modal-caption"></div>
         </div>
-        <div class="modal-hint">Press ESC to close • Click outside to close</div>
+        <div class="modal-hint">Press ESC to close · Click outside to close</div>
     </div>
 
     <script>
-        // Theme management
-        let currentTheme = localStorage.getItem('theme') || 'auto';
-
+        // Theme
+        let currentTheme = localStorage.getItem('theme') || 'dark';
         function setTheme(theme) {
             currentTheme = theme;
             localStorage.setItem('theme', theme);
-
-            const body = document.body;
-            const themeIcon = document.getElementById('theme-icon');
-
-            // Remove existing theme classes
-            body.classList.remove('light-theme', 'dark-theme');
-
-            let activeTheme = theme;
-            if (activeTheme === 'auto') {
-                activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            }
-
-            if (activeTheme === 'light') {
-                body.classList.add('light-theme');
-                themeIcon.textContent = '🌙';
-            } else if (activeTheme === 'dark') {
-                body.classList.add('dark-theme');
-                themeIcon.textContent = '☀️';
-            }
-
-            if (theme === 'auto') {
-                themeIcon.textContent = window.matchMedia('(prefers-color-scheme: dark)').matches ? '☀️' : '🌙';
-            }
-
-            updateImages(activeTheme);
-        }
-
-        function copyInstallCmd(btn) {
-            const cmd = "brew tap foxfollow/stone\nbrew install stone-clipboarder-tool";
-
-            // Try modern API first
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(cmd).then(() => showCopiedFeedback(btn));
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon-fa');
+            if (theme === 'dark') {
+                html.classList.add('dark');
+                document.body.classList.add('bg-dark-900', 'text-white');
+                document.body.classList.remove('bg-white', 'text-gray-900');
+                icon.className = 'fa-solid fa-sun text-sm text-yellow-400';
             } else {
-                // Fallback for non-secure contexts (like file://)
-                const textArea = document.createElement("textarea");
-                textArea.value = cmd;
-                textArea.style.position = "fixed";
-                textArea.style.left = "-9999px";
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                    showCopiedFeedback(btn);
-                } catch (err) {
-                    console.error('Failed to copy', err);
-                }
-                document.body.removeChild(textArea);
+                html.classList.remove('dark');
+                document.body.classList.remove('bg-dark-900', 'text-white');
+                document.body.classList.add('bg-white', 'text-gray-900');
+                icon.className = 'fa-solid fa-moon text-sm text-gray-600';
             }
+            updateImages(theme);
         }
-
-        function showCopiedFeedback(btn) {
-            const originalText = btn.textContent;
-            btn.textContent = '✓ Copied!';
-            btn.style.background = 'rgba(40, 167, 69, 0.3)';
-            btn.style.borderColor = '#28a745';
-
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.style.background = '';
-                btn.style.borderColor = '';
-            }, 2000);
-        }
-
+        function toggleTheme() { setTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
         function updateImages(theme) {
-            const images = document.querySelectorAll('.theme-image');
-            images.forEach(img => {
-                if (theme === 'dark') {
-                    img.src = img.getAttribute('data-dark-src');
-                } else {
-                    img.src = img.getAttribute('data-light-src');
-                }
+            document.querySelectorAll('.theme-image').forEach(img => {
+                img.src = theme === 'dark' ? img.getAttribute('data-dark-src') : img.getAttribute('data-light-src');
             });
         }
 
-        function toggleTheme() {
-            if (currentTheme === 'auto' || currentTheme === 'light') {
-                setTheme('dark');
+        // Homebrew copy
+        function copyInstallCmd() {
+            const cmd = "brew tap foxfollow/stone\nbrew install stone-clipboarder-tool";
+            const btn = document.getElementById('copy-btn');
+            const icon = btn.querySelector('i');
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(cmd).then(() => showCopied(icon));
             } else {
-                setTheme('light');
+                const ta = document.createElement("textarea");
+                ta.value = cmd; ta.style.position = "fixed"; ta.style.left = "-9999px";
+                document.body.appendChild(ta); ta.focus(); ta.select();
+                try { document.execCommand('copy'); showCopied(icon); } catch (e) { }
+                document.body.removeChild(ta);
             }
         }
-
-        // Auto-refresh update feed status
-        function checkUpdateFeed() {
-            fetch('appcast.xml')
-                .then(response => {
-                    if (response.ok) {
-                        document.querySelector('.update-info').style.background = currentTheme === 'dark' ? '#1a4a3a' : '#d4edda';
-                        document.querySelector('.update-info h3').textContent = '✅ Update Feed Active';
-                    }
-                })
-                .catch(() => {
-                    // Feed not ready yet
-                });
+        function showCopied(icon) {
+            icon.className = 'fa-solid fa-check text-green-500';
+            setTimeout(() => { icon.className = 'fa-regular fa-copy'; }, 2000);
         }
 
-        // Modal functionality
+        // Carousel scroll progress
+        function initCarousel() {
+            const container = document.getElementById('featureCarousel');
+            const bar = document.getElementById('scrollProgress');
+            function updateProgress() {
+                const max = container.scrollWidth - container.clientWidth;
+                const pct = max > 0 ? (container.scrollLeft / max) * 100 : 0;
+                bar.style.width = Math.max(20, pct) + '%';
+            }
+            container.addEventListener('scroll', updateProgress, { passive: true });
+            updateProgress();
+            window.addEventListener('resize', updateProgress);
+        }
+
+        // Modal
         function openModal(imgElement, caption) {
             const modal = document.getElementById('imageModal');
-            const modalImg = document.getElementById('modalImage');
-            const modalCaption = document.getElementById('modalCaption');
-
+            document.getElementById('modalImage').src = imgElement.src;
+            document.getElementById('modalImage').alt = imgElement.alt;
+            document.getElementById('modalCaption').textContent = caption;
             modal.style.display = 'flex';
-            modalImg.src = imgElement.src;
-            modalImg.alt = imgElement.alt;
-            modalCaption.textContent = caption;
-
-            // Trigger animation after display is set
-            setTimeout(() => {
-                modal.classList.add('show');
-            }, 10);
-
-            // Prevent body scroll
+            setTimeout(() => modal.classList.add('show'), 10);
             document.body.style.overflow = 'hidden';
         }
-
         function closeModal() {
             const modal = document.getElementById('imageModal');
             modal.classList.remove('show');
-
-            // Hide modal after animation
-            setTimeout(() => {
-                modal.style.display = 'none';
-                document.body.style.overflow = 'auto';
-            }, 300);
+            setTimeout(() => { modal.style.display = 'none'; document.body.style.overflow = 'auto'; }, 300);
         }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-        // Close modal with Escape key
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') {
-                closeModal();
-            }
-        });
-
-        // Initialize theme on page load
-        document.addEventListener('DOMContentLoaded', function () {
-            setTheme(currentTheme);
-            checkUpdateFeed();
-        });
-
-        // Listen for system theme changes
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-            if (currentTheme === 'auto') {
-                setTheme('auto');
-            }
-        });
+        // Init
+        document.addEventListener('DOMContentLoaded', () => { setTheme(currentTheme); initCarousel(); });
     </script>
 </body>
 
