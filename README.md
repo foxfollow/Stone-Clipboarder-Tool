@@ -2,8 +2,11 @@
 
 <div align="leading">
 
+[![CodeQL](https://github.com/foxfollow/Stone-Clipboarder-Tool/actions/workflows/codeql.yml/badge.svg)](https://github.com/foxfollow/Stone-Clipboarder-Tool/actions/workflows/codeql.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=foxfollow_Stone-Clipboarder-Tool&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=foxfollow_Stone-Clipboarder-Tool)
+
 ![from macOS 15](https://img.shields.io/badge/macOS-15.0+-blue.svg) <br>
-![database](https://img.shields.io/badge/local%20DB-SwiftData-brightgreen)
+![database](https://img.shields.io/badge/local%20DB-SwiftData-blue)
 
 </div>
 

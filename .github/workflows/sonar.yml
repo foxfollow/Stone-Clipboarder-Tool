@@ -42,8 +42,8 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v4
         with:
           args: >
-            -Dsonar.organization=heorhii
-            -Dsonar.projectKey=Heorhii_Stone-Clipboarder-Tool
+            -Dsonar.organization=foxfollow
+            -Dsonar.projectKey=foxfollow_Stone-Clipboarder-Tool
             -Dsonar.sources=StoneClipboarderTool
             -Dsonar.exclusions=build/**,docs/**
         env:
