@@ -39,7 +39,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v4
+        uses: SonarSource/sonarqube-scan-action@v7
         with:
           args: >
             -Dsonar.organization=foxfollow
