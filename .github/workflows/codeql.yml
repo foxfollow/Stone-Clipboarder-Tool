@@ -1,0 +1,54 @@
+name: CodeQL Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze Swift Code
+    runs-on: macos-26
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1)
+          if [[ -n "$LATEST_XCODE" ]]; then
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: swift
+
+      - name: Build for CodeQL
+        run: |
+          xcodebuild build \
+            -project StoneClipboarderTool.xcodeproj \
+            -scheme StoneClipboarderTool \
+            -configuration Release \
+            -derivedDataPath build/DerivedData \
+            -destination "platform=macOS" \
+            MACOSX_DEPLOYMENT_TARGET=15.0 \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:swift"
