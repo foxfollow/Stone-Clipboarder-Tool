@@ -9,7 +9,8 @@
     <meta name="keywords"
         content="менеджер буфера обміну, macOS, історія буфера обміну, clipboard manager, копіювання вставка, продуктивність, безкоштовно, відкритий код" />
     <title>Stone Clipboarder Tool – Безкоштовний менеджер буфера обміну для macOS</title>
-    <link rel="icon" type="image/png" href="resources/index/StoneClipboarderIcon2-iOS-Default-64x64.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="resources/index/favicon-48x48.png" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" sizes="48x48" href="resources/index/favicon-dark-48x48.png" media="(prefers-color-scheme: dark)" />
     <link rel="apple-touch-icon" href="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
@@ -162,8 +163,10 @@
     <header class="fixed top-0 w-full z-50 glass-nav">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
             <a href="#" class="flex items-center gap-2 no-underline" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">
-                <img alt="Stone Clipboarder Logo" class="w-8 h-8 rounded-lg object-contain"
+                <img alt="Stone Clipboarder Logo" class="w-8 h-8 rounded-lg object-contain block dark:hidden"
                     src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+                <img alt="Stone Clipboarder Logo" class="w-8 h-8 rounded-lg object-contain hidden dark:block"
+                    src="resources/index/StoneClipboarderIcon-iOS-Dark-1024x1024@1x.png" />
                 <span class="text-lg font-semibold tracking-tight nav-brand">Stone Clipboarder Tool</span>
             </a>
             <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
@@ -344,7 +347,8 @@
         <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div>
                 <div class="flex items-center gap-2 mb-6">
-                    <img alt="Logo" class="w-6 h-6 rounded-md" src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+                    <img alt="Logo" class="w-6 h-6 rounded-md block dark:hidden" src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+                    <img alt="Logo" class="w-6 h-6 rounded-md hidden dark:block" src="resources/index/StoneClipboarderIcon-iOS-Dark-1024x1024@1x.png" />
                     <span class="font-semibold">Stone Clipboarder Tool</span>
                 </div>
                 <p class="text-sm text-gray-400 leading-relaxed">Ваш надійний помічник для керування буфером обміну на macOS. Створений з акцентом на продуктивність та приватність.</p>

@@ -6,7 +6,8 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <meta name="description" content="Complete version history and release notes for Stone Clipboarder Tool, a free clipboard manager for macOS." />
     <title>Version History - Stone Clipboarder Tool</title>
-    <link rel="icon" type="image/png" href="resources/index/StoneClipboarderIcon2-iOS-Default-64x64.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="resources/index/favicon-48x48.png" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" sizes="48x48" href="resources/index/favicon-dark-48x48.png" media="(prefers-color-scheme: dark)" />
     <link rel="apple-touch-icon" href="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
@@ -71,8 +72,10 @@
     <header class="fixed top-0 w-full z-50 glass-nav">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
             <a href="index.html" class="flex items-center gap-2 no-underline">
-                <img alt="Stone Clipboarder Logo" class="w-8 h-8 rounded-lg object-contain"
+                <img alt="Stone Clipboarder Logo" class="w-8 h-8 rounded-lg object-contain block dark:hidden"
                     src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+                <img alt="Stone Clipboarder Logo" class="w-8 h-8 rounded-lg object-contain hidden dark:block"
+                    src="resources/index/StoneClipboarderIcon-iOS-Dark-1024x1024@1x.png" />
                 <span class="text-lg font-semibold tracking-tight nav-brand">Stone Clipboarder Tool</span>
             </a>
             <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
