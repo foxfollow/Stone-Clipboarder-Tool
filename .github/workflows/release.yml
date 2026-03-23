@@ -50,10 +50,13 @@ jobs:
 
       - name: Determine version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
-            VERSION="${{ inputs.version }}"
-          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_VERSION" ]]; then
+            VERSION="$INPUT_VERSION"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
             VERSION="0.0.0-dev"
@@ -64,8 +67,10 @@ jobs:
           echo "📦 Building version: $VERSION"
 
       - name: Validate required secrets
+        env:
+          HAS_SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
         run: |
-          if [[ -z "${{ secrets.SPARKLE_PRIVATE_KEY }}" ]]; then
+          if [[ "$HAS_SPARKLE_KEY" != "true" ]]; then
             echo "❌ ERROR: SPARKLE_PRIVATE_KEY secret is required"
             echo ""
             echo "Generate a new key pair with:"
