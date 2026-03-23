@@ -39,7 +39,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarqube-scan-action@v4
+        with:
+          args: >
+            -Dsonar.organization=heorhii
+            -Dsonar.projectKey=Heorhii_Stone-Clipboarder-Tool
+            -Dsonar.sources=StoneClipboarderTool
+            -Dsonar.exclusions=build/**,docs/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
