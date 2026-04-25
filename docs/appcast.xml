@@ -11,12 +11,42 @@
         <language>en</language>
 
     <item>
+        <title>Version VERSION_NUMBER</title>
+        <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
+        <sparkle:version>VERSION_NUMBER</sparkle:version>
+        <sparkle:shortVersionString>VERSION_NUMBER</sparkle:shortVersionString>
+        <description
+            ><![CDATA[
+            <h2>StoneClipboarderTool VERSION_NUMBER</h2>
+            <ul>
+                <li>🪟 NEW: Quick Picker now renders over other apps' fullscreen Spaces — open it without leaving the app you're in</li>
+                <li>🖼️ NEW: Menu bar popover now appears alongside other apps' fullscreen apps too</li>
+                <li>🔍 NEW: Smart preview fallback — when you trigger preview while in another app's fullscreen Space, the custom preview is used automatically (Apple Quick Look is system-managed and can't render in another app's fullscreen)</li>
+                <li>⌨️ IMPROVED: Search field cursor now lands in the Quick Picker on open and is restored after closing the preview</li>
+                <li>🛠️ FIXED: Quick Picker no longer pulls you out of another app's fullscreen Space when triggered</li>
+                <li>🛠️ FIXED: QuickLook stability — temp files are cleaned up with a delay so "Open with…" actions have time to read them</li>
+                <li>🛠️ IMPROVED: Window resignation handling — Quick Picker now closes cleanly when an external app activates (e.g. via "Open with…")</li>
+                <li>🧹 IMPROVED: Code quality refactor based on SonarCloud scanner issues</li>
+            </ul>
+        ]]></description>
+        <pubDate>RELEASE_DATE</pubDate>
+        <enclosure
+                url="https://github.com/REPO_OWNER/REPO_NAME/releases/download/vVERSION_NUMBER/StoneClipboarderTool.zip"
+                sparkle:version="VERSION_NUMBER"
+                sparkle:shortVersionString="VERSION_NUMBER"
+                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
+                length="FILE_SIZE"
+                type="application/octet-stream"
+            />
+    </item>
+    
+    <item>
         <title>Version 1.5.2</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
         <sparkle:version>14</sparkle:version>
         <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
         <description
-        ><![CDATA[
+            ><![CDATA[
             <h2>StoneClipboarderTool 1.5.2</h2>
             <ul>
                 <li>🛡️ NEW: Accessibility settings tab — view permission status and open System Settings directly</li>
@@ -32,13 +62,13 @@
         ]]></description>
         <pubDate>Fri, 20 Mar 2026 13:29:52 +0000</pubDate>
         <enclosure
-            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.5.2/StoneClipboarderTool.zip"
-            sparkle:version="14"
-            sparkle:shortVersionString="1.5.2"
-            sparkle:edSignature="op7hyVkCIt0JMbYiLRDi6sip3Is19/If3W9S5DvKQ2VWoHVJgiw261gRyKgW1Ix69jLQp3itFh2li3lD+NOKBA=="
-            length="4525426"
-            type="application/octet-stream"
-        />
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.5.2/StoneClipboarderTool.zip"
+                sparkle:version="14"
+                sparkle:shortVersionString="1.5.2"
+                sparkle:edSignature="op7hyVkCIt0JMbYiLRDi6sip3Is19/If3W9S5DvKQ2VWoHVJgiw261gRyKgW1Ix69jLQp3itFh2li3lD+NOKBA=="
+                length="4525426"
+                type="application/octet-stream"
+            />
     </item>
 
     <item>
@@ -47,19 +77,19 @@
         <sparkle:version>13</sparkle:version>
         <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
         <description
-        ><![CDATA[
+            ><![CDATA[
             <h2>Version 1.4.0</h2>
             <p>See release notes on GitHub for details.</p>
         ]]></description>
         <pubDate>Mon, 16 Feb 2026 14:32:00 +0000</pubDate>
         <enclosure
-            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.4.0/StoneClipboarderTool.zip"
-            sparkle:version="13"
-            sparkle:shortVersionString="1.4.0"
-            sparkle:edSignature="zfo2vhXZC55I/XiJIafed+WAFREv/3eHfWi9pn/MQ/xlFhOpDpK5xxvAV7EK+SD3DdAs3WyK51OxXRveCABvBQ=="
-            length="4417177"
-            type="application/octet-stream"
-        />
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.4.0/StoneClipboarderTool.zip"
+                sparkle:version="13"
+                sparkle:shortVersionString="1.4.0"
+                sparkle:edSignature="zfo2vhXZC55I/XiJIafed+WAFREv/3eHfWi9pn/MQ/xlFhOpDpK5xxvAV7EK+SD3DdAs3WyK51OxXRveCABvBQ=="
+                length="4417177"
+                type="application/octet-stream"
+            />
     </item>
 
     <item>
@@ -68,7 +98,7 @@
         <sparkle:version>1.4.0</sparkle:version>
         <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
         <description
-        ><![CDATA[
+            ><![CDATA[
             <h2>StoneClipboarderTool 1.4.0</h2>
             <ul>
                 <li>🛡️ Separated database storage for clipboard history and settings — corruption in one won't affect the other</li>
@@ -88,13 +118,13 @@
         ]]></description>
         <pubDate>RELEASE_DATE</pubDate>
         <enclosure
-            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.4.0/StoneClipboarderTool.zip"
-            sparkle:version="1.4.0"
-            sparkle:shortVersionString="1.4.0"
-            sparkle:edSignature="SIGNATURE_PLACEHOLDER"
-            length="FILE_SIZE"
-            type="application/octet-stream"
-        />
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.4.0/StoneClipboarderTool.zip"
+                sparkle:version="1.4.0"
+                sparkle:shortVersionString="1.4.0"
+                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
+                length="FILE_SIZE"
+                type="application/octet-stream"
+            />
     </item>
 
     <item>
@@ -103,7 +133,7 @@
         <sparkle:version>12</sparkle:version>
         <sparkle:shortVersionString>1.3.2</sparkle:shortVersionString>
         <description
-        ><![CDATA[
+            ><![CDATA[
             <h2>Version 1.3.2</h2>
             <ul>
 <li>✨ IMPROVED: Quick Picker now asks Accessibility for pasting simulation</li>
@@ -113,13 +143,13 @@
         ]]></description>
         <pubDate>Sat, 27 Dec 2025 19:32:19 +0000</pubDate>
         <enclosure
-            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.3.2/StoneClipboarderTool.zip"
-            sparkle:version="12"
-            sparkle:shortVersionString="1.3.2"
-            sparkle:edSignature="gApidUbsszK3qCToD7ljStKhS4xWnAlQYUG4AyDG/QobwmaV4Y01GQ8eCuoYo1OLu/hAvsVoB4KHEzzVeuRmCg=="
-            length="4198731"
-            type="application/octet-stream"
-        />
+                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.3.2/StoneClipboarderTool.zip"
+                sparkle:version="12"
+                sparkle:shortVersionString="1.3.2"
+                sparkle:edSignature="gApidUbsszK3qCToD7ljStKhS4xWnAlQYUG4AyDG/QobwmaV4Y01GQ8eCuoYo1OLu/hAvsVoB4KHEzzVeuRmCg=="
+                length="4198731"
+                type="application/octet-stream"
+            />
     </item>
 
 

@@ -49,6 +49,10 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 ## Features
 
 ### 🆕 New in Version 1.5.x
+- **🪟 Fullscreen Support (1.5.3)**: Quick Picker and menu bar popover now render over other apps' fullscreen Spaces — open them without leaving the app you're in
+- **🔍 Smart Preview Fallback (1.5.3)**: When triggering preview inside a fullscreen app, the custom preview is used automatically (Apple Quick Look is system-managed and can't render there)
+- **🛠️ Quick Picker Stability (1.5.3)**: Fixed Quick Picker pulling you out of fullscreen, improved QuickLook temp-file cleanup timing, cleaner window resignation handling
+- **🧹 Code Quality (1.5.3)**: SonarCloud refactor — code quality improvements across the codebase
 - **🛡️ Accessibility Settings Tab**: New settings tab showing accessibility permission status with direct link to System Settings
 - **🚀 Launch at Login**: Toggle auto-start at login via SMAppService, with first-launch prompt
 - **🎨 Improved Quick Picker**: Better item row layout, footer bar with keyboard shortcut hints, pagination and search improvements
