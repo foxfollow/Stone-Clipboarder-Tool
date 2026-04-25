@@ -59,7 +59,7 @@ struct SettingsView: View {
             Button("Enable") {
                 settingsManager.startAtLogin = true
             }
-            Button("Not Now", role: .cancel) {}
+            Button("Not Now", role: .cancel) { /* No action needed for cancel */ }
         } message: {
             Text("Would you like StoneClipboarder to start automatically when you log in?\n\nYou can change this later in Settings > Accessibility or in macOS System Settings > Login Items.")
         }

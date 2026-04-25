@@ -215,10 +215,9 @@ class QPCustomPreviewManager {
             let mainFrame = mainWindow.frame
             var origin = NSPoint(x: mainFrame.maxX + 8, y: mainFrame.origin.y)
 
-            if let screen = NSScreen.main {
-                if origin.x + 420 > screen.visibleFrame.maxX {
-                    origin.x = mainFrame.minX - 420 - 8
-                }
+            if let screen = NSScreen.main,
+               origin.x + 420 > screen.visibleFrame.maxX {
+                origin.x = mainFrame.minX - 420 - 8
             }
             panel.setFrameOrigin(origin)
         }

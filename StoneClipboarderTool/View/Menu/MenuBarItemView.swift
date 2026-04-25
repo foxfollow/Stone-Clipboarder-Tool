@@ -22,21 +22,18 @@ struct MenuBarItemView: View {
                     .font(.system(.body, design: .monospaced))
                     .lineLimit(2)
                     .foregroundStyle(.primary)
-                if item.itemType != .text {
-                    if let thumbnail = item.thumbnail {
-                        Image(nsImage: thumbnail)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 100)
-                            .cornerRadius(4)
-                    } else if item.itemType == .file && !item.isImageFile, let fileIcon = item.fileIcon
-                    {
-                        Image(nsImage: fileIcon)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 36)
-                            .cornerRadius(4)
-                    }
+                if item.itemType != .text, let thumbnail = item.thumbnail {
+                    Image(nsImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 100)
+                        .cornerRadius(4)
+                } else if item.itemType == .file && !item.isImageFile, let fileIcon = item.fileIcon {
+                    Image(nsImage: fileIcon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 36)
+                        .cornerRadius(4)
                 }
 
                 Text(item.timestamp, format: Date.FormatStyle(date: .omitted, time: .shortened))

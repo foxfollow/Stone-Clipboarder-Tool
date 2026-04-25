@@ -35,11 +35,11 @@ class KeyCapturingPanel: NSPanel {
     }
 
     override var canBecomeMain: Bool {
-        return true  // Allow it to become main to receive proper focus
+        return canBecomeKey  // Allow it to become main to receive proper focus
     }
 
     override var acceptsFirstResponder: Bool {
-        return true
+        return canBecomeKey
     }
 
     override func becomeFirstResponder() -> Bool {
@@ -51,10 +51,8 @@ class KeyCapturingPanel: NSPanel {
         super.sendEvent(event)
 
         // Force focus for any keyboard events
-        if event.type == .keyDown || event.type == .keyUp {
-            if !self.isKeyWindow {
-                self.makeKey()
-            }
+        if (event.type == .keyDown || event.type == .keyUp), !self.isKeyWindow {
+            self.makeKey()
         }
     }
 

@@ -107,34 +107,32 @@ final class CBItem {
         }
 
         // Generate thumbnail on-demand for images and combined items
-        if itemType == .image || itemType == .combined {
-            if let imageData = imageData,
-                let image = NSImage(data: imageData)
+        if (itemType == .image || itemType == .combined),
+           let imageData = imageData,
+           let image = NSImage(data: imageData)
+        {
+            let thumbnail = generateThumbnailImage(from: image)
+            // Cache the generated thumbnail immediately
+            if let thumbnail = thumbnail,
+                let pngData = thumbnail.pngRepresentation
             {
-                let thumbnail = generateThumbnailImage(from: image)
-                // Cache the generated thumbnail immediately
-                if let thumbnail = thumbnail,
-                    let pngData = thumbnail.pngRepresentation
-                {
-                    self.thumbnailData = pngData
-                }
-                return thumbnail ?? createPlaceholderThumbnail()
+                self.thumbnailData = pngData
             }
+            return thumbnail ?? createPlaceholderThumbnail()
         }
         // Generate thumbnail for image files
-        else if isImageFile {
-            if let fileData = fileData,
+        else if isImageFile,
+                let fileData = fileData,
                 let image = NSImage(data: fileData)
+        {
+            let thumbnail = generateThumbnailImage(from: image)
+            // Cache the generated thumbnail immediately
+            if let thumbnail = thumbnail,
+                let pngData = thumbnail.pngRepresentation
             {
-                let thumbnail = generateThumbnailImage(from: image)
-                // Cache the generated thumbnail immediately
-                if let thumbnail = thumbnail,
-                    let pngData = thumbnail.pngRepresentation
-                {
-                    self.thumbnailData = pngData
-                }
-                return thumbnail ?? createPlaceholderThumbnail()
+                self.thumbnailData = pngData
             }
+            return thumbnail ?? createPlaceholderThumbnail()
         }
 
         // Return placeholder for failed generation

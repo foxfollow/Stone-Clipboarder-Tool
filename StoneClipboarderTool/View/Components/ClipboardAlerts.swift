@@ -34,7 +34,7 @@ struct ClipboardAlertModifier: ViewModifier {
                     set: { if !$0 { activeAlert = nil } }
                 )
             ) {
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) { /* No action needed for cancel */ }
                 switch activeAlert {
                 case .cleanup:
                     Button("Clean Up", role: .destructive) {
@@ -105,10 +105,9 @@ enum AccessibilityAlertHelper {
 
             alert.window.level = .floating
 
-            if alert.runModal() == .alertFirstButtonReturn {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                    NSWorkspace.shared.open(url)
-                }
+            if alert.runModal() == .alertFirstButtonReturn,
+               let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
             }
         }
     }

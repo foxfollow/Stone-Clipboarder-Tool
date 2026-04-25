@@ -344,20 +344,19 @@ struct ZoomableDetailView: View {
         savePanel.nameFieldStringValue = "clipboard_image"
         
         savePanel.begin { result in
-            if result == .OK, let url = savePanel.url {
-                if let tiffData = image.tiffRepresentation,
-                   let bitmapRep = NSBitmapImageRep(data: tiffData) {
-                    
-                    let imageData: Data?
-                    if url.pathExtension.lowercased() == "png" {
-                        imageData = bitmapRep.representation(using: .png, properties: [:])
-                    } else {
-                        imageData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.9])
-                    }
-                    
-                    if let data = imageData {
-                        try? data.write(to: url)
-                    }
+            if result == .OK, let url = savePanel.url,
+               let tiffData = image.tiffRepresentation,
+               let bitmapRep = NSBitmapImageRep(data: tiffData) {
+
+                let imageData: Data?
+                if url.pathExtension.lowercased() == "png" {
+                    imageData = bitmapRep.representation(using: .png, properties: [:])
+                } else {
+                    imageData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.9])
+                }
+
+                if let data = imageData {
+                    try? data.write(to: url)
                 }
             }
         }

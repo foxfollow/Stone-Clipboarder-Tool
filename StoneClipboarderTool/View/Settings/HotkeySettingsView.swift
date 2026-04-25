@@ -72,7 +72,7 @@ struct HotkeySettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Hotkey Settings")
         .alert("Hotkey Conflict", isPresented: $showingConflictAlert) {
-            Button("OK") {}
+            Button("OK") { /* No action needed for acknowledgement */ }
         } message: {
             Text(conflictMessage)
         }
@@ -140,6 +140,12 @@ struct HotkeyConfigRow: View {
     @State private var globalEventMonitor: Any?
     @State private var blockedShortcut = ""
 
+    private var rowOpacity: Double {
+        let recordingOther = currentlyRecordingID != nil && currentlyRecordingID != config.id
+        let dimmedForRecording = recordingOther ? 0.4 : 1.0
+        return settingsManager.enableHotkeys ? dimmedForRecording : 0.6
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -198,12 +204,7 @@ struct HotkeyConfigRow: View {
                 !settingsManager.enableHotkeys
                     || (currentlyRecordingID != nil && currentlyRecordingID != config.id))
         }
-        .opacity(
-            settingsManager.enableHotkeys
-                ? (currentlyRecordingID != nil && currentlyRecordingID != config.id ? 0.4 : 1.0)
-                : 0.6
-        )
-        .animation(.easeInOut(duration: 0.2), value: currentlyRecordingID)
+        .opacity(rowOpacity)
         .onDisappear {
             stopRecording()
         }
@@ -215,36 +216,34 @@ struct HotkeyConfigRow: View {
     }
 
     private var displayText: String {
-        if isRecording {
-            if !blockedShortcut.isEmpty {
-                return "\(blockedShortcut) (blocked)"
-            } else if recordedShortcut.isEmpty {
-                return "Press keys..."
-            } else {
-                // Show preview with first character highlighted
-                let modifierChars: Set<Character> = ["⌃", "⌥", "⇧", "⌘"]
-                let modifiers = String(recordedShortcut.filter { modifierChars.contains($0) })
-                let keys = String(recordedShortcut.filter { !modifierChars.contains($0) })
-                if !keys.isEmpty {
-                    let firstChar = String(keys.prefix(1))
-                    return "\(modifiers)\(firstChar)..."
-                } else {
-                    return recordedShortcut
-                }
-            }
-        } else {
+        guard isRecording else {
             let shortcut = config.shortcutKeys ?? ""
             return shortcut.isEmpty ? "None" : shortcut
+        }
+        
+        if !blockedShortcut.isEmpty {
+            return "\(blockedShortcut) (blocked)"
+        } else if recordedShortcut.isEmpty {
+            return "Press keys..."
+        } else {
+            // Show preview with first character highlighted
+            let modifierChars: Set<Character> = ["⌃", "⌥", "⇧", "⌘"]
+            let modifiers = String(recordedShortcut.filter { modifierChars.contains($0) })
+            let keys = String(recordedShortcut.filter { !modifierChars.contains($0) })
+            if !keys.isEmpty {
+                let firstChar = String(keys.prefix(1))
+                return "\(modifiers)\(firstChar)..."
+            } else {
+                return recordedShortcut
+            }
         }
     }
 
     private var backgroundColor: Color {
-        if isRecording {
-            if !blockedShortcut.isEmpty {
-                return Color.red.opacity(0.3)
-            } else {
-                return Color.accentColor.opacity(0.3)
-            }
+        if isRecording, !blockedShortcut.isEmpty {
+            return Color.red.opacity(0.3)
+        } else if isRecording {
+            return Color.accentColor.opacity(0.3)
         } else if currentlyRecordingID != nil && currentlyRecordingID != config.id {
             return Color.gray.opacity(0.05)
         } else {
@@ -361,59 +360,26 @@ struct HotkeyConfigRow: View {
     }
 
     private func keyStringForKeyCode(_ keyCode: UInt16) -> String? {
-
-        switch keyCode {
-        case 18: return "1"
-        case 19: return "2"
-        case 20: return "3"
-        case 21: return "4"
-        case 23: return "5"
-        case 22: return "6"
-        case 26: return "7"
-        case 28: return "8"
-        case 25: return "9"
-        case 29: return "0"
-        case 49: return "Space"
-        case 0: return "A"
-        case 11: return "B"
-        case 8: return "C"
-        case 2: return "D"
-        case 14: return "E"
-        case 3: return "F"
-        case 5: return "G"
-        case 4: return "H"
-        case 34: return "I"
-        case 38: return "J"
-        case 40: return "K"
-        case 37: return "L"
-        case 46: return "M"
-        case 45: return "N"
-        case 31: return "O"
-        case 35: return "P"
-        case 12: return "Q"
-        case 15: return "R"
-        case 1: return "S"
-        case 17: return "T"
-        case 32: return "U"
-        case 9: return "V"
-        case 13: return "W"
-        case 7: return "X"
-        case 16: return "Y"
-        case 6: return "Z"
-        case 36: return "Return"
-        case 53: return "Escape"
-        case 51: return "Delete"
-        case 48: return "Tab"
-        case 76: return "Enter"
-        case 123: return "←"
-        case 124: return "→"
-        case 125: return "↓"
-        case 126: return "↑"
-        default:
-
-            // Fallback: try to get character from key code
-            return getCharacterFromKeyCode(keyCode)
+        // Static lookup table mapping key codes to display strings
+        let keyCodeMap: [UInt16: String] = [
+            18: "1", 19: "2", 20: "3", 21: "4", 23: "5",
+            22: "6", 26: "7", 28: "8", 25: "9", 29: "0",
+            49: "Space",
+            0: "A",  11: "B", 8: "C",  2: "D",  14: "E",
+            3: "F",  5: "G",  4: "H",  34: "I", 38: "J",
+            40: "K", 37: "L", 46: "M", 45: "N", 31: "O",
+            35: "P", 12: "Q", 15: "R", 1: "S",  17: "T",
+            32: "U", 9: "V",  13: "W", 7: "X",  16: "Y",
+            6: "Z",
+            36: "Return", 53: "Escape", 51: "Delete",
+            48: "Tab",    76: "Enter",
+            123: "←",    124: "→",    125: "↓",  126: "↑",
+        ]
+        if let mapped = keyCodeMap[keyCode] {
+            return mapped
         }
+        // Fallback: try to get character from key code
+        return getCharacterFromKeyCode(keyCode)
     }
 
     private func getCharacterFromKeyCode(_ keyCode: UInt16) -> String? {
