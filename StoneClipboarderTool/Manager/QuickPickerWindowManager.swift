@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import QuickLookUI
 import SwiftUI
 
 class QuickPickerHostingView: NSHostingView<QuickPickerView> {
@@ -81,6 +82,12 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     private var isDragging = false
     private var dragOffset: NSPoint = NSPoint.zero
     private var menuBarRefreshCallback: (() -> Void)?
+    // Debounced dismiss used when QL panel is open — avoids frame-check fragility
+    // and double-scheduling when the user clicks twice on the QL panel.
+    nonisolated(unsafe) private var pendingQLDismiss: DispatchWorkItem?
+    // Observes app resign-active so QuickPicker closes when an external app activates
+    // (e.g. "Open with TextEdit" in QL, whether TextEdit was already running or not).
+    private var resignActiveObserver: NSObjectProtocol?
 
     func setCBViewModel(_ viewModel: CBViewModel) {
         self.cbViewModel = viewModel
@@ -219,9 +226,13 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         setupEventMonitoring()
         setupKeyMonitoring()
         setupLocalKeyMonitoring()
+        setupResignActiveObserver()
     }
 
     func hideQuickPicker() {
+        pendingQLDismiss?.cancel()
+        pendingQLDismiss = nil
+        removeResignActiveObserver()
         hidePreviewPanel()
         removeEventMonitoring()
         removeKeyMonitoring()
@@ -314,9 +325,34 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             else { return }
 
             let clickLocation = NSEvent.mouseLocation
-            if !window.frame.contains(clickLocation) {
-                self.hideQuickPicker()
+
+            // Never dismiss for clicks inside the QuickPicker window itself
+            if window.frame.contains(clickLocation) {
+                return
             }
+
+            // When native QL is visible, ANY click outside the QuickPicker could be on
+            // the QL panel body OR its detached toolbar/HUD ("Open with" button lives there).
+            // Frame-checking is unreliable because that button is in a separate NSWindow.
+            // Instead, debounce: cancel any previous pending dismiss and schedule a new one
+            // so the button's mouseUp action fires before we tear everything down.
+            if self.isPreviewPanelVisible() {
+                self.pendingQLDismiss?.cancel()
+                let work = DispatchWorkItem { [weak self] in
+                    self?.pendingQLDismiss = nil
+                    self?.hideQuickPicker()
+                }
+                self.pendingQLDismiss = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
+                return
+            }
+
+            // Don't dismiss for clicks inside the custom preview panel
+            if self.customPreviewManager.isPreviewVisible {
+                return
+            }
+
+            self.hideQuickPicker()
         }
     }
 
@@ -369,6 +405,40 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
             localKeyMonitor = nil
+        }
+    }
+
+    // MARK: - Resign Active Observer
+
+    private func setupResignActiveObserver() {
+        removeResignActiveObserver()
+        // Delay registration briefly so the NSApp.activate() call in showQuickPicker
+        // doesn't immediately fire the observer on app launch / re-show.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
+            MainActor.assumeIsolated {
+                guard self.window?.isVisible == true else { return }
+                self.resignActiveObserver = NotificationCenter.default.addObserver(
+                    forName: NSApplication.willResignActiveNotification,
+                    object: nil,
+                    queue: .main
+                ) { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        guard let self = self, self.window?.isVisible == true else { return }
+                        // Delay slightly so "Open with" button action fires and temp files survive
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            self.hideQuickPicker()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func removeResignActiveObserver() {
+        if let observer = resignActiveObserver {
+            NotificationCenter.default.removeObserver(observer)
+            resignActiveObserver = nil
         }
     }
 

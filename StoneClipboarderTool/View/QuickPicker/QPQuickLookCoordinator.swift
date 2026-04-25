@@ -121,13 +121,23 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
     }
 
     /// Hide the QLPreviewPanel if visible.
+    /// Delays temp file cleanup so "Open with" actions can read the file.
     func hidePreview() {
         if QLPreviewPanel.sharedPreviewPanelExists(),
            let panel = QLPreviewPanel.shared(),
            panel.isVisible {
             panel.orderOut(nil)
         }
-        cleanupTempFiles()
+
+        // Delay cleanup so external apps launched via "Open with" have time to read the file
+        let tempDir = tempDirectory
+        tempDirectory = nil
+        previewURL = nil
+        if let tempDir = tempDir {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                try? FileManager.default.removeItem(at: tempDir)
+            }
+        }
     }
 
     /// Whether the preview panel is currently visible.
