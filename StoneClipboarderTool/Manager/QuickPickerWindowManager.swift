@@ -282,7 +282,21 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     }
 
     private func showPreviewPanel(for item: CBItem) {
-        let mode = settingsManager?.quickLookMode ?? .native
+        let configuredMode = settingsManager?.quickLookMode ?? .native
+        // QLPreviewPanel.shared() is system-managed and ignores the
+        // .canJoinAllSpaces / .fullScreenAuxiliary collection-behavior tweaks
+        // we'd need to render it in another app's fullscreen Space, so when
+        // the user is inside such a Space we transparently fall back to the
+        // custom preview (which uses an NSPanel we own and therefore *can*
+        // be shown over fullscreen content). Outside fullscreen, .native
+        // keeps using Apple's Quick Look as configured.
+        let mode: QuickLookMode
+        if configuredMode == .native && Self.isInOtherAppFullscreenSpace() {
+            mode = .custom
+        } else {
+            mode = configuredMode
+        }
+
         switch mode {
         case .native:
             guard quickLookCoordinator.prepareItem(item) else { return }
@@ -352,12 +366,12 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     }
 
     func isPreviewPanelVisible() -> Bool {
-        let mode = settingsManager?.quickLookMode ?? .native
-        switch mode {
-        case .native: return quickLookCoordinator.isPreviewVisible
-        case .custom: return customPreviewManager.isPreviewVisible
-        case .disabled: return false
-        }
+        // Check both: when configured mode is .native but the user is in
+        // another app's fullscreen Space, showPreviewPanel transparently
+        // routes to the custom preview, so a strict mode-based switch would
+        // miss it and toggle/escape would think nothing is open.
+        guard settingsManager?.quickLookMode != .disabled else { return false }
+        return quickLookCoordinator.isPreviewVisible || customPreviewManager.isPreviewVisible
     }
 
     func hidePreviewPanel() {
@@ -544,5 +558,63 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }
+    }
+
+    // MARK: - Fullscreen Detection
+
+    /// True when the user is currently inside another app's native macOS
+    /// fullscreen Space. We detect this by scanning on-screen windows that
+    /// don't belong to us and checking whether any of them covers an entire
+    /// screen — that's the signature of a fullscreen Space (in regular
+    /// Spaces no app's window matches the screen frame exactly).
+    ///
+    /// Used to fall back from Apple's QLPreviewPanel (which is system-managed
+    /// and refuses to render in another app's fullscreen Space) to our own
+    /// custom preview panel, which is configured to render anywhere.
+    static func isInOtherAppFullscreenSpace() -> Bool {
+        guard let mainScreen = NSScreen.main else { return false }
+        let ourPID = ProcessInfo.processInfo.processIdentifier
+
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let windows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return false
+        }
+
+        for window in windows {
+            // Skip our own windows (the QuickPicker panel itself can be
+            // borderless and on the same Space, but it doesn't span the
+            // screen — still, exclude defensively).
+            if let pid = window[kCGWindowOwnerPID as String] as? pid_t, pid == ourPID {
+                continue
+            }
+            // Only look at normal-layer windows; menu bar, dock, status
+            // items, etc. live on higher layers and would falsely match.
+            if let layer = window[kCGWindowLayer as String] as? Int, layer != 0 {
+                continue
+            }
+            guard let bounds = window[kCGWindowBounds as String] as? [String: CGFloat] else {
+                continue
+            }
+            let rect = CGRect(
+                x: bounds["X"] ?? 0,
+                y: bounds["Y"] ?? 0,
+                width: bounds["Width"] ?? 0,
+                height: bounds["Height"] ?? 0
+            )
+            for screen in NSScreen.screens {
+                if abs(rect.width - screen.frame.width) < 2,
+                   abs(rect.height - screen.frame.height) < 2 {
+                    return true
+                }
+            }
+            // Some apps (e.g. browsers) report fullscreen as the visibleFrame
+            // of mainScreen (excluding menu bar) — treat that as fullscreen
+            // too if menu bar is currently auto-hidden.
+            if abs(rect.width - mainScreen.frame.width) < 2,
+               abs(rect.height - mainScreen.visibleFrame.height) < 2 {
+                return true
+            }
+        }
+        return false
     }
 }
