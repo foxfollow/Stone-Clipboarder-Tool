@@ -102,6 +102,7 @@ class MenuBarManager: ObservableObject {
                 popover.performClose(sender)
             } else {
                 popover.show(relativeTo: button.bounds, of: button, preferredEdge: NSRectEdge.minY)
+                makePopoverFullscreenSafe(popover)
             }
         } else {
             // Recreate popover if it's nil
@@ -109,8 +110,23 @@ class MenuBarManager: ObservableObject {
             // Try again after refresh
             if let popover = popover {
                 popover.show(relativeTo: button.bounds, of: button, preferredEdge: NSRectEdge.minY)
+                makePopoverFullscreenSafe(popover)
             }
         }
+    }
+
+    /// NSPopover's internal window doesn't carry .canJoinAllSpaces /
+    /// .fullScreenAuxiliary by default, so it can't render alongside another
+    /// app's fullscreen Space. Patching the collection behavior right after
+    /// show() lets the popover appear without forcing a Space switch.
+    /// Window level is left at NSPopover's default to avoid interfering with
+    /// other floating UI (e.g. QuickLook).
+    @MainActor
+    private func makePopoverFullscreenSafe(_ popover: NSPopover) {
+        guard let popoverWindow = popover.contentViewController?.view.window else { return }
+        popoverWindow.collectionBehavior = [
+            .canJoinAllSpaces, .fullScreenAuxiliary, .transient
+        ]
     }
 
     /// Update the menu bar icon based on pause state

@@ -14,14 +14,12 @@ class QuickPickerHostingView: NSHostingView<QuickPickerView> {
         return true
     }
 
-    override func becomeFirstResponder() -> Bool {
-        let result = super.becomeFirstResponder()
-        // Ensure the hosting view can receive keyboard events
-        DispatchQueue.main.async {
-            self.window?.makeFirstResponder(self)
-        }
-        return result
-    }
+    // No becomeFirstResponder override here. A previous version re-asserted
+    // self as first responder on the next runloop tick, which fired *after*
+    // SwiftUI's @FocusState routed focus to the search TextField's field
+    // editor — kicking the cursor out of the search box. SwiftUI's onKeyPress
+    // handlers fire on the parent view regardless of which child is focused,
+    // so we don't need to force the hosting view to stay first responder.
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         return true
@@ -34,10 +32,9 @@ class KeyCapturingPanel: NSPanel {
     override var canBecomeKey: Bool {
         return true
     }
-
-    override var canBecomeMain: Bool {
-        return canBecomeKey  // Allow it to become main to receive proper focus
-    }
+    // canBecomeMain intentionally not overridden — NSPanel's default is false,
+    // which is what we want so .nonactivatingPanel + canJoinAllSpaces can
+    // render over another app's fullscreen Space without triggering activation.
 
     override var acceptsFirstResponder: Bool {
         return canBecomeKey
@@ -117,16 +114,23 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
         // Store the currently active app so we can return focus to it later
         previousApp = NSWorkspace.shared.frontmostApplication
-        
-        // Hide ALL other windows to ensure QuickPicker is the only one visible
+
+        // Hide our other windows so the QuickPicker is the only one visible.
+        // orderOut on its own does NOT trigger a Space switch — only NSApp.activate
+        // and activation-policy changes do. Safe to do this in any context.
         for window in NSApp.windows {
             window.orderOut(nil)
         }
 
-        // Create a panel that captures focus without activating the main app
+        // Create a borderless non-activating panel. .nonactivatingPanel is
+        // required for the picker to render over another app's fullscreen
+        // Space without forcing a Space switch; SwiftUI @FocusState is
+        // unreliable in this configuration, so focusSearchField() below
+        // pushes the cursor into the search field directly via the
+        // responder chain instead of relying on @FocusState.
         let panel = KeyCapturingPanel(
             contentRect: NSRect(x: 0, y: 0, width: 500, height: 430),
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -134,7 +138,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         panel.quickPickerDelegate = self
 
         panel.isFloatingPanel = true
-        panel.level = .floating  // Use floating level instead of screenSaver
+        // Keep .floating so QuickLook (which uses ~floating level) can render
+        // above the picker when the user previews an item. A higher level like
+        // .popUpMenu would shove QL behind the picker.
+        panel.level = .floating
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
@@ -144,9 +151,11 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         panel.worksWhenModal = true
         panel.isMovableByWindowBackground = true
         panel.isMovable = true
+        // canJoinAllSpaces + fullScreenAuxiliary lets the panel render on top
+        // of another app's fullscreen Space without triggering a Space switch.
         panel.collectionBehavior = [
             .canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle,
-            .transient  // Add transient to prevent it from becoming main
+            .transient
         ]
 
         // Create content view
@@ -188,36 +197,32 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             panel.setFrameOrigin(origin)
         }
 
-        // Store current activation policy
-        let currentPolicy = NSApp.activationPolicy()
-        
-        // Temporarily set to accessory to prevent dock icon bounce
-        if currentPolicy == .regular {
-            NSApp.setActivationPolicy(.accessory)
-        }
-        
-        // Show panel without activating main app
+        // Show the panel and activate our app so it becomes the OS-level
+        // active app. macOS routes key events to the active app first, so
+        // without this the trigger key (space / →) for QuickLook leaks
+        // through to whichever app was frontmost before the picker opened
+        // and types the literal character there.
+        //
+        // We deliberately do NOT toggle activation policy
+        // (.regular ↔ .accessory) — that's what previously caused a Space
+        // switch out of another app's fullscreen Space. NSApp.activate by
+        // itself is safe here because the orderOut() loop above already
+        // hid every other window of ours, and the panel itself lives on the
+        // current Space (canJoinAllSpaces + fullScreenAuxiliary), so macOS
+        // has nothing to switch Spaces *to*.
         panel.orderFrontRegardless()
         panel.makeKey()
-        
-        // Activate the app to ensure we can receive keyboard events
         NSApp.activate(ignoringOtherApps: true)
-        
-        // Force keyboard focus to the panel
-        DispatchQueue.main.async {
-            panel.makeKey()
-            panel.makeMain()
-            if let contentView = panel.contentView {
-                panel.makeFirstResponder(contentView)
-                contentView.becomeFirstResponder()
-            }
-            
-            // Restore activation policy after a short delay
-            if currentPolicy == .regular {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    NSApp.setActivationPolicy(currentPolicy)
-                }
-            }
+
+        // Push the cursor straight into the search TextField. SwiftUI renders
+        // the TextField as an NSTextField inside the hosting view; we walk
+        // the subview tree to find it and make it first responder. The small
+        // delay lets SwiftUI finish its initial render so the NSTextField
+        // actually exists. Doing this via the AppKit responder chain works
+        // reliably even when @FocusState misfires (which it does inside a
+        // borderless .nonactivatingPanel).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.focusSearchField()
         }
 
         self.window = panel
@@ -266,6 +271,11 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
         if isPreviewPanelVisible() {
             hidePreviewPanel()
+            // QLPreviewPanel.orderOut leaves first responder unset, so arrow
+            // keys / trigger key would do nothing in the picker afterwards.
+            // Re-key our panel so the search field regains the cursor and
+            // SwiftUI's onKeyPress handlers wake up again.
+            reclaimKeyFocus()
         } else {
             showPreviewPanel(for: item)
         }
@@ -284,6 +294,56 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         case .disabled:
             break
         }
+        // Re-take key focus on our QuickPicker panel after showing the preview.
+        // QLPreviewPanel.makeKeyAndOrderFront steals key, and with
+        // .nonactivatingPanel our app is not "active", so without this the
+        // trigger key (space / →) and escape would be delivered to whichever
+        // app was frontmost before the picker opened — typing the literal
+        // character there instead of toggling the preview off.
+        reclaimKeyFocus()
+    }
+
+    private func reclaimKeyFocus() {
+        // Re-take key on our panel after QuickLook steals it and put the
+        // cursor back into the search field. Without this, arrow keys and
+        // the trigger key go nowhere after closing QL.
+        DispatchQueue.main.async { [weak self] in
+            guard let window = self?.window else { return }
+            window.makeKey()
+            self?.focusSearchField()
+        }
+    }
+
+    /// Walk the hosting view's subview tree to find the search NSTextField
+    /// (rendered by SwiftUI's TextField) and make it first responder so the
+    /// cursor lands in it. Falls back to the hosting view if no field is
+    /// found yet (rare — would mean SwiftUI hasn't rendered).
+    private func focusSearchField() {
+        guard let window = window, let contentView = window.contentView else { return }
+        if let textField = Self.findFirstTextField(in: contentView) {
+            window.makeFirstResponder(textField)
+        } else {
+            window.makeFirstResponder(contentView)
+        }
+    }
+
+    private static func findFirstTextField(in view: NSView) -> NSView? {
+        if view is NSTextField {
+            return view
+        }
+        // SwiftUI on macOS sometimes wraps text input in a private subclass
+        // whose class name contains "TextField" — match by name as a fallback
+        // so we don't miss it on future macOS versions.
+        let className = String(describing: type(of: view))
+        if className.contains("TextField"), view.acceptsFirstResponder {
+            return view
+        }
+        for subview in view.subviews {
+            if let found = findFirstTextField(in: subview) {
+                return found
+            }
+        }
+        return nil
     }
 
     private func updatePreviewPanel(for item: CBItem) {
