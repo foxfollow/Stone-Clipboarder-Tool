@@ -57,7 +57,7 @@ jobs:
             -Dsonar.sources=StoneClipboarderTool
             -Dsonar.tests=StoneClipboarderToolTests
             -Dsonar.exclusions=build/**,docs/**
-            -Dsonar.coverage.exclusions=StoneClipboarderTool/View/**,StoneClipboarderTool/StoneClipboarderToolApp.swift,StoneClipboarderTool/Assets.xcassets/**
+            -Dsonar.coverage.exclusions=StoneClipboarderTool/View/**,StoneClipboarderTool/Manager/**,StoneClipboarderTool/StoneClipboarderToolApp.swift,StoneClipboarderTool/Assets.xcassets/**,StoneClipboarderTool/Helper/**
             -Dsonar.coverageReportPaths=sonar-coverage.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
