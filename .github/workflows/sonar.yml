@@ -24,19 +24,29 @@ jobs:
           fi
           xcodebuild -version
 
-      - name: Build and generate coverage
+      - name: Run tests with coverage
         run: |
-          xcodebuild build \
+          xcodebuild test \
             -project StoneClipboarderTool.xcodeproj \
             -scheme StoneClipboarderTool \
             -configuration Debug \
             -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults.xcresult \
             -destination "platform=macOS" \
+            -enableCodeCoverage YES \
             MACOSX_DEPLOYMENT_TARGET=15.0 \
-            ONLY_ACTIVE_ARCH=NO \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Convert coverage to Sonar generic format
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/SonarSource/sonar-scanning-examples/master/swift-coverage/swift-coverage-example/xccov-to-sonarqube-generic.sh \
+            -o xccov-to-sonarqube-generic.sh
+          chmod +x xccov-to-sonarqube-generic.sh
+          ./xccov-to-sonarqube-generic.sh build/TestResults.xcresult > sonar-coverage.xml
+          echo "Coverage report size: $(wc -l < sonar-coverage.xml) lines"
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v7
@@ -45,7 +55,10 @@ jobs:
             -Dsonar.organization=foxfollow
             -Dsonar.projectKey=foxfollow_Stone-Clipboarder-Tool
             -Dsonar.sources=StoneClipboarderTool
+            -Dsonar.tests=StoneClipboarderToolTests
             -Dsonar.exclusions=build/**,docs/**
+            -Dsonar.coverage.exclusions=StoneClipboarderTool/View/**,StoneClipboarderTool/StoneClipboarderToolApp.swift,StoneClipboarderTool/Assets.xcassets/**
+            -Dsonar.coverageReportPaths=sonar-coverage.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

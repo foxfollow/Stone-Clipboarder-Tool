@@ -10,8 +10,19 @@
 		BF5B4D872E48BC2700D5FF70 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = BF5B4D862E48BC2700D5FF70 /* Sparkle */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		BFAA00072E60000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BF67485B2E45EEE40035F367 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BF6748622E45EEE40035F367;
+			remoteInfo = StoneClipboarderTool;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		BF6748632E45EEE40035F367 /* StoneClipboarderTool.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StoneClipboarderTool.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BFAA00022E60000000000001 /* StoneClipboarderToolTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StoneClipboarderToolTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -33,6 +44,11 @@
 			path = StoneClipboarderTool;
 			sourceTree = "<group>";
 		};
+		BFAA00032E60000000000001 /* StoneClipboarderToolTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = StoneClipboarderToolTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +60,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BFAA00052E60000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -51,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				BF6748652E45EEE40035F367 /* StoneClipboarderTool */,
+				BFAA00032E60000000000001 /* StoneClipboarderToolTests */,
 				BF6748642E45EEE40035F367 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -59,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				BF6748632E45EEE40035F367 /* StoneClipboarderTool.app */,
+				BFAA00022E60000000000001 /* StoneClipboarderToolTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -88,6 +113,29 @@
 			productName = StoneClipboarderTool;
 			productReference = BF6748632E45EEE40035F367 /* StoneClipboarderTool.app */;
 			productType = "com.apple.product-type.application";
+		};
+		BFAA00012E60000000000001 /* StoneClipboarderToolTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BFAA00092E60000000000001 /* Build configuration list for PBXNativeTarget "StoneClipboarderToolTests" */;
+			buildPhases = (
+				BFAA00042E60000000000001 /* Sources */,
+				BFAA00052E60000000000001 /* Frameworks */,
+				BFAA00062E60000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BFAA00082E60000000000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				BFAA00032E60000000000001 /* StoneClipboarderToolTests */,
+			);
+			name = StoneClipboarderToolTests;
+			packageProductDependencies = (
+			);
+			productName = StoneClipboarderToolTests;
+			productReference = BFAA00022E60000000000001 /* StoneClipboarderToolTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -122,12 +170,20 @@
 			projectRoot = "";
 			targets = (
 				BF6748622E45EEE40035F367 /* StoneClipboarderTool */,
+				BFAA00012E60000000000001 /* StoneClipboarderToolTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		BF6748612E45EEE40035F367 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BFAA00062E60000000000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -144,7 +200,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BFAA00042E60000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BFAA00082E60000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BF6748622E45EEE40035F367 /* StoneClipboarderTool */;
+			targetProxy = BFAA00072E60000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BF67486F2E45EEE50035F367 /* Debug */ = {
@@ -329,6 +400,42 @@
 			};
 			name = Release;
 		};
+		BFAA000A2E60000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 729B6K44G8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = d3f0ld.StoneClipboarderToolTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StoneClipboarderTool.app/Contents/MacOS/StoneClipboarderTool";
+			};
+			name = Debug;
+		};
+		BFAA000B2E60000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 729B6K44G8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = d3f0ld.StoneClipboarderToolTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StoneClipboarderTool.app/Contents/MacOS/StoneClipboarderTool";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -346,6 +453,15 @@
 			buildConfigurations = (
 				BF6748722E45EEE50035F367 /* Debug */,
 				BF6748732E45EEE50035F367 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BFAA00092E60000000000001 /* Build configuration list for PBXNativeTarget "StoneClipboarderToolTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BFAA000A2E60000000000001 /* Debug */,
+				BFAA000B2E60000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
