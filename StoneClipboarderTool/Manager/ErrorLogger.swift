@@ -31,7 +31,7 @@ class ErrorLogger {
         return appDir.appendingPathComponent(logFileName)
     }
 
-    private init() {}
+    private init() { /* Private initialization to ensure singleton usage */ }
 
     /// Log an error. Always prints to console. Writes to file if file logging is enabled.
     func log(_ message: String, category: String = "General", error: Error? = nil) {

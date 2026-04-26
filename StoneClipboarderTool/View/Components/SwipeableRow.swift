@@ -160,6 +160,16 @@ struct SwipeableRow<Content: View>: View {
             return false
         }
     }
+    
+    private var backgroundColor: Color {
+        if swipeOffset < -50 {
+            return Color.red.opacity(0.1)
+        } else if swipeOffset > 50 {
+            return Color.green.opacity(0.1)
+        } else {
+            return Color.clear
+        }
+    }
 
     init(@ViewBuilder content: () -> Content, onDelete: @escaping () -> Void) {
         self.content = content()
@@ -191,11 +201,7 @@ struct SwipeableRow<Content: View>: View {
                 .offset(x: swipeOffset)
                 .background(
                     Rectangle()
-                        .fill(
-                            swipeOffset < -50 ? Color.red.opacity(0.1) :
-                            swipeOffset > 50 ? Color.green.opacity(0.1) :
-                            Color.clear
-                        )
+                        .fill(backgroundColor)
                         .animation(.easeOut(duration: 0.1), value: swipeOffset)
                 )
                 .scaleEffect(isDeleting ? 0.95 : 1.0)

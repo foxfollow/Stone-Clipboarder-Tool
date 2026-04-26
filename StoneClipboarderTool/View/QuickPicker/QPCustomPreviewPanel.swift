@@ -192,9 +192,14 @@ class QPCustomPreviewManager {
             return
         }
 
+        // .nonactivatingPanel is required so the preview can render alongside
+        // another app's fullscreen Space without forcing a Space switch — the
+        // QuickPicker panel uses the same flag for the same reason. Without
+        // it, an activating borderless panel resolves to our app's home
+        // Space instead of the user's current fullscreen Space.
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 400),
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -215,10 +220,9 @@ class QPCustomPreviewManager {
             let mainFrame = mainWindow.frame
             var origin = NSPoint(x: mainFrame.maxX + 8, y: mainFrame.origin.y)
 
-            if let screen = NSScreen.main {
-                if origin.x + 420 > screen.visibleFrame.maxX {
-                    origin.x = mainFrame.minX - 420 - 8
-                }
+            if let screen = NSScreen.main,
+               origin.x + 420 > screen.visibleFrame.maxX {
+                origin.x = mainFrame.minX - 420 - 8
             }
             panel.setFrameOrigin(origin)
         }

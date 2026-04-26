@@ -181,8 +181,8 @@ struct QPItemList: View {
         searchText: .constant(""),
         isLoading: false,
         hasMoreItems: true,
-        onLoadMore: {},
-        performAction: {},
+        onLoadMore: { /* preview dummy implementation */ },
+        performAction: { /* preview dummy implementation */ },
         onOpenPreview: { _ in },
         onOpenTextEdit: { _ in }
     )

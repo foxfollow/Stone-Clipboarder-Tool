@@ -69,25 +69,23 @@ struct ActionsBottomButtonView: View {
                 .buttonStyle(.bordered)
             }
 
-            if item.itemType == .text {
-                if isEditing {
-                    Button("Save Changes") {
-                        saveTextChanges()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!hasChanges)
-                    
-                    Button("Cancel") {
-                        cancelEditing()
-                    }
-                    .buttonStyle(.bordered)
-                } else {
-                    // TODO: if it is link add "Open Link" button
-                    Button("Edit Text") {
-                        startEditing()
-                    }
-                    .buttonStyle(.bordered)
+            if item.itemType == .text, isEditing {
+                Button("Save Changes") {
+                    saveTextChanges()
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(!hasChanges)
+                
+                Button("Cancel") {
+                    cancelEditing()
+                }
+                .buttonStyle(.bordered)
+            } else if item.itemType == .text {
+                // TODO: if it is link add "Open Link" button
+                Button("Edit Text") {
+                    startEditing()
+                }
+                .buttonStyle(.bordered)
             }
             
             Spacer()

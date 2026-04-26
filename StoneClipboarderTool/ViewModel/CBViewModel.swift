@@ -668,10 +668,9 @@ class CBViewModel: ObservableObject {
                 continue
             }
 
-            if let lastAccess = lastAccessTimes[item.persistentModelID] {
-                if now.timeIntervalSince(lastAccess) > maxInactiveTime {
-                    itemsToCleanup.append(item)
-                }
+            if let lastAccess = lastAccessTimes[item.persistentModelID],
+               now.timeIntervalSince(lastAccess) > maxInactiveTime {
+                itemsToCleanup.append(item)
             }
         }
 

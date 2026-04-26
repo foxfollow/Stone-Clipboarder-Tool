@@ -306,46 +306,18 @@ class HotkeyManager: ObservableObject {
     }
 
     private func keyCodeForCharacter(_ character: String) -> UInt32? {
-        switch character.lowercased() {
-        case "1": return 18
-        case "2": return 19
-        case "3": return 20
-        case "4": return 21
-        case "5": return 23
-        case "6": return 22
-        case "7": return 26
-        case "8": return 28
-        case "9": return 25
-        case "0": return 29
-        case "space": return 49
-        case "a": return 0
-        case "b": return 11
-        case "c": return 8
-        case "d": return 2
-        case "e": return 14
-        case "f": return 3
-        case "g": return 5
-        case "h": return 4
-        case "i": return 34
-        case "j": return 38
-        case "k": return 40
-        case "l": return 37
-        case "m": return 46
-        case "n": return 45
-        case "o": return 31
-        case "p": return 35
-        case "q": return 12
-        case "r": return 15
-        case "s": return 1
-        case "t": return 17
-        case "u": return 32
-        case "v": return 9
-        case "w": return 13
-        case "x": return 7
-        case "y": return 16
-        case "z": return 6
-        default: return nil
-        }
+        let characterMap: [String: UInt32] = [
+            "1": 18, "2": 19, "3": 20, "4": 21, "5": 23,
+            "6": 22, "7": 26, "8": 28, "9": 25, "0": 29,
+            "space": 49,
+            "a": 0, "b": 11, "c": 8, "d": 2, "e": 14,
+            "f": 3, "g": 5, "h": 4, "i": 34, "j": 38,
+            "k": 40, "l": 37, "m": 46, "n": 45, "o": 31,
+            "p": 35, "q": 12, "r": 15, "s": 1, "t": 17,
+            "u": 32, "v": 9, "w": 13, "x": 7, "y": 16,
+            "z": 6
+        ]
+        return characterMap[character.lowercased()]
     }
 
     // MARK: - Actions

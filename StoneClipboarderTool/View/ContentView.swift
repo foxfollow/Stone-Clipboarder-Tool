@@ -128,7 +128,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .clipboardAlert($activeAlert, onCleanup: {}, onDeleteAll: {
+            .clipboardAlert($activeAlert, onCleanup: { /* Cleanup not used in this context */ }, onDeleteAll: {
                 deleteAllItems()
             })
         } detail: {

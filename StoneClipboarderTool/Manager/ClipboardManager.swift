@@ -352,17 +352,23 @@ class ClipboardManager: ObservableObject {
                         }
                     }
 
-                    await MainActor.run {
-                        print("File saved successfully")
-                    }
+                    await self.logSuccessOnMain()
 
                 } catch {
-                    await MainActor.run {
-                        print("Error saving file: \(error.localizedDescription)")
-                    }
+                    await self.logErrorOnMain(error)
                 }
             }
         }
+    }
+    
+    @MainActor
+    private func logSuccessOnMain() {
+        print("File saved successfully")
+    }
+    
+    @MainActor
+    private func logErrorOnMain(_ error: Error) {
+        print("Error saving file: \(error.localizedDescription)")
     }
     
     func copyItemToClipboard(_ item: CBItem) {

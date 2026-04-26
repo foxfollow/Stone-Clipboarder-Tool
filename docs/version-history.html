@@ -109,9 +109,27 @@
         <!-- Version List -->
         <section class="max-w-3xl mx-auto px-4 space-y-8">
 
-            <!-- Version 1.5.2 -->
+            <!-- Version 1.5.3 -->
             <div class="card-gradient rounded-2xl p-8 relative">
                 <span class="absolute top-6 right-6 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30">Latest</span>
+                <div class="flex items-baseline gap-4 mb-4 border-b border-white/5 pb-4">
+                    <h3 class="font-mono text-2xl font-bold text-white">Version 1.5.3</h3>
+                    <span class="version-date text-sm text-gray-500">Apr 2026</span>
+                </div>
+                <ul class="space-y-3 text-gray-300 text-sm leading-relaxed list-none pl-0">
+                    <li>🪟 <strong>NEW:</strong> Quick Picker now renders over other apps' fullscreen Spaces — open it without leaving the app you're in</li>
+                    <li>🖼️ <strong>NEW:</strong> Menu bar popover now appears alongside other apps' fullscreen apps too</li>
+                    <li>🔍 <strong>NEW:</strong> Smart preview fallback — when you trigger preview while in another app's fullscreen Space, the custom preview is used automatically (Apple Quick Look is system-managed and can't render in another app's fullscreen)</li>
+                    <li>⌨️ <strong>IMPROVED:</strong> Search field cursor now lands in the Quick Picker on open and is restored after closing the preview</li>
+                    <li>🛠️ <strong>FIXED:</strong> Quick Picker no longer pulls you out of another app's fullscreen Space when triggered</li>
+                    <li>🛠️ <strong>FIXED:</strong> QuickLook stability — temp files are cleaned up with a delay so "Open with…" actions have time to read them</li>
+                    <li>🛠️ <strong>IMPROVED:</strong> Window resignation handling — Quick Picker now closes cleanly when an external app activates (e.g. via "Open with…")</li>
+                    <li>🧹 <strong>IMPROVED:</strong> Code quality refactor based on SonarCloud scanner issues</li>
+                </ul>
+            </div>
+
+            <!-- Version 1.5.2 -->
+            <div class="card-gradient rounded-2xl p-8">
                 <div class="flex items-baseline gap-4 mb-4 border-b border-white/5 pb-4">
                     <h3 class="font-mono text-2xl font-bold text-white">Version 1.5.2</h3>
                     <span class="version-date text-sm text-gray-500">Mar 2026</span>

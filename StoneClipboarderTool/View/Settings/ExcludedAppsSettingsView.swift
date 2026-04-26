@@ -320,7 +320,7 @@ struct AppPickerView: View {
                     onAppRemoved(excludedApp)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) { /* No action needed for cancel */ }
         } message: { app in
             Text("'\(app.name)' is already in the excluded apps list. Do you want to remove it?")
         }

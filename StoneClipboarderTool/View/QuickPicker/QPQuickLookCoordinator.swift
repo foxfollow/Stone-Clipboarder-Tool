@@ -121,14 +121,23 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
     }
 
     /// Hide the QLPreviewPanel if visible.
+    /// Delays temp file cleanup so "Open with" actions can read the file.
     func hidePreview() {
-        if QLPreviewPanel.sharedPreviewPanelExists() {
-            let panel = QLPreviewPanel.shared()!
-            if panel.isVisible {
-                panel.orderOut(nil)
+        if QLPreviewPanel.sharedPreviewPanelExists(),
+           let panel = QLPreviewPanel.shared(),
+           panel.isVisible {
+            panel.orderOut(nil)
+        }
+
+        // Delay cleanup so external apps launched via "Open with" have time to read the file
+        let tempDir = tempDirectory
+        tempDirectory = nil
+        previewURL = nil
+        if let tempDir = tempDir {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                try? FileManager.default.removeItem(at: tempDir)
             }
         }
-        cleanupTempFiles()
     }
 
     /// Whether the preview panel is currently visible.
@@ -139,13 +148,13 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
 
     // MARK: - QLPreviewPanelDataSource
 
-    nonisolated func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+    nonisolated func numberOfPreviewItems(in _: QLPreviewPanel!) -> Int {
         return MainActor.assumeIsolated {
             previewURL != nil ? 1 : 0
         }
     }
 
-    nonisolated func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
+    nonisolated func previewPanel(_: QLPreviewPanel!, previewItemAt _: Int) -> (any QLPreviewItem)! {
         return MainActor.assumeIsolated {
             previewURL as? QLPreviewItem
         }
