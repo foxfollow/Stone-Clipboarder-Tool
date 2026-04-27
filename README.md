@@ -49,6 +49,8 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 ## Features
 
 ### 🆕 New in Version 1.5.x
+- **🛠️ Apple Quick Look Fix (1.5.4)**: Fullscreen detection refined — Apple Quick Look now stays selected in regular and "Fill"/maximized windows; the Custom Preview fallback only kicks in for true "Entire Screen" Spaces
+- **⌨️ QL Arrow Navigation (1.5.4)**: ↑/↓ in Quick Picker now reliably moves the highlight and reloads the Apple Quick Look preview to the new item even when QL has grabbed the key window
 - **🪟 Fullscreen Support (1.5.3)**: Quick Picker and menu bar popover now render over other apps' fullscreen Spaces — open them without leaving the app you're in
 - **🔍 Smart Preview Fallback (1.5.3)**: When triggering preview inside a fullscreen app, the custom preview is used automatically (Apple Quick Look is system-managed and can't render there)
 - **🛠️ Quick Picker Stability (1.5.3)**: Fixed Quick Picker pulling you out of fullscreen, improved QuickLook temp-file cleanup timing, cleaner window resignation handling

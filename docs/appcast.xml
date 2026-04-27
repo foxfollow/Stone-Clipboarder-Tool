@@ -11,6 +11,30 @@
         <language>en</language>
 
     <item>
+        <title>Version VERSION_NUMBER</title>
+        <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
+        <sparkle:version>VERSION_NUMBER</sparkle:version>
+        <sparkle:shortVersionString>VERSION_NUMBER</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>StoneClipboarderTool VERSION_NUMBER</h2>
+            <ul>
+                <li>🛠️ FIXED: Apple Quick Look now stays selected in regular and "Fill"/maximized windows — fullscreen detection no longer falsely matches non-fullscreen full-size windows and only falls back to the Custom Preview when the focused app is in a true "Entire Screen" Space</li>
+                <li>⌨️ IMPROVED: Arrow navigation while Apple Quick Look is open — the search field keeps focus and ↑/↓ now reliably moves the highlight in Quick Picker, reloading the QL preview with the new item even when QL grabs key window status</li>
+            </ul>
+        ]]></description>
+        <pubDate>RELEASE_DATE</pubDate>
+        <enclosure
+            url="https://github.com/REPO_OWNER/REPO_NAME/releases/download/vVERSION_NUMBER/StoneClipboarderTool.zip"
+            sparkle:version="VERSION_NUMBER"
+            sparkle:shortVersionString="VERSION_NUMBER"
+            sparkle:edSignature="SIGNATURE_PLACEHOLDER"
+            length="FILE_SIZE"
+            type="application/octet-stream"
+        />
+    </item>
+
+    <item>
         <title>Version 1.5.3</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
         <sparkle:version>15</sparkle:version>
