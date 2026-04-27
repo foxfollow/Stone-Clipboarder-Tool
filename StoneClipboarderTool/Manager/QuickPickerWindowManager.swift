@@ -462,15 +462,33 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     private func setupLocalKeyMonitoring() {
         removeLocalKeyMonitoring()
 
-        // Local monitor to capture all keyboard events when panel is key
+        // Local monitor catches all keyDowns dispatched in our process,
+        // regardless of which window is key. We use it as a safety net for
+        // QLPreviewPanel: when QL opens via makeKeyAndOrderFront it steals key
+        // status, and the async reclaimKeyFocus() may not run before the user
+        // presses the next key. Without this, an arrow press while QL is key
+        // would be consumed by QL (which navigates between its own preview
+        // items — we only ever supply one, so the press appears to do
+        // nothing) and never reach SwiftUI's onKeyPress in QuickPickerView.
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) {
             [weak self] event in
             guard let self = self,
-                let window = self.window,
-                window.isKeyWindow
+                  let window = self.window,
+                  window.isVisible
             else { return event }
 
-            // Let SwiftUI handle navigation and text input
+            if !window.isKeyWindow, self.quickLookCoordinator.isPreviewVisible {
+                // Take key back from QL, put cursor in the search field, and
+                // re-deliver this event to our window so SwiftUI's onKeyPress
+                // handlers fire (arrow up/down → select prev/next item →
+                // QL reloads with the new item).
+                window.makeKey()
+                self.focusSearchField()
+                window.sendEvent(event)
+                return nil
+            }
+
+            // Otherwise let the event propagate normally.
             return event
         }
     }
@@ -563,16 +581,21 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     // MARK: - Fullscreen Detection
 
     /// True when the user is currently inside another app's native macOS
-    /// fullscreen Space. We detect this by scanning on-screen windows that
-    /// don't belong to us and checking whether any of them covers an entire
-    /// screen — that's the signature of a fullscreen Space (in regular
-    /// Spaces no app's window matches the screen frame exactly).
+    /// "Entire Screen" fullscreen Space (the green-button → Full Screen → Entire
+    /// Screen mode). Detected by scanning on-screen windows that don't belong
+    /// to us and looking for one whose CG-coordinate bounds exactly match a
+    /// screen's full frame (origin AND size).
+    ///
+    /// macOS "Fill" / "Fill & Arrange" modes size windows to `visibleFrame`
+    /// (screen minus menu bar/dock), so their height differs from `frame.height`
+    /// and origin.y is the menu bar height — they won't match here. Only true
+    /// Entire-Screen fullscreen, which has its own Space and hides the menu
+    /// bar, produces a window whose bounds equal the full screen frame.
     ///
     /// Used to fall back from Apple's QLPreviewPanel (which is system-managed
     /// and refuses to render in another app's fullscreen Space) to our own
     /// custom preview panel, which is configured to render anywhere.
     static func isInOtherAppFullscreenSpace() -> Bool {
-        guard let mainScreen = NSScreen.main else { return false }
         let ourPID = ProcessInfo.processInfo.processIdentifier
 
         let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
@@ -580,15 +603,25 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             return false
         }
 
+        // Convert each NSScreen frame into CG window coordinates (origin at
+        // top-left of the screen with the menu bar, Y increases downward).
+        // NSScreen uses Cocoa coordinates (origin bottom-left, Y up), so we
+        // flip Y against the menu-bar screen's height.
+        guard let menuBarScreen = NSScreen.screens.first else { return false }
+        let menuBarScreenHeight = menuBarScreen.frame.height
+        let cgScreenFrames: [CGRect] = NSScreen.screens.map { screen in
+            let nsFrame = screen.frame
+            let cgY = menuBarScreenHeight - nsFrame.origin.y - nsFrame.height
+            return CGRect(x: nsFrame.origin.x, y: cgY, width: nsFrame.width, height: nsFrame.height)
+        }
+
         for window in windows {
-            // Skip our own windows (the QuickPicker panel itself can be
-            // borderless and on the same Space, but it doesn't span the
-            // screen — still, exclude defensively).
+            // Skip our own windows.
             if let pid = window[kCGWindowOwnerPID as String] as? pid_t, pid == ourPID {
                 continue
             }
-            // Only look at normal-layer windows; menu bar, dock, status
-            // items, etc. live on higher layers and would falsely match.
+            // Only normal-layer windows; menu bar, dock, status items live on
+            // higher layers and would falsely match.
             if let layer = window[kCGWindowLayer as String] as? Int, layer != 0 {
                 continue
             }
@@ -601,18 +634,13 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
                 width: bounds["Width"] ?? 0,
                 height: bounds["Height"] ?? 0
             )
-            for screen in NSScreen.screens {
-                if abs(rect.width - screen.frame.width) < 2,
-                   abs(rect.height - screen.frame.height) < 2 {
+            for screenFrame in cgScreenFrames {
+                if abs(rect.origin.x - screenFrame.origin.x) < 2, 
+                   abs(rect.origin.y - screenFrame.origin.y) < 2,
+                   abs(rect.width - screenFrame.width) < 2,
+                   abs(rect.height - screenFrame.height) < 2 {
                     return true
                 }
-            }
-            // Some apps (e.g. browsers) report fullscreen as the visibleFrame
-            // of mainScreen (excluding menu bar) — treat that as fullscreen
-            // too if menu bar is currently auto-hidden.
-            if abs(rect.width - mainScreen.frame.width) < 2,
-               abs(rect.height - mainScreen.visibleFrame.height) < 2 {
-                return true
             }
         }
         return false
