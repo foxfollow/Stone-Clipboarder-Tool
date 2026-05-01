@@ -76,6 +76,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menuBarManager.refreshMenuBar()
         }
 
+        // Clean up leftover preview session files from previous launches
+        QPQuickLookCoordinator.cleanupOldPreviewSessions()
+
         // Load and register hotkeys
         hotkeyManager.loadHotkeyConfigs()
 

@@ -16,13 +16,21 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
     private var previewURL: URL?
     private var tempDirectory: URL?
 
-    /// Prepare a CBItem for Quick Look by writing its data to a temporary file.
+    // Stable directory under Application Support so external apps (Preview.app) can always find the file.
+    private static var previewsDirectory: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport
+            .appendingPathComponent("StoneClipboarderTool")
+            .appendingPathComponent("Previews")
+    }
+
+    /// Prepare a CBItem for Quick Look by writing its data to a stable file.
     func prepareItem(_ item: CBItem) -> Bool {
-        // Clean up previous temp files
+        // Clean up previous session files before creating a new one
         cleanupTempFiles()
 
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("StoneClipboarderQL_\(UUID().uuidString)")
+        let tempDir = QPQuickLookCoordinator.previewsDirectory
+            .appendingPathComponent("Session_\(UUID().uuidString)")
 
         do {
             try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -121,23 +129,16 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
     }
 
     /// Hide the QLPreviewPanel if visible.
-    /// Delays temp file cleanup so "Open with" actions can read the file.
+    /// Does NOT delete the session file — Preview.app or other external apps may still have it open.
+    /// The file is cleaned up when the next preview is prepared, or on app launch.
     func hidePreview() {
         if QLPreviewPanel.sharedPreviewPanelExists(),
            let panel = QLPreviewPanel.shared(),
            panel.isVisible {
             panel.orderOut(nil)
         }
-
-        // Delay cleanup so external apps launched via "Open with" have time to read the file
-        let tempDir = tempDirectory
         tempDirectory = nil
         previewURL = nil
-        if let tempDir = tempDir {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                try? FileManager.default.removeItem(at: tempDir)
-            }
-        }
     }
 
     /// Whether the preview panel is currently visible.
@@ -168,11 +169,26 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
             tempDirectory = nil
         }
         previewURL = nil
+        QPQuickLookCoordinator.cleanupOldPreviewSessions()
+    }
+
+    /// Removes session directories older than 1 hour that are no longer needed.
+    static func cleanupOldPreviewSessions() {
+        let dir = previewsDirectory
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.creationDateKey], options: .skipsHiddenFiles
+        ) else { return }
+        let cutoff = Date().addingTimeInterval(-3600)
+        for url in contents {
+            let created = (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? .distantPast
+            if created < cutoff {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
     }
 
     deinit {
-        if let tempDir = tempDirectory {
-            try? FileManager.default.removeItem(at: tempDir)
-        }
+        // Session files are intentionally kept alive so external apps (Preview.app) can still access them.
+        // Cleanup happens in cleanupTempFiles() before the next preview, or via cleanupOldPreviewSessions().
     }
 }
