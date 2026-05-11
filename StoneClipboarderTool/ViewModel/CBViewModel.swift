@@ -15,7 +15,10 @@ class CBViewModel: ObservableObject {
     @Published var items: [CBItem] = []
     @Published var selectedItem: CBItem?
     @Published var isLoadingMore = false
+    // Non-favorite items on disk. Favorites are tracked separately and never
+    // counted against this number, so they can't be auto-cleaned.
     @Published var totalItemCount: Int = 0
+    @Published var favoriteItemCount: Int = 0
 
     var inMemoryItemCount: Int { items.count }
 
@@ -611,7 +614,14 @@ class CBViewModel: ObservableObject {
     func refreshItemCounts() {
         guard let modelContext = _modelContext else { return }
         do {
-            totalItemCount = try modelContext.fetchCount(FetchDescriptor<CBItem>())
+            let nonFavDescriptor = FetchDescriptor<CBItem>(
+                predicate: #Predicate { !$0.isFavorite }
+            )
+            let favDescriptor = FetchDescriptor<CBItem>(
+                predicate: #Predicate { $0.isFavorite }
+            )
+            totalItemCount = try modelContext.fetchCount(nonFavDescriptor)
+            favoriteItemCount = try modelContext.fetchCount(favDescriptor)
         } catch {
             ErrorLogger.shared.log("Failed to fetch item count", category: "SwiftData", error: error)
         }
@@ -720,31 +730,58 @@ class CBViewModel: ObservableObject {
     private func performItemCountCleanupCore(maxItems: Int) {
         guard let modelContext = _modelContext else { return }
 
-        let countDescriptor = FetchDescriptor<CBItem>()
+        // The cap applies only to non-favorites. Favorites sit outside the
+        // limit and are never auto-deleted.
+        let nonFavPredicate = #Predicate<CBItem> { !$0.isFavorite }
+        let countDescriptor = FetchDescriptor<CBItem>(predicate: nonFavPredicate)
         do {
-            let totalCount = try modelContext.fetchCount(countDescriptor)
+            let nonFavCount = try modelContext.fetchCount(countDescriptor)
 
-            if totalCount > maxItems {
-                let itemsToDelete = totalCount - maxItems
-                var oldItemsDescriptor = FetchDescriptor<CBItem>(
-                    sortBy: [SortDescriptor(\.timestamp, order: .forward)]
-                )
-                oldItemsDescriptor.fetchLimit = itemsToDelete
+            guard nonFavCount > maxItems else { return }
 
-                let oldItems = try modelContext.fetch(oldItemsDescriptor)
-                let nonFavoriteOldItems = oldItems.filter { !$0.isFavorite }
+            let itemsToDelete = nonFavCount - maxItems
+            var oldItemsDescriptor = FetchDescriptor<CBItem>(
+                predicate: nonFavPredicate,
+                sortBy: [SortDescriptor(\.timestamp, order: .forward)]
+            )
+            oldItemsDescriptor.fetchLimit = itemsToDelete
 
+            let nonFavoriteOldItems = try modelContext.fetch(oldItemsDescriptor)
+
+            guard !nonFavoriteOldItems.isEmpty else { return }
+
+            // Clear UI references BEFORE detaching backing data so SwiftUI
+            // doesn't render views holding the to-be-detached items. This
+            // prevents "backing data detached from context" crashes when a
+            // currently-viewed item is auto-cleaned.
+            let idsToDelete = Set(nonFavoriteOldItems.map { $0.id })
+
+            if let sel = selectedItem, idsToDelete.contains(sel.id) {
+                selectedItem = nil
+                NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+            }
+
+            items.removeAll { idsToDelete.contains($0.id) }
+
+            // Defer context deletion to the next run loop iteration so SwiftUI
+            // gets a full layout pass to drop views before the backing data
+            // is invalidated (mirrors deleteItem/deleteAllItems).
+            let deletedCount = nonFavoriteOldItems.count
+            DispatchQueue.main.async { [weak self] in
                 for item in nonFavoriteOldItems {
                     modelContext.delete(item)
                 }
-
-                try modelContext.save()
-
-                fetchItems(reset: true)
-
-                print(
-                    "Cleanup: Removed \(nonFavoriteOldItems.count) old items, keeping under \(maxItems) limit"
-                )
+                do {
+                    try modelContext.save()
+                    self?.fetchItems(reset: true)
+                    print(
+                        "Cleanup: Removed \(deletedCount) old items, keeping under \(maxItems) limit"
+                    )
+                } catch {
+                    modelContext.rollback()
+                    ErrorLogger.shared.log("Failed to save item count cleanup", category: "SwiftData", error: error)
+                    self?.fetchItems(reset: true)
+                }
             }
         } catch {
             ErrorLogger.shared.log("Failed to perform item count cleanup", category: "SwiftData", error: error)

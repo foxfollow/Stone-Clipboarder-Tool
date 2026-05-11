@@ -235,18 +235,19 @@ struct QuickPickerView: View {
     private var footerBar: some View {
         Divider()
         HStack(spacing: 0) {
-            // Left side: item counts
+            // Left side: item counts (non-favorites + favorites, never summed)
             HStack(spacing: 4) {
-                Text("\(viewModel.totalItemCount) on disk")
-                Text("·")
-                Text("\(viewModel.inMemoryItemCount) in memory")
+                Text("\(viewModel.totalItemCount)")
                 if favoriteCount > 0 {
-                    Text("·")
+                    Text("+")
                     Text("\(favoriteCount)")
                     Image(systemName: "heart.fill")
                         .font(.system(size: 8))
                         .foregroundStyle(.red)
                 }
+                Text("on disk")
+                Text("·")
+                Text("\(viewModel.inMemoryItemCount) in memory")
             }
             .font(.system(size: 10))
             .foregroundStyle(.tertiary)
