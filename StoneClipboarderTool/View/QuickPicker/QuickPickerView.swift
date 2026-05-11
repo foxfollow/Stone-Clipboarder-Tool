@@ -11,8 +11,32 @@ import SwiftData
 import SwiftUI
 import Vision
 
+enum QPTab: Hashable, CaseIterable, Identifiable {
+    case all
+    case favorites
+    case text
+    case images
+    case files
+
+    var id: Self { self }
+
+    var next: QPTab {
+        let cases = QPTab.allCases
+        guard let i = cases.firstIndex(of: self) else { return .all }
+        return cases[(i + 1) % cases.count]
+    }
+
+    var previous: QPTab {
+        let cases = QPTab.allCases
+        guard let i = cases.firstIndex(of: self) else { return .all }
+        return cases[(i - 1 + cases.count) % cases.count]
+    }
+}
+
 struct QuickPickerView: View {
     @ObservedObject var viewModel: CBViewModel
+    @StateObject private var tabInterceptor = TabKeyInterceptor()
+    @State private var activeTab: QPTab = .all
     @State private var searchText = ""
     @State private var selectedIndex = 0
     @State private var quickPickerItems: [CBItem] = []
@@ -20,6 +44,9 @@ struct QuickPickerView: View {
     @State private var hasMoreItems = true
     @State private var searchTask: Task<Void, Never>?
     @State private var favoriteCount: Int = 0
+    @State private var textCount: Int = 0
+    @State private var imageCount: Int = 0
+    @State private var fileCount: Int = 0
     @FocusState private var isSearchFocused: Bool
 
     let onClose: () -> Void
@@ -45,13 +72,29 @@ struct QuickPickerView: View {
     }
 
     private var filteredItems: [CBItem] {
-        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return quickPickerItems
+        // Apply tab filter in-memory too so ⌥Space (unfavorite while on
+        // Favorites) and other state changes update the view without an
+        // extra disk fetch.
+        let base: [CBItem]
+        switch activeTab {
+        case .all:
+            base = quickPickerItems
+        case .favorites:
+            base = quickPickerItems.filter { $0.isFavorite }
+        case .text:
+            base = quickPickerItems.filter { $0.itemType == .text || $0.itemType == .combined }
+        case .images:
+            base = quickPickerItems.filter { $0.itemType == .image || $0.itemType == .combined }
+        case .files:
+            base = quickPickerItems.filter { $0.itemType == .file }
         }
 
         let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedSearch.isEmpty {
+            return base
+        }
 
-        return quickPickerItems.filter { item in
+        return base.filter { item in
             switch item.itemType {
             case .text, .combined:
                 if let content = item.content {
@@ -101,7 +144,12 @@ struct QuickPickerView: View {
                 }
                 return .handled
             }
-            .onKeyPress(.space) {
+            .onKeyPress(keys: [.space]) { keyPress in
+                // ⌥Space toggles favorite on the selected item.
+                if keyPress.modifiers.contains(.option) {
+                    toggleFavoriteForSelected()
+                    return .handled
+                }
                 guard triggerKey == .space else { return .ignored }
                 return handlePreviewTrigger()
             }
@@ -124,7 +172,12 @@ struct QuickPickerView: View {
                 // Cancel previous search task
                 searchTask?.cancel()
 
-                if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    // Favorites tab: all favorites are already in memory,
+                    // so filteredItems handles search synchronously.
+                    if activeTab == .favorites { return }
+
                     // Debounce search with 300ms delay
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
@@ -136,8 +189,14 @@ struct QuickPickerView: View {
                     }
                 } else {
                     // Reset to showing all items when search is cleared
-                    loadInitialItems()
+                    reloadForActiveTab()
                 }
+            }
+            .onChange(of: activeTab) { _, _ in
+                selectedIndex = 0
+                searchTask?.cancel()
+                reloadForActiveTab()
+                isSearchFocused = true
             }
             .onChange(of: filteredItems.count) { _, newCount in
                 if selectedIndex >= newCount {
@@ -151,6 +210,7 @@ struct QuickPickerView: View {
         VStack(spacing: 0) {
             dragHandle
             searchBar
+            tabBar
             Divider()
             QPItemList(
                 filteredItems: filteredItems,
@@ -158,6 +218,7 @@ struct QuickPickerView: View {
                 searchText: $searchText,
                 isLoading: isLoadingItems,
                 hasMoreItems: hasMoreItems,
+                ocrEnabled: settingsManager?.enableOCROptionKey == true,
                 onLoadMore: {
                     loadMoreItems()
                 },
@@ -173,7 +234,7 @@ struct QuickPickerView: View {
             )
             footerBar
         }
-        .frame(width: 500, height: 430)
+        .frame(width: 500, height: 460)
         .background(Color(NSColor.windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
@@ -183,10 +244,27 @@ struct QuickPickerView: View {
         .clipped()
         .onAppear {
             loadInitialItems()
-            loadFavoriteCount()
+            loadTabCounts()
+
+            // Forward-Tab and Shift-Tab cycle tabs. We intercept at the
+            // NSEvent layer because AppKit's field editor consumes Shift-Tab
+            // for focus traversal before SwiftUI's .onKeyPress runs.
+            tabInterceptor.onTab = {
+                activeTab = activeTab.next
+                isSearchFocused = true
+            }
+            tabInterceptor.onShiftTab = {
+                activeTab = activeTab.previous
+                isSearchFocused = true
+            }
+            tabInterceptor.start()
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isSearchFocused = true
             }
+        }
+        .onDisappear {
+            tabInterceptor.stop()
         }
     }
 
@@ -211,7 +289,10 @@ struct QuickPickerView: View {
                 .foregroundColor(.accentColor)
                 .font(.system(size: 14, weight: .medium))
 
-            TextField("Search clipboard...", text: $searchText)
+            TextField(
+                activeTab == .favorites ? "Search favorites..." : "Search clipboard...",
+                text: $searchText
+            )
                 .textFieldStyle(.plain)
                 .focused($isSearchFocused)
                 .onSubmit {
@@ -232,46 +313,166 @@ struct QuickPickerView: View {
     }
 
     @ViewBuilder
+    private var tabBar: some View {
+        HStack(spacing: 8) {
+            ForEach(QPTab.allCases) { tab in
+                tabPill(tab)
+            }
+            Spacer()
+            tabSwitchHint
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    // Discoverability hint: Tab cycles forward, Shift+Tab cycles backward.
+    private var tabSwitchHint: some View {
+        HStack(spacing: 4) {
+            Text("⇥")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+            Text("switch")
+                .font(.system(size: 10))
+        }
+        .foregroundStyle(.tertiary)
+        .help("Tab to switch tabs forward, Shift+Tab backward")
+    }
+
+    private func tabPill(_ tab: QPTab) -> some View {
+        let isActive = activeTab == tab
+        return Button {
+            activeTab = tab
+            // Click must NOT steal focus from the search field — otherwise
+            // shortcuts like Tab/Space/⏎ would stop working.
+            isSearchFocused = true
+        } label: {
+            HStack(spacing: 5) {
+                if tab == .favorites {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(isActive ? Color.white : .red)
+                }
+                Text(tabTitle(tab))
+                    .font(.system(size: 11, weight: .medium))
+                Text("\(tabCount(tab))")
+                    .font(.system(size: 10))
+                    .foregroundStyle(
+                        isActive ? Color.white.opacity(0.85) : Color.secondary
+                    )
+            }
+            .foregroundStyle(isActive ? Color.white : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(isActive ? Color.accentColor : Color.clear)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        isActive ? Color.clear : Color.secondary.opacity(0.35),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+    }
+
+    private func tabTitle(_ tab: QPTab) -> String {
+        switch tab {
+        case .all: return "All"
+        case .favorites: return "Favorites"
+        case .text: return "Text"
+        case .images: return "Images"
+        case .files: return "Files"
+        }
+    }
+
+    private func tabCount(_ tab: QPTab) -> Int {
+        switch tab {
+        case .all:
+            // "All" is everything on disk, favorites included.
+            return viewModel.totalItemCount + viewModel.favoriteItemCount
+        case .favorites:
+            return favoriteCount
+        case .text:
+            return textCount
+        case .images:
+            return imageCount
+        case .files:
+            return fileCount
+        }
+    }
+
+    @ViewBuilder
     private var footerBar: some View {
         Divider()
         HStack(spacing: 0) {
-            // Left side: item counts (non-favorites + favorites, never summed)
+            // Left side: disk counts (non-favorites + favorites). No "in memory"
+            // — that's an internal detail, not useful at-a-glance.
             HStack(spacing: 4) {
                 Text("\(viewModel.totalItemCount)")
-                if favoriteCount > 0 {
+                if viewModel.favoriteItemCount > 0 {
                     Text("+")
-                    Text("\(favoriteCount)")
+                    Text("\(viewModel.favoriteItemCount)")
                     Image(systemName: "heart.fill")
                         .font(.system(size: 8))
                         .foregroundStyle(.red)
                 }
-                Text("on disk")
-                Text("·")
-                Text("\(viewModel.inMemoryItemCount) in memory")
+                Text("on Disk")
             }
             .font(.system(size: 10))
             .foregroundStyle(.tertiary)
 
             Spacer()
 
-            // Right side: keyboard shortcut hints
+            // Right side: only the shortcuts that aren't shown in the row
+            // (Paste/OCR live on the selected row now) or in the tab bar.
             HStack(spacing: 6) {
                 shortcutBadge("ESC", label: "Close")
-                shortcutBadge("⏎", label: "Paste")
+                favoriteToggleBadge()
 
                 if settingsManager?.quickLookMode != .disabled {
                     let key = settingsManager?.quickLookTriggerKey ?? .space
                     shortcutBadge(key == .space ? "⎵" : "→", label: "Preview")
-                }
-
-                if settingsManager?.enableOCROptionKey == true {
-                    shortcutBadge("⌥⏎", label: "OCR")
                 }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    private func favoriteToggleBadge() -> some View {
+        HStack(spacing: 3) {
+            Text("⌥⎵")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+            Image(systemName: "heart")
+                .font(.system(size: 9))
+        }
+        .foregroundStyle(.tertiary)
+        .help("Toggle favorite on the selected item")
     }
 
     private func shortcutBadge(_ key: String, label: String) -> some View {
@@ -294,15 +495,87 @@ struct QuickPickerView: View {
         .foregroundStyle(.tertiary)
     }
 
-    private func loadFavoriteCount() {
+    // Single fetch + in-memory tally. SwiftData #Predicate over String-backed
+    // enums is finicky; iterating once is simple, accurate, and cheap at
+    // typical clipboard-history sizes.
+    private func loadTabCounts() {
         guard let modelContext = viewModel.modelContext else { return }
-        let descriptor = FetchDescriptor<CBItem>(
-            predicate: #Predicate<CBItem> { $0.isFavorite }
-        )
         do {
-            favoriteCount = try modelContext.fetchCount(descriptor)
+            let all = try modelContext.fetch(FetchDescriptor<CBItem>())
+            favoriteCount = all.lazy.filter { $0.isFavorite }.count
+            textCount = all.lazy.filter { $0.itemType == .text || $0.itemType == .combined }.count
+            imageCount = all.lazy.filter { $0.itemType == .image || $0.itemType == .combined }.count
+            fileCount = all.lazy.filter { $0.itemType == .file }.count
         } catch {
             favoriteCount = 0
+            textCount = 0
+            imageCount = 0
+            fileCount = 0
+        }
+    }
+
+    private func toggleFavoriteForSelected() {
+        guard selectedIndex < filteredItems.count else { return }
+        let item = filteredItems[selectedIndex]
+        viewModel.toggleFavorite(item)
+        loadTabCounts()
+
+        // If we unfavorited an item while on the Favorites tab the row
+        // disappears (filteredItems re-filters). Clamp selection.
+        if activeTab == .favorites {
+            let newCount = filteredItems.count
+            if selectedIndex >= newCount {
+                selectedIndex = max(0, newCount - 1)
+            }
+        }
+    }
+
+    private func reloadForActiveTab() {
+        switch activeTab {
+        case .all:
+            loadInitialItems()
+        case .favorites:
+            loadFavoritesOnly()
+        case .text:
+            loadByTypes([.text, .combined])
+        case .images:
+            loadByTypes([.image, .combined])
+        case .files:
+            loadByTypes([.file])
+        }
+    }
+
+    private func loadFavoritesOnly() {
+        guard let modelContext = viewModel.modelContext else { return }
+        let descriptor = FetchDescriptor<CBItem>(
+            predicate: #Predicate<CBItem> { $0.isFavorite },
+            sortBy: [SortDescriptor(\.orderIndex, order: .forward)]
+        )
+        do {
+            quickPickerItems = try modelContext.fetch(descriptor)
+            hasMoreItems = false
+            isLoadingItems = false
+        } catch {
+            quickPickerItems = []
+            hasMoreItems = false
+            isLoadingItems = false
+        }
+    }
+
+    private func loadByTypes(_ types: [CBItemType]) {
+        guard let modelContext = viewModel.modelContext else { return }
+        let descriptor = FetchDescriptor<CBItem>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        do {
+            let all = try modelContext.fetch(descriptor)
+            quickPickerItems = all.filter { types.contains($0.itemType) }
+            hasMoreItems = false
+            isLoadingItems = false
+        } catch {
+            quickPickerItems = []
+            hasMoreItems = false
+            isLoadingItems = false
         }
     }
 
@@ -565,6 +838,60 @@ private extension Array {
         indices.contains(index) ? self[index] : nil
     }
 }
+
+// MARK: - Tab key interception
+//
+// SwiftUI's `.onKeyPress(.tab)` is not reliable on macOS when a TextField has
+// focus: the field editor (NSTextView) consumes Shift-Tab for backward focus
+// traversal before SwiftUI sees it. We catch the raw key event ourselves so
+// both directions work consistently while typing in the search field.
+@MainActor
+final class TabKeyInterceptor: ObservableObject {
+    var onTab: (() -> Void)?
+    var onShiftTab: (() -> Void)?
+
+    private var monitor: Any?
+    private static let tabKeyCode: UInt16 = 48
+
+    func start() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.intercept(event) ?? event
+        }
+    }
+
+    func stop() {
+        if let m = monitor {
+            NSEvent.removeMonitor(m)
+            monitor = nil
+        }
+        onTab = nil
+        onShiftTab = nil
+    }
+
+    private func intercept(_ event: NSEvent) -> NSEvent? {
+        guard event.keyCode == Self.tabKeyCode else { return event }
+
+        let shift = event.modifierFlags.contains(.shift)
+        // Defer to next runloop tick — mutating SwiftUI state directly inside
+        // an event-dispatch callback can fight with the active event cycle.
+        DispatchQueue.main.async { [weak self] in
+            if shift {
+                self?.onShiftTab?()
+            } else {
+                self?.onTab?()
+            }
+        }
+        return nil  // swallow so the field editor doesn't move focus
+    }
+
+    deinit {
+        if let m = monitor {
+            NSEvent.removeMonitor(m)
+        }
+    }
+}
+
 
 #Preview {
     QuickPickerView(viewModel: CBViewModel()) {

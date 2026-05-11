@@ -11,6 +11,7 @@ import SwiftUI
 struct QPItemRow: View {
     let item: CBItem
     let isSelected: Bool
+    var showOCRHint: Bool = false
 
     private var typeLabel: String {
         switch item.itemType {
@@ -18,6 +19,18 @@ struct QPItemRow: View {
         case .image: return "Image"
         case .file: return "File"
         case .combined: return "Combined"
+        }
+    }
+
+    // OCR is only meaningful on image content.
+    private var isImageLike: Bool {
+        switch item.itemType {
+        case .image, .combined:
+            return true
+        case .file:
+            return item.isImageFile
+        case .text:
+            return false
         }
     }
 
@@ -58,17 +71,18 @@ struct QPItemRow: View {
 
             Spacer()
 
-            // Paste hint on selected row
+            // Inline action hints on the selected row: ⌥⏎ OCR (image-like
+            // items only, when enabled in settings), then ⏎ Paste.
             if isSelected {
-                Text("⏎")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.primary.opacity(0.08))
-                    )
+                HStack(spacing: 4) {
+                    if showOCRHint && isImageLike {
+                        Text("OCR:")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        rowKeyBadge("⌥⏎", help: "Extract text (OCR)")
+                    }
+                    rowKeyBadge("⏎", help: "Paste")
+                }
             }
         }
         .padding(.horizontal, 12)
@@ -81,6 +95,19 @@ struct QPItemRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isSelected ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
         )
+    }
+
+    private func rowKeyBadge(_ key: String, help: String) -> some View {
+        Text(key)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.primary.opacity(0.08))
+            )
+            .help(help)
     }
 
     @ViewBuilder

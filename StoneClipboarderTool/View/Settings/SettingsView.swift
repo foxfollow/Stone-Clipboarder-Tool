@@ -122,7 +122,7 @@ struct SettingsView: View {
                 HStack(spacing: 4) {
                     Text("Items:")
                         .foregroundColor(.secondary)
-                    Text("\(cbViewModel.totalItemCount) + \(cbViewModel.favoriteItemCount) favorites on disk")
+                    Text("\(cbViewModel.totalItemCount) + \(cbViewModel.favoriteItemCount) favorites on Disk")
                         .foregroundColor(.secondary)
                     Text("·")
                         .foregroundColor(.secondary.opacity(0.6))
