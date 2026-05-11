@@ -49,7 +49,7 @@ jobs:
           echo "Coverage report size: $(wc -l < sonar-coverage.xml) lines"
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v7
+        uses: SonarSource/sonarqube-scan-action@v8
         with:
           args: >
             -Dsonar.organization=foxfollow

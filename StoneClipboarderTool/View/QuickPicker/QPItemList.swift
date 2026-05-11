@@ -13,6 +13,7 @@ struct QPItemList: View {
     @Binding var searchText: String
     var isLoading: Bool = false
     var hasMoreItems: Bool = true
+    var ocrEnabled: Bool = false
     let onLoadMore: () -> Void
     let performAction: () -> Void
     var onOpenPreview: ((CBItem) -> Void)?
@@ -52,7 +53,11 @@ struct QPItemList: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
-                        QPItemRow(item: item, isSelected: index == selectedIndex)
+                        QPItemRow(
+                            item: item,
+                            isSelected: index == selectedIndex,
+                            showOCRHint: ocrEnabled
+                        )
                             .id(item.id)
                             .contentShape(Rectangle())
                             .onTapGesture {

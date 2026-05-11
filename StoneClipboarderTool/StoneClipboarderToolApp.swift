@@ -22,6 +22,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsContainer: ModelContainer?
 
     private var isInitialized = false
+    private var quitKeyDownMonitor: Any?
+    private var quitKeyUpMonitor: Any?
+    private var quitTimer: Timer?
+    private var quitDoubleTapTimer: Timer?
+    private var awaitingSecondTap = false
+    private var quitHUDWindow: NSWindow?
+    private var quitHUDShownAt: Date?
+
+    private let quitHoldDuration: TimeInterval = 1.0
+    private let quitHUDMinDisplayDuration: TimeInterval = 0.8
+    private let quitDoubleTapWindow: TimeInterval = 0.4
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize app in background, even if no window appears
@@ -68,6 +79,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menuBarManager.refreshMenuBar()
         }
 
+        // Clean up leftover preview session files from previous launches
+        QPQuickLookCoordinator.cleanupOldPreviewSessions()
+
         // Load and register hotkeys
         hotkeyManager.loadHotkeyConfigs()
 
@@ -75,6 +89,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             settingsManager: settingsManager, menuBarManager: menuBarManager,
             cbViewModel: cbViewModel)
         updateWindowVisibility(settingsManager: settingsManager)
+        startQuitKeyMonitor()
     }
 
     private func updateMenuBarVisibility(
@@ -90,6 +105,117 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             menuBarManager.hideMenuBar()
         }
+    }
+
+    private func startQuitKeyMonitor() {
+        quitKeyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  self.settingsManager?.confirmQuitOnCmdQ == true,
+                  event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  event.keyCode == 12, // Q
+                  !event.isARepeat
+            else { return event }
+            if self.awaitingSecondTap {
+                self.confirmQuit()
+            } else {
+                self.handleQuitKeyDown()
+            }
+            return nil // consume event, prevent default quit
+        }
+    }
+
+    private func handleQuitKeyDown() {
+        showQuitHUD()
+        quitTimer = Timer.scheduledTimer(withTimeInterval: quitHoldDuration, repeats: false) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.confirmQuit()
+            }
+        }
+        quitKeyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            if event.keyCode == 12 {
+                DispatchQueue.main.async { self?.handleQuitKeyUp() }
+            }
+            return event
+        }
+    }
+
+    private func handleQuitKeyUp() {
+        quitTimer?.invalidate()
+        quitTimer = nil
+        if let monitor = quitKeyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            quitKeyUpMonitor = nil
+        }
+        // Start a window during which a second ⌘Q press will confirm quit
+        awaitingSecondTap = true
+        quitDoubleTapTimer = Timer.scheduledTimer(withTimeInterval: quitDoubleTapWindow, repeats: false) { [weak self] _ in
+            DispatchQueue.main.async { self?.expireDoubleTapWindow() }
+        }
+    }
+
+    private func expireDoubleTapWindow() {
+        awaitingSecondTap = false
+        quitDoubleTapTimer?.invalidate()
+        quitDoubleTapTimer = nil
+        // Keep HUD visible for minimum duration so the user can read it
+        let elapsed = quitHUDShownAt.map { Date().timeIntervalSince($0) } ?? quitHUDMinDisplayDuration
+        let remaining = quitHUDMinDisplayDuration - elapsed
+        if remaining > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + remaining) { [weak self] in
+                self?.hideQuitHUD()
+            }
+        } else {
+            hideQuitHUD()
+        }
+    }
+
+    private func confirmQuit() {
+        quitTimer?.invalidate()
+        quitTimer = nil
+        quitDoubleTapTimer?.invalidate()
+        quitDoubleTapTimer = nil
+        awaitingSecondTap = false
+        if let monitor = quitKeyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            quitKeyUpMonitor = nil
+        }
+        hideQuitHUD()
+        NSApp.terminate(nil)
+    }
+
+    private func showQuitHUD() {
+        guard quitHUDWindow == nil else { return }
+        let panel = NSPanel(
+            contentRect: .zero,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.level = .floating
+        panel.ignoresMouseEvents = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary]
+
+        let hud = NSHostingView(rootView: QuitHUDView())
+        hud.frame = NSRect(origin: .zero, size: hud.fittingSize)
+        panel.contentView = hud
+        panel.setContentSize(hud.fittingSize)
+
+        if let screen = NSScreen.main {
+            let mid = screen.frame
+            let sz = panel.frame.size
+            panel.setFrameOrigin(NSPoint(x: mid.midX - sz.width / 2, y: mid.midY - sz.height / 2))
+        }
+        panel.orderFront(nil)
+        quitHUDWindow = panel
+        quitHUDShownAt = Date()
+    }
+
+    private func hideQuitHUD() {
+        quitHUDWindow?.orderOut(nil)
+        quitHUDWindow = nil
+        quitHUDShownAt = nil
     }
 
     private func updateWindowVisibility(settingsManager: SettingsManager) {
@@ -111,6 +237,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             NSApp.setActivationPolicy(.accessory)
         }
+    }
+}
+
+// MARK: - Quit HUD
+private struct QuitHUDView: View {
+    var body: some View {
+        Text("Hold \u{2318}Q to Quit")
+            .font(.system(size: 18, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 36)
+            .padding(.vertical, 22)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(white: 0.18).opacity(0.95))
+            )
     }
 }
 
@@ -277,7 +418,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(settingsManager)
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
-                    .frame(width: 500, height: 500)
+                    .frame(minWidth: 720, minHeight: 540)
             }
             .modelContainer(settingsContainer)
             .windowResizability(.contentSize)

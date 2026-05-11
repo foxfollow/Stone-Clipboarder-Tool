@@ -21,6 +21,12 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @Published var confirmQuitOnCmdQ: Bool {
+        didSet {
+            UserDefaults.standard.set(confirmQuitOnCmdQ, forKey: "confirmQuitOnCmdQ")
+        }
+    }
+
     @Published var maxLastItems: Int {
         didSet {
             UserDefaults.standard.set(maxLastItems, forKey: "maxLastItems")
@@ -149,6 +155,7 @@ class SettingsManager: ObservableObject {
     init() {
         self.showInMenubar = UserDefaults.standard.bool(forKey: "showInMenubar")
         self.showMainWindow = UserDefaults.standard.bool(forKey: "showMainWindow")
+        self.confirmQuitOnCmdQ = UserDefaults.standard.object(forKey: "confirmQuitOnCmdQ") as? Bool ?? false
         self.maxLastItems = UserDefaults.standard.object(forKey: "maxLastItems") as? Int ?? 10
         self.maxFavoriteItems =
             UserDefaults.standard.object(forKey: "maxFavoriteItems") as? Int ?? 10

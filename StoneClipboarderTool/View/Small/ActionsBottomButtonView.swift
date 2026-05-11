@@ -10,15 +10,23 @@ import Vision
 
 struct ActionsBottomButtonView: View {
     @EnvironmentObject var cbViewModel: CBViewModel
-    
+
     var item: CBItem
     @Binding var editedText: String
     @Binding var isEditing: Bool
     @Binding var hasChanges: Bool
     @Binding var selectedItem: CBItem?
-    
+
+    // Guards against accessing properties on a SwiftData model whose backing
+    // data was detached (e.g. by auto-cleanup deleting it from the context).
+    // Without this, SwiftData crashes with "backing data detached from context".
+    private var isItemDeleted: Bool {
+        item.modelContext == nil
+    }
+
     // Computed property to determine if Preview button should be shown
     private var shouldShowPreviewButton: Bool {
+        guard !isItemDeleted else { return false }
         switch item.itemType {
         case .image, .combined:
             return item.image != nil
@@ -31,6 +39,7 @@ struct ActionsBottomButtonView: View {
 
     // Computed property to determine if OCR button should be shown
     private var shouldShowOCRButton: Bool {
+        guard !isItemDeleted else { return false }
         switch item.itemType {
         case .image:
             return item.image != nil
@@ -40,8 +49,18 @@ struct ActionsBottomButtonView: View {
             return false
         }
     }
-    
+
     var body: some View {
+        if isItemDeleted {
+            EmptyView()
+                .onAppear { selectedItem = nil }
+        } else {
+            actionsContent
+        }
+    }
+
+    @ViewBuilder
+    private var actionsContent: some View {
         HStack {
             Button("Copy to Clipboard") {
                 if hasChanges && isEditing {
