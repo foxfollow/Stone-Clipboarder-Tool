@@ -25,11 +25,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var quitKeyDownMonitor: Any?
     private var quitKeyUpMonitor: Any?
     private var quitTimer: Timer?
+    private var quitDoubleTapTimer: Timer?
+    private var awaitingSecondTap = false
     private var quitHUDWindow: NSWindow?
     private var quitHUDShownAt: Date?
 
     private let quitHoldDuration: TimeInterval = 1.0
     private let quitHUDMinDisplayDuration: TimeInterval = 0.8
+    private let quitDoubleTapWindow: TimeInterval = 0.4
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize app in background, even if no window appears
@@ -112,7 +115,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                   event.keyCode == 12, // Q
                   !event.isARepeat
             else { return event }
-            self.handleQuitKeyDown()
+            if self.awaitingSecondTap {
+                self.confirmQuit()
+            } else {
+                self.handleQuitKeyDown()
+            }
             return nil // consume event, prevent default quit
         }
     }
@@ -121,25 +128,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         showQuitHUD()
         quitTimer = Timer.scheduledTimer(withTimeInterval: quitHoldDuration, repeats: false) { [weak self] _ in
             DispatchQueue.main.async {
-                self?.hideQuitHUD()
-                NSApp.terminate(nil)
+                self?.confirmQuit()
             }
         }
         quitKeyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
             if event.keyCode == 12 {
-                DispatchQueue.main.async { self?.cancelQuit() }
+                DispatchQueue.main.async { self?.handleQuitKeyUp() }
             }
             return event
         }
     }
 
-    private func cancelQuit() {
+    private func handleQuitKeyUp() {
         quitTimer?.invalidate()
         quitTimer = nil
         if let monitor = quitKeyUpMonitor {
             NSEvent.removeMonitor(monitor)
             quitKeyUpMonitor = nil
         }
+        // Start a window during which a second ⌘Q press will confirm quit
+        awaitingSecondTap = true
+        quitDoubleTapTimer = Timer.scheduledTimer(withTimeInterval: quitDoubleTapWindow, repeats: false) { [weak self] _ in
+            DispatchQueue.main.async { self?.expireDoubleTapWindow() }
+        }
+    }
+
+    private func expireDoubleTapWindow() {
+        awaitingSecondTap = false
+        quitDoubleTapTimer?.invalidate()
+        quitDoubleTapTimer = nil
         // Keep HUD visible for minimum duration so the user can read it
         let elapsed = quitHUDShownAt.map { Date().timeIntervalSince($0) } ?? quitHUDMinDisplayDuration
         let remaining = quitHUDMinDisplayDuration - elapsed
@@ -150,6 +167,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             hideQuitHUD()
         }
+    }
+
+    private func confirmQuit() {
+        quitTimer?.invalidate()
+        quitTimer = nil
+        quitDoubleTapTimer?.invalidate()
+        quitDoubleTapTimer = nil
+        awaitingSecondTap = false
+        if let monitor = quitKeyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            quitKeyUpMonitor = nil
+        }
+        hideQuitHUD()
+        NSApp.terminate(nil)
     }
 
     private func showQuitHUD() {

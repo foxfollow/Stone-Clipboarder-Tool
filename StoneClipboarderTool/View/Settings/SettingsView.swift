@@ -75,8 +75,8 @@ struct SettingsView: View {
                 Toggle("Show Main Window", isOn: $settingsManager.showMainWindow)
                     .help("Keep the main window visible in the dock")
 
-                Toggle("Hold ⌘Q to quit", isOn: $settingsManager.confirmQuitOnCmdQ)
-                    .help("Require holding ⌘Q for 1 seconds to quit, preventing accidental quits")
+                Toggle("Hold or double-tap ⌘Q to quit", isOn: $settingsManager.confirmQuitOnCmdQ)
+                    .help("Require holding ⌘Q for 1 second, or double-tapping ⌘Q, to quit — preventing accidental quits")
             }
 
             Section("Quick Look") {
