@@ -418,7 +418,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(settingsManager)
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
-                    .frame(width: 500, height: 500)
+                    .frame(minWidth: 720, minHeight: 540)
             }
             .modelContainer(settingsContainer)
             .windowResizability(.contentSize)
