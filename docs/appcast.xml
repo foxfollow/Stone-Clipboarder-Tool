@@ -40,8 +40,12 @@
         ><![CDATA[
             <h2>StoneClipboarderTool VERSION_NUMBER</h2>
             <ul>
-                <li>🛠️ FIXED: Apple Quick Look now stays selected in regular and "Fill"/maximized windows — fullscreen detection no longer falsely matches non-fullscreen full-size windows and only falls back to the Custom Preview when the focused app is in a true "Entire Screen" Space</li>
-                <li>⌨️ IMPROVED: Arrow navigation while Apple Quick Look is open — the search field keeps focus and ↑/↓ now reliably moves the highlight in Quick Picker, reloading the QL preview with the new item even when QL grabs key window status</li>
+                <li>🪟 NEW: Quick Picker tabs — filter by All / Favorites / Text / Images / Files; cycle tabs with Tab / Shift+Tab without losing search focus</li>
+                <li>✨ NEW: Toggle favorite on the selected Quick Picker row with Option+Space; image rows show an OCR hint badge when OCR is enabled in Settings</li>
+                <li>🛡️ NEW: Optional confirm-quit — hold ⌘Q for 1 second (or double-tap ⌘Q) to quit, with on-screen HUD; protects against accidental quits and is toggleable in Settings</li>
+                <li>🎨 IMPROVED: Settings rebuilt as a sidebar NavigationSplitView; larger 720×540 minimum window size for both Settings and the main window</li>
+                <li>🛠️ FIXED: SwiftData "backing data detached" crashes during auto-cleanup — favorites are now excluded from cleanup counts, the selected item is cleared before deletion, and context deletes are deferred with proper save/rollback</li>
+                <li>🛠️ FIXED: Quick Look previews are now written to Application Support/StoneClipboarderTool/Previews so external apps can open them; stale preview sessions older than one hour are cleaned up on launch</li>
             </ul>
         ]]></description>
         <pubDate>RELEASE_DATE</pubDate>

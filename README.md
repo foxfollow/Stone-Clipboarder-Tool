@@ -49,6 +49,12 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 ## Features
 
 ### 🆕 New in Version 1.5.x
+- **🪟 Quick Picker Tabs (1.5.5)**: Filter Quick Picker by All / Favorites / Text / Images / Files; cycle tabs with Tab / Shift+Tab without losing search focus
+- **✨ Favorite from Quick Picker (1.5.5)**: Toggle favorite on the selected row with Option+Space; image rows show an OCR hint badge when OCR is enabled
+- **🛡️ Confirm-Quit (1.5.5)**: Optionally require holding ⌘Q for 1s (or a double-tap) to quit, with on-screen HUD — protects against accidental quits
+- **🎨 Sidebar Settings (1.5.5)**: Settings rebuilt as a NavigationSplitView with a sidebar; larger 720×540 minimum window size
+- **🛠️ SwiftData Stability (1.5.5)**: Fixed "backing data detached" crashes during auto-cleanup; favorites are now excluded from cleanup
+- **🛠️ Quick Look Reliability (1.5.5)**: Preview files now live in Application Support so external apps can open them; stale session files are cleaned up on launch
 - **🛠️ Apple Quick Look Fix (1.5.4)**: Fullscreen detection refined — Apple Quick Look now stays selected in regular and "Fill"/maximized windows; the Custom Preview fallback only kicks in for true "Entire Screen" Spaces
 - **⌨️ QL Arrow Navigation (1.5.4)**: ↑/↓ in Quick Picker now reliably moves the highlight and reloads the Apple Quick Look preview to the new item even when QL has grabbed the key window
 - **🪟 Fullscreen Support (1.5.3)**: Quick Picker and menu bar popover now render over other apps' fullscreen Spaces — open them without leaving the app you're in
