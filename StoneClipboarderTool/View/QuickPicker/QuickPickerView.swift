@@ -129,8 +129,12 @@ struct QuickPickerView: View {
                 return .handled
             }
             .onKeyPress(keys: [.return]) { keyPress in
-                if keyPress.modifiers.contains(.option),
-                   settingsManager?.enableOCROptionKey == true {
+                let optionHeld = keyPress.modifiers.contains(.option)
+                let hasMultiSelection = (selectedRange()?.count ?? 0) > 1
+                // ⌥⏎ on a Shift-extended range is always OCR intent — bypass
+                // the per-user `enableOCROptionKey` toggle, which only gates
+                // the single-item shortcut.
+                if optionHeld && (hasMultiSelection || settingsManager?.enableOCROptionKey == true) {
                     performOCRAction()
                 } else {
                     performAction()
@@ -660,7 +664,7 @@ struct QuickPickerView: View {
     //     copy to clipboard, ⌘V, wait, repeat. The receiving app sees a
     //     separate paste per item, so images come through as images and files
     //     as files. Apps that don't support a given type ignore that step.
-    // OCR (⌥⏎) remains a single-item action.
+    // Multi-OCR (⌥⏎) is handled separately in performOCRAction.
     private func performMultiPaste(range: ClosedRange<Int>) {
         let items = range.compactMap { filteredItems[safe: $0] }
         guard !items.isEmpty else { return }
@@ -742,6 +746,14 @@ struct QuickPickerView: View {
     }
 
     private func performOCRAction() {
+        // Multi-select: combine text from text items + OCR'd text from
+        // images, preserving order.
+        if let range = selectedRange(), range.count > 1 {
+            let items = range.compactMap { filteredItems[safe: $0] }
+            performMultiOCR(items: items, range: range)
+            return
+        }
+
         guard selectedIndex < filteredItems.count else { return }
 
         let item = filteredItems[selectedIndex]
@@ -773,46 +785,127 @@ struct QuickPickerView: View {
         onClose()
 
         // Run OCR on background thread
-        let request = VNRecognizeTextRequest { request, error in
-            if let error = error {
-                print("OCR error: \(error.localizedDescription)")
-                return
-            }
-
-            guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                return
-            }
-
-            let recognizedText = observations.compactMap { observation in
-                observation.topCandidates(1).first?.string
-            }.joined(separator: "\n")
-
-            guard !recognizedText.isEmpty else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let recognizedText = Self.recognizeText(in: cgImage),
+                  !recognizedText.isEmpty else { return }
 
             DispatchQueue.main.async {
-                // Copy recognized text to pasteboard
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(recognizedText, forType: .string)
 
-                // Simulate paste
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                     self.simulatePaste()
                 }
             }
         }
+    }
 
+    // Each item contributes one chunk to the final paste: text items use
+    // their `content` verbatim, image items get OCR'd via Vision, image
+    // files use their preview image. Non-image files contribute nothing.
+    // Order matches the visible selection (top-to-bottom). Bails to
+    // performMultiPaste if nothing in the range yields OCR-able input
+    // (e.g. all non-image files), so ⌥⏎ always does something useful.
+    private func performMultiOCR(items: [CBItem], range: ClosedRange<Int>) {
+        enum OCRSource {
+            case text(String)
+            case image(CGImage)
+        }
+
+        let sources: [OCRSource] = items.compactMap { item -> OCRSource? in
+            switch item.itemType {
+            case .text, .combined:
+                // Prefer existing text. For combined items the text portion
+                // is already the user's intent — skip OCR on its image.
+                if let c = item.content, !c.isEmpty { return .text(c) }
+                if item.itemType == .combined,
+                   let img = item.image,
+                   let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                    return .image(cg)
+                }
+                return nil
+            case .image:
+                guard let img = item.image,
+                      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                    return nil
+                }
+                return .image(cg)
+            case .file:
+                guard item.isImageFile,
+                      let img = item.filePreviewImage,
+                      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                    return nil
+                }
+                return .image(cg)
+            }
+        }
+
+        guard !sources.isEmpty else {
+            // Nothing OCR-able (e.g. all non-image files) — fall back to
+            // the regular multi-paste behavior.
+            performMultiPaste(range: range)
+            return
+        }
+
+        items.forEach { viewModel.markItemAccessed($0) }
+        onClose()
+
+        // Process sources off the main thread, preserving order. Each image
+        // gets its own request + handler (no shared mutable state). We use
+        // a serial loop on a background queue — Vision is heavy enough that
+        // parallelism wouldn't help much and pulls in Sendable headaches.
+        DispatchQueue.global(qos: .userInitiated).async {
+            var parts: [String] = []
+            for source in sources {
+                switch source {
+                case .text(let s):
+                    parts.append(s)
+                case .image(let cg):
+                    if let recognized = Self.recognizeText(in: cg) {
+                        parts.append(recognized)
+                    }
+                }
+            }
+
+            let combined = parts.joined(separator: "\n")
+            guard !combined.isEmpty else { return }
+
+            DispatchQueue.main.async {
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(combined, forType: .string)
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    simulatePaste()
+                }
+            }
+        }
+    }
+
+    // Synchronous Vision OCR. Safe to call concurrently — each invocation
+    // creates its own request and handler with no captured mutable state.
+    private static func recognizeText(in cgImage: CGImage) -> String? {
+        final class Box { var text: String = "" }
+        let box = Box()
+
+        let request = VNRecognizeTextRequest { req, _ in
+            guard let observations = req.results as? [VNRecognizedTextObservation] else {
+                return
+            }
+            box.text = observations.compactMap { $0.topCandidates(1).first?.string }
+                .joined(separator: "\n")
+        }
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try handler.perform([request])
-            } catch {
-                print("Failed to perform OCR: \(error.localizedDescription)")
-            }
+        do {
+            try handler.perform([request])
+        } catch {
+            return nil
         }
+        return box.text.isEmpty ? nil : box.text
     }
 
     private func simulatePaste() {
