@@ -39,6 +39,9 @@ struct QuickPickerView: View {
     @State private var activeTab: QPTab = .all
     @State private var searchText = ""
     @State private var selectedIndex = 0
+    // Shift+Arrow multi-select. nil = single-selection; otherwise the selected
+    // range is min(anchor, selectedIndex)...max(anchor, selectedIndex).
+    @State private var selectionAnchor: Int? = nil
     @State private var quickPickerItems: [CBItem] = []
     @State private var isLoadingItems = false
     @State private var hasMoreItems = true
@@ -117,22 +120,12 @@ struct QuickPickerView: View {
                 }
                 return .handled
             }
-            .onKeyPress(.upArrow) {
-                if selectedIndex > 0 {
-                    selectedIndex -= 1
-                    if let item = filteredItems[safe: selectedIndex] {
-                        onPreviewUpdate(item)
-                    }
-                }
+            .onKeyPress(keys: [.upArrow]) { keyPress in
+                moveSelection(by: -1, extendingWith: keyPress.modifiers.contains(.shift))
                 return .handled
             }
-            .onKeyPress(.downArrow) {
-                if selectedIndex < filteredItems.count - 1 {
-                    selectedIndex += 1
-                    if let item = filteredItems[safe: selectedIndex] {
-                        onPreviewUpdate(item)
-                    }
-                }
+            .onKeyPress(keys: [.downArrow]) { keyPress in
+                moveSelection(by: +1, extendingWith: keyPress.modifiers.contains(.shift))
                 return .handled
             }
             .onKeyPress(keys: [.return]) { keyPress in
@@ -168,6 +161,7 @@ struct QuickPickerView: View {
             }
             .onChange(of: searchText) { _, newValue in
                 selectedIndex = 0
+                selectionAnchor = nil
 
                 // Cancel previous search task
                 searchTask?.cancel()
@@ -194,6 +188,7 @@ struct QuickPickerView: View {
             }
             .onChange(of: activeTab) { _, _ in
                 selectedIndex = 0
+                selectionAnchor = nil
                 searchTask?.cancel()
                 reloadForActiveTab()
                 isSearchFocused = true
@@ -201,6 +196,10 @@ struct QuickPickerView: View {
             .onChange(of: filteredItems.count) { _, newCount in
                 if selectedIndex >= newCount {
                     selectedIndex = max(0, newCount - 1)
+                }
+                // Drop anchor if it now points past the list.
+                if let anchor = selectionAnchor, anchor >= newCount {
+                    selectionAnchor = nil
                 }
             }
     }
@@ -219,6 +218,10 @@ struct QuickPickerView: View {
                 isLoading: isLoadingItems,
                 hasMoreItems: hasMoreItems,
                 ocrEnabled: settingsManager?.enableOCROptionKey == true,
+                multiSelectionRange: selectedRange(),
+                onClearMultiSelection: {
+                    selectionAnchor = nil
+                },
                 onLoadMore: {
                     loadMoreItems()
                 },
@@ -455,6 +458,14 @@ struct QuickPickerView: View {
             // Right side: only the shortcuts that aren't shown in the row
             // (Paste/OCR live on the selected row now) or in the tab bar.
             HStack(spacing: 6) {
+                if let range = selectedRange(), range.count > 1 {
+                    Text("\(range.count) selected")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    shortcutBadge("⇧↑↓", label: "Extend")
+                } else {
+                    shortcutBadge("⇧↑↓", label: "Multi-select")
+                }
                 shortcutBadge("ESC", label: "Close")
                 favoriteToggleBadge()
 
@@ -534,9 +545,10 @@ struct QuickPickerView: View {
         let item = filteredItems[selectedIndex]
         viewModel.toggleFavorite(item)
         loadTabCounts()
+        // Toggling favorite can re-filter the list (Favorites tab) — drop
+        // the multi-select anchor so the range doesn't reference stale rows.
+        selectionAnchor = nil
 
-        // If we unfavorited an item while on the Favorites tab the row
-        // disappears (filteredItems re-filters). Clamp selection.
         if activeTab == .favorites {
             let newCount = filteredItems.count
             if selectedIndex >= newCount {
@@ -595,6 +607,11 @@ struct QuickPickerView: View {
     }
 
     private func performAction() {
+        if let range = selectedRange(), range.count > 1 {
+            performMultiPaste(range: range)
+            return
+        }
+
         guard selectedIndex < filteredItems.count else { return }
 
         let item = filteredItems[selectedIndex]
@@ -606,6 +623,91 @@ struct QuickPickerView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             simulatePaste()
+        }
+    }
+
+    // Resolved Shift+Arrow selection range, clamped to current items.
+    // Returns nil when no anchor (= single selection on `selectedIndex`).
+    private func selectedRange() -> ClosedRange<Int>? {
+        guard let anchor = selectionAnchor, !filteredItems.isEmpty else { return nil }
+        let lastValid = filteredItems.count - 1
+        let lo = max(0, min(anchor, selectedIndex))
+        let hi = min(lastValid, max(anchor, selectedIndex))
+        guard hi >= lo else { return nil }
+        return lo...hi
+    }
+
+    private func moveSelection(by delta: Int, extendingWith extending: Bool) {
+        let newIndex = selectedIndex + delta
+        guard newIndex >= 0, newIndex < filteredItems.count else { return }
+
+        if extending {
+            if selectionAnchor == nil { selectionAnchor = selectedIndex }
+        } else {
+            selectionAnchor = nil
+        }
+
+        selectedIndex = newIndex
+        if let item = filteredItems[safe: selectedIndex] {
+            onPreviewUpdate(item)
+        }
+    }
+
+    // Multi-paste strategy:
+    //   - All text/combined items → join `content` with newlines and paste
+    //     once (snappy, no flicker, works in any text field).
+    //   - Anything else (images, files, mixed) → paste each item sequentially:
+    //     copy to clipboard, ⌘V, wait, repeat. The receiving app sees a
+    //     separate paste per item, so images come through as images and files
+    //     as files. Apps that don't support a given type ignore that step.
+    // OCR (⌥⏎) remains a single-item action.
+    private func performMultiPaste(range: ClosedRange<Int>) {
+        let items = range.compactMap { filteredItems[safe: $0] }
+        guard !items.isEmpty else { return }
+
+        let allTextLike = items.allSatisfy { item in
+            (item.itemType == .text || item.itemType == .combined)
+                && (item.content?.isEmpty == false)
+        }
+
+        if allTextLike {
+            let joined = items.compactMap { $0.content }.joined(separator: "\n")
+            items.forEach { viewModel.markItemAccessed($0) }
+
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(joined, forType: .string)
+
+            onClose()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                simulatePaste()
+            }
+        } else {
+            items.forEach { viewModel.markItemAccessed($0) }
+            onClose()
+            // Let focus return to the previously-active window first, then
+            // start the sequential paste chain.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                pasteSequentially(items, at: 0)
+            }
+        }
+    }
+
+    // Per-step timing matches the single-item path (~0.05s between copy and
+    // ⌘V) plus a 0.25s gap between items so the receiving app finishes
+    // handling one paste before the next clipboard write.
+    private func pasteSequentially(_ items: [CBItem], at index: Int) {
+        guard index < items.count else { return }
+        let item = items[index]
+        viewModel.copyAndUpdateItem(item)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            simulatePaste()
+            let next = index + 1
+            guard next < items.count else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                pasteSequentially(items, at: next)
+            }
         }
     }
 

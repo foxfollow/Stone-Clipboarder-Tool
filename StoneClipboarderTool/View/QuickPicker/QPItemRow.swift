@@ -11,6 +11,9 @@ import SwiftUI
 struct QPItemRow: View {
     let item: CBItem
     let isSelected: Bool
+    // True when this row is part of a Shift+Arrow range but is not the
+    // current cursor row (the cursor row uses `isSelected`).
+    var isInMultiSelection: Bool = false
     var showOCRHint: Bool = false
 
     private var typeLabel: String {
@@ -89,12 +92,24 @@ struct QPItemRow: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+                .fill(backgroundFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(isSelected ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
+                .stroke(borderStroke, lineWidth: 1)
         )
+    }
+
+    private var backgroundFill: Color {
+        if isSelected { return Color.accentColor.opacity(0.2) }
+        if isInMultiSelection { return Color.accentColor.opacity(0.1) }
+        return Color.clear
+    }
+
+    private var borderStroke: Color {
+        if isSelected { return Color.accentColor.opacity(0.5) }
+        if isInMultiSelection { return Color.accentColor.opacity(0.25) }
+        return Color.clear
     }
 
     private func rowKeyBadge(_ key: String, help: String) -> some View {

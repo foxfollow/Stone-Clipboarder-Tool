@@ -14,6 +14,11 @@ struct QPItemList: View {
     var isLoading: Bool = false
     var hasMoreItems: Bool = true
     var ocrEnabled: Bool = false
+    // Indices currently part of a Shift+Arrow multi-selection. nil = none.
+    var multiSelectionRange: ClosedRange<Int>? = nil
+    // Optional hook to clear the parent's multi-select anchor on direct row
+    // taps (a click is treated as a fresh single-selection intent).
+    var onClearMultiSelection: (() -> Void)? = nil
     let onLoadMore: () -> Void
     let performAction: () -> Void
     var onOpenPreview: ((CBItem) -> Void)?
@@ -56,11 +61,13 @@ struct QPItemList: View {
                         QPItemRow(
                             item: item,
                             isSelected: index == selectedIndex,
+                            isInMultiSelection: multiSelectionRange?.contains(index) == true,
                             showOCRHint: ocrEnabled
                         )
                             .id(item.id)
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                onClearMultiSelection?()
                                 selectedIndex = index
                                 performAction()
                             }
@@ -78,10 +85,11 @@ struct QPItemList: View {
                                         onOpenTextEdit(item)
                                     }
                                 }
-                                
+
                                 Divider()
 
                                 Button("Copy") {
+                                    onClearMultiSelection?()
                                     selectedIndex = index
                                     performAction()
                                 }
