@@ -249,13 +249,24 @@ struct QuickPickerView: View {
             // Forward-Tab and Shift-Tab cycle tabs. We intercept at the
             // NSEvent layer because AppKit's field editor consumes Shift-Tab
             // for focus traversal before SwiftUI's .onKeyPress runs.
+            //
+            // Toggle focus false→true on the next tick: AppKit's responder
+            // can desync from SwiftUI's @FocusState during the Tab event,
+            // and re-assigning `true` to an already-`true` state is a no-op
+            // that won't re-grab focus from the field editor.
             tabInterceptor.onTab = {
                 activeTab = activeTab.next
-                isSearchFocused = true
+                isSearchFocused = false
+                DispatchQueue.main.async {
+                    isSearchFocused = true
+                }
             }
             tabInterceptor.onShiftTab = {
                 activeTab = activeTab.previous
-                isSearchFocused = true
+                isSearchFocused = false
+                DispatchQueue.main.async {
+                    isSearchFocused = true
+                }
             }
             tabInterceptor.start()
 
@@ -353,8 +364,12 @@ struct QuickPickerView: View {
         return Button {
             activeTab = tab
             // Click must NOT steal focus from the search field — otherwise
-            // shortcuts like Tab/Space/⏎ would stop working.
-            isSearchFocused = true
+            // shortcuts like Tab/Space/⏎ would stop working. Toggle to force
+            // SwiftUI to re-grab focus if AppKit's responder desynced.
+            isSearchFocused = false
+            DispatchQueue.main.async {
+                isSearchFocused = true
+            }
         } label: {
             HStack(spacing: 5) {
                 if tab == .favorites {
