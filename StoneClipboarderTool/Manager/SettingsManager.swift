@@ -11,12 +11,20 @@ import ServiceManagement
 class SettingsManager: ObservableObject {
     @Published var showInMenubar: Bool {
         didSet {
+            // Invariant: at least one of showInMenubar / showMainWindow must stay true,
+            // otherwise the app becomes inaccessible (no menubar icon, no Dock icon, no Cmd+Tab).
+            if !showInMenubar && !showMainWindow {
+                showMainWindow = true
+            }
             UserDefaults.standard.set(showInMenubar, forKey: "showInMenubar")
         }
     }
 
     @Published var showMainWindow: Bool {
         didSet {
+            if !showMainWindow && !showInMenubar {
+                showInMenubar = true
+            }
             UserDefaults.standard.set(showMainWindow, forKey: "showMainWindow")
         }
     }
@@ -216,6 +224,12 @@ class SettingsManager: ObservableObject {
 
         // Default to showing main window if first launch
         if UserDefaults.standard.object(forKey: "showMainWindow") == nil {
+            self.showMainWindow = true
+        }
+
+        // Invariant repair: if persisted state has both disabled (e.g. manual defaults edit),
+        // restore main-window visibility so the app stays reachable.
+        if !self.showInMenubar && !self.showMainWindow {
             self.showMainWindow = true
         }
     }
