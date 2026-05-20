@@ -35,6 +35,7 @@ enum QPTab: Hashable, CaseIterable, Identifiable {
 
 struct QuickPickerView: View {
     @ObservedObject var viewModel: CBViewModel
+    @ObservedObject var pinManager: PinManager
     @StateObject private var tabInterceptor = TabKeyInterceptor()
     @State private var activeTab: QPTab = .all
     @State private var searchText = ""
@@ -60,6 +61,7 @@ struct QuickPickerView: View {
 
     init(
         viewModel: CBViewModel,
+        pinManager: PinManager,
         settingsManager: SettingsManager? = nil,
         onClose: @escaping () -> Void,
         onPreviewToggle: @escaping (CBItem) -> Void = { _ in },
@@ -67,6 +69,7 @@ struct QuickPickerView: View {
         isPreviewVisible: @escaping () -> Bool = { false }
     ) {
         self.viewModel = viewModel
+        self.pinManager = pinManager
         self.settingsManager = settingsManager
         self.onClose = onClose
         self.onPreviewToggle = onPreviewToggle
@@ -150,6 +153,12 @@ struct QuickPickerView: View {
                 guard triggerKey == .space else { return .ignored }
                 return handlePreviewTrigger()
             }
+            .onKeyPress(keys: [KeyEquivalent("p")]) { keyPress in
+                // ⌥P toggles pin on the selected item (or extended selection).
+                guard keyPress.modifiers.contains(.option) else { return .ignored }
+                togglePinForSelection()
+                return .handled
+            }
             .onKeyPress(.rightArrow) {
                 guard triggerKey == .arrowRight else { return .ignored }
                 // Only open QL when cursor is at the end of search text
@@ -222,6 +231,8 @@ struct QuickPickerView: View {
                 isLoading: isLoadingItems,
                 hasMoreItems: hasMoreItems,
                 ocrEnabled: settingsManager?.enableOCROptionKey == true,
+                isItemPinned: { item in pinManager.isPinned(item) },
+                onTogglePin: { item in pinManager.togglePin(item) },
                 multiSelectionRange: selectedRange(),
                 onClearMultiSelection: {
                     selectionAnchor = nil
@@ -386,12 +397,15 @@ struct QuickPickerView: View {
                 }
                 Text(tabTitle(tab))
                     .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
                 Text("\(tabCount(tab))")
                     .font(.system(size: 10))
+                    .lineLimit(1)
                     .foregroundStyle(
                         isActive ? Color.white.opacity(0.85) : Color.secondary
                     )
             }
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(isActive ? Color.white : Color.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
@@ -414,7 +428,7 @@ struct QuickPickerView: View {
     private func tabTitle(_ tab: QPTab) -> String {
         switch tab {
         case .all: return "All"
-        case .favorites: return "Favorites"
+        case .favorites: return "Favs"
         case .text: return "Text"
         case .images: return "Images"
         case .files: return "Files"
@@ -472,6 +486,7 @@ struct QuickPickerView: View {
                 }
                 shortcutBadge("ESC", label: "Close")
                 favoriteToggleBadge()
+                pinToggleBadge()
 
                 if settingsManager?.quickLookMode != .disabled {
                     let key = settingsManager?.quickLookTriggerKey ?? .space
@@ -482,6 +497,27 @@ struct QuickPickerView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    private func pinToggleBadge() -> some View {
+        HStack(spacing: 3) {
+            Text("⌥P")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+            Image(systemName: "pin")
+                .font(.system(size: 9))
+        }
+        .foregroundStyle(.tertiary)
+        .help("Pin / unpin the selected item to the screen")
     }
 
     private func favoriteToggleBadge() -> some View {
@@ -542,6 +578,19 @@ struct QuickPickerView: View {
             imageCount = 0
             fileCount = 0
         }
+    }
+
+    private func togglePinForSelection() {
+        // If there's a Shift-extended range, pin each item in it; otherwise
+        // toggle on the cursor row. Already-pinned items inside a range get
+        // toggled off, which mirrors the single-item behavior.
+        if let range = selectedRange(), range.count > 1 {
+            let items = range.compactMap { filteredItems[safe: $0] }
+            items.forEach { pinManager.togglePin($0) }
+            return
+        }
+        guard selectedIndex < filteredItems.count else { return }
+        pinManager.togglePin(filteredItems[selectedIndex])
     }
 
     private func toggleFavoriteForSelected() {
@@ -1104,7 +1153,7 @@ final class TabKeyInterceptor: ObservableObject {
 
 
 #Preview {
-    QuickPickerView(viewModel: CBViewModel()) {
+    QuickPickerView(viewModel: CBViewModel(), pinManager: PinManager()) {
         print("Closed")
     }
 }

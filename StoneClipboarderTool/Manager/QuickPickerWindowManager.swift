@@ -72,6 +72,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     private let customPreviewManager = QPCustomPreviewManager()
     private weak var cbViewModel: CBViewModel?
     private weak var settingsManager: SettingsManager?
+    private weak var pinManager: PinManager?
     nonisolated(unsafe) private var eventMonitor: Any?
     nonisolated(unsafe) private var keyMonitor: Any?
     nonisolated(unsafe) private var localKeyMonitor: Any?
@@ -94,6 +95,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     func setSettingsManager(_ manager: SettingsManager) {
         self.settingsManager = manager
+    }
+
+    func setPinManager(_ manager: PinManager) {
+        self.pinManager = manager
     }
 
     func setMenuBarRefreshCallback(_ callback: @escaping () -> Void) {
@@ -159,8 +164,13 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         ]
 
         // Create content view
+        guard let pinManager = pinManager else {
+            print("PinManager is nil — QuickPicker cannot start")
+            return
+        }
         let contentView = QuickPickerView(
             viewModel: cbViewModel,
+            pinManager: pinManager,
             settingsManager: settingsManager,
             onClose: { [weak self] in
                 self?.hideQuickPicker()

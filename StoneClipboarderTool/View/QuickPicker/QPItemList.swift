@@ -14,6 +14,8 @@ struct QPItemList: View {
     var isLoading: Bool = false
     var hasMoreItems: Bool = true
     var ocrEnabled: Bool = false
+    var isItemPinned: (CBItem) -> Bool = { _ in false }
+    var onTogglePin: (CBItem) -> Void = { _ in }
     // Indices currently part of a Shift+Arrow multi-selection. nil = none.
     var multiSelectionRange: ClosedRange<Int>? = nil
     // Optional hook to clear the parent's multi-select anchor on direct row
@@ -62,7 +64,8 @@ struct QPItemList: View {
                             item: item,
                             isSelected: index == selectedIndex,
                             isInMultiSelection: multiSelectionRange?.contains(index) == true,
-                            showOCRHint: ocrEnabled
+                            showOCRHint: ocrEnabled,
+                            isPinned: isItemPinned(item)
                         )
                             .id(item.id)
                             .contentShape(Rectangle())
@@ -87,6 +90,10 @@ struct QPItemList: View {
                                 }
 
                                 Divider()
+
+                                Button(isItemPinned(item) ? "Unpin from Screen" : "Pin to Screen") {
+                                    onTogglePin(item)
+                                }
 
                                 Button("Copy") {
                                     onClearMultiSelection?()

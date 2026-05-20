@@ -15,6 +15,7 @@ struct QPItemRow: View {
     // current cursor row (the cursor row uses `isSelected`).
     var isInMultiSelection: Bool = false
     var showOCRHint: Bool = false
+    var isPinned: Bool = false
 
     private var typeLabel: String {
         switch item.itemType {
@@ -68,6 +69,12 @@ struct QPItemRow: View {
                         Image(systemName: "heart.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(.red)
+                    }
+
+                    if isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
             }
