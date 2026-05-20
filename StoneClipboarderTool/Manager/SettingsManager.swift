@@ -35,6 +35,12 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    @Published var closeOtherWindowsOnQuickPicker: Bool {
+        didSet {
+            UserDefaults.standard.set(closeOtherWindowsOnQuickPicker, forKey: "closeOtherWindowsOnQuickPicker")
+        }
+    }
+
     @Published var maxLastItems: Int {
         didSet {
             UserDefaults.standard.set(maxLastItems, forKey: "maxLastItems")
@@ -157,13 +163,6 @@ class SettingsManager: ObservableObject {
         didSet { UserDefaults.standard.set(pinAlwaysShowChrome, forKey: "pinAlwaysShowChrome") }
     }
 
-    @Published var pinShowOnAllSpaces: Bool {
-        didSet {
-            UserDefaults.standard.set(pinShowOnAllSpaces, forKey: "pinShowOnAllSpaces")
-            NotificationCenter.default.post(name: .pinBehaviorSettingsChanged, object: nil)
-        }
-    }
-
     @Published var pinShowOverFullscreen: Bool {
         didSet {
             UserDefaults.standard.set(pinShowOverFullscreen, forKey: "pinShowOverFullscreen")
@@ -229,6 +228,12 @@ class SettingsManager: ObservableObject {
         didSet { UserDefaults.standard.set(pinDismissAllConfirm, forKey: "pinDismissAllConfirm") }
     }
 
+    /// When true, opening the Quick Picker also hides pinned windows. Default
+    /// false so pins survive the picker (they're meant to stay on top).
+    @Published var pinQuickPickerDismissesPins: Bool {
+        didSet { UserDefaults.standard.set(pinQuickPickerDismissesPins, forKey: "pinQuickPickerDismissesPins") }
+    }
+
     func updateLoginItem() {
         do {
             if startAtLogin {
@@ -249,6 +254,7 @@ class SettingsManager: ObservableObject {
         self.showInMenubar = UserDefaults.standard.bool(forKey: "showInMenubar")
         self.showMainWindow = UserDefaults.standard.bool(forKey: "showMainWindow")
         self.confirmQuitOnCmdQ = UserDefaults.standard.object(forKey: "confirmQuitOnCmdQ") as? Bool ?? false
+        self.closeOtherWindowsOnQuickPicker = UserDefaults.standard.object(forKey: "closeOtherWindowsOnQuickPicker") as? Bool ?? true
         self.maxLastItems = UserDefaults.standard.object(forKey: "maxLastItems") as? Int ?? 10
         self.maxFavoriteItems =
             UserDefaults.standard.object(forKey: "maxFavoriteItems") as? Int ?? 10
@@ -289,7 +295,6 @@ class SettingsManager: ObservableObject {
         // Pin settings
         self.pinPersistAcrossLaunches = UserDefaults.standard.object(forKey: "pinPersistAcrossLaunches") as? Bool ?? true
         self.pinAlwaysShowChrome = UserDefaults.standard.object(forKey: "pinAlwaysShowChrome") as? Bool ?? false
-        self.pinShowOnAllSpaces = UserDefaults.standard.object(forKey: "pinShowOnAllSpaces") as? Bool ?? true
         self.pinShowOverFullscreen = UserDefaults.standard.object(forKey: "pinShowOverFullscreen") as? Bool ?? true
         self.pinSnapToScreenEdges = UserDefaults.standard.object(forKey: "pinSnapToScreenEdges") as? Bool ?? false
         self.pinShadowEnabled = UserDefaults.standard.object(forKey: "pinShadowEnabled") as? Bool ?? true
@@ -304,6 +309,7 @@ class SettingsManager: ObservableObject {
         self.pinDefaultFileHeight = UserDefaults.standard.object(forKey: "pinDefaultFileHeight") as? Double ?? 120
         self.pinAllowTextEdit = UserDefaults.standard.object(forKey: "pinAllowTextEdit") as? Bool ?? false
         self.pinDismissAllConfirm = UserDefaults.standard.object(forKey: "pinDismissAllConfirm") as? Bool ?? false
+        self.pinQuickPickerDismissesPins = UserDefaults.standard.object(forKey: "pinQuickPickerDismissesPins") as? Bool ?? false
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = UserDefaults.standard.string(forKey: "clipboardCaptureMode"),

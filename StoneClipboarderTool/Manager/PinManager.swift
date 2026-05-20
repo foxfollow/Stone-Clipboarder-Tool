@@ -243,8 +243,8 @@ final class PinManager: ObservableObject {
             .map { ctrl in
                 PinSnapshot(
                     configId: ctrl.config.id,
-                    itemType: ctrl.config.itemType,
-                    preview: previewString(for: ctrl.config),
+                    itemType: ctrl.state.itemType,
+                    preview: previewString(for: ctrl.state),
                     createdAt: ctrl.config.createdAt
                 )
             }
@@ -350,19 +350,24 @@ final class PinManager: ObservableObject {
         }
     }
 
-    private func previewString(for config: PinnedItemConfig) -> String {
-        switch config.itemType {
+    private func previewString(for state: PinViewState) -> String {
+        switch state.itemType {
         case .text, .combined:
-            let text = (config.content ?? "").prefix(60)
+            let text = (state.content ?? "").prefix(60)
             return String(text)
         case .image:
             return "[Image]"
         case .file:
-            return config.fileName ?? "[File]"
+            return state.fileName ?? "[File]"
         }
     }
 
     // MARK: - HUD
+
+    /// Public entry point used by controllers (e.g. click-through hint).
+    func showHUDMessage(_ message: String) {
+        showHUD(message)
+    }
 
     private func showHUD(_ message: String) {
         hudWindow?.orderOut(nil)

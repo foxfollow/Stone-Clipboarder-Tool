@@ -153,12 +153,6 @@ struct QuickPickerView: View {
                 guard triggerKey == .space else { return .ignored }
                 return handlePreviewTrigger()
             }
-            .onKeyPress(keys: [KeyEquivalent("p")]) { keyPress in
-                // ⌥P toggles pin on the selected item (or extended selection).
-                guard keyPress.modifiers.contains(.option) else { return .ignored }
-                togglePinForSelection()
-                return .handled
-            }
             .onKeyPress(.rightArrow) {
                 guard triggerKey == .arrowRight else { return .ignored }
                 // Only open QL when cursor is at the end of search text
@@ -285,6 +279,9 @@ struct QuickPickerView: View {
                 DispatchQueue.main.async {
                     isSearchFocused = true
                 }
+            }
+            tabInterceptor.onOptionP = {
+                togglePinForSelection()
             }
             tabInterceptor.start()
 
@@ -1108,14 +1105,22 @@ private extension Array {
 final class TabKeyInterceptor: ObservableObject {
     var onTab: (() -> Void)?
     var onShiftTab: (() -> Void)?
+    // ⌥P pin toggle. Matched by physical key code, not character, so it works
+    // on non-Latin layouts (e.g. Ukrainian ЙЦУКЕН, where the P key types "з").
+    var onOptionP: (() -> Void)?
 
     private var monitor: Any?
     private static let tabKeyCode: UInt16 = 48
+    private static let pKeyCode: UInt16 = 35
 
     func start() {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.intercept(event) ?? event
+            // NOTE: must NOT use `intercept(event) ?? event` — that turns a
+            // deliberate nil (swallow) back into the event, so the keystroke
+            // (e.g. the "p" in ⌥P) would leak into the search field.
+            guard let self else { return event }
+            return self.intercept(event)
         }
     }
 
@@ -1126,12 +1131,27 @@ final class TabKeyInterceptor: ObservableObject {
         }
         onTab = nil
         onShiftTab = nil
+        onOptionP = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
+        let flags = event.modifierFlags
+
+        // ⌥P (Option held, no Control/Command — the latter is the global pin
+        // hotkey handled elsewhere). Key code is layout-independent.
+        if event.keyCode == Self.pKeyCode,
+           flags.contains(.option),
+           !flags.contains(.control),
+           !flags.contains(.command) {
+            DispatchQueue.main.async { [weak self] in
+                self?.onOptionP?()
+            }
+            return nil  // swallow so no character is typed into the search field
+        }
+
         guard event.keyCode == Self.tabKeyCode else { return event }
 
-        let shift = event.modifierFlags.contains(.shift)
+        let shift = flags.contains(.shift)
         // Defer to next runloop tick — mutating SwiftUI state directly inside
         // an event-dispatch callback can fight with the active event cycle.
         DispatchQueue.main.async { [weak self] in

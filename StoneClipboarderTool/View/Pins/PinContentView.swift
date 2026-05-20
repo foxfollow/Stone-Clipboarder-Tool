@@ -2,38 +2,39 @@
 //  PinContentView.swift
 //  StoneClipboarderTool
 //
-//  Root SwiftUI view rendered inside a pinned-clipboard NSPanel.
+//  Root SwiftUI view rendered inside a pinned-clipboard NSPanel. Renders
+//  exclusively from PinViewState (a context-free snapshot) — never from the
+//  SwiftData model — to avoid faulting crashes.
 //
 
 import AppKit
 import SwiftUI
 
 struct PinContentView: View {
-    /// The shared config — mutated by the chrome (opacity, lock, etc.) and
-    /// observed by the panel for size/position persistence. The pin owns a
-    /// single config instance shared with the controller.
-    @Bindable var config: PinnedItemConfig
+    @ObservedObject var state: PinViewState
     let controller: PinWindowController
     @ObservedObject var settings: SettingsManager
 
     @State private var isHovering = false
-    @State private var editedText: String = ""
     @FocusState private var isEditing: Bool
 
     private var showChrome: Bool {
-        settings.pinAlwaysShowChrome || isHovering || config.isCollapsed
+        // Click-through pins always show chrome: hover can't trigger because
+        // the mouse passes through, so without this the controls (incl. the
+        // hand icon to turn click-through off) would be unreachable.
+        settings.pinAlwaysShowChrome || isHovering || state.isCollapsed || state.isClickThrough
     }
 
     var body: some View {
         ZStack(alignment: .top) {
-            if !config.isCollapsed {
+            if !state.isCollapsed {
                 contentBody
-                    .padding(.top, settings.pinAlwaysShowChrome ? chromeHeight : 0)
+                    .padding(.top, (settings.pinAlwaysShowChrome || state.isClickThrough) ? chromeHeight : 0)
             }
 
             if showChrome {
                 PinChromeView(
-                    config: config,
+                    state: state,
                     controller: controller,
                     settings: settings
                 )
@@ -51,9 +52,6 @@ struct PinContentView: View {
             withAnimation(.easeOut(duration: 0.12)) {
                 isHovering = hovering
             }
-        }
-        .onAppear {
-            editedText = config.content ?? ""
         }
         // Don't make Cmd+C trigger when text is being actively edited — the
         // editor needs that for normal copy behavior.
@@ -79,14 +77,14 @@ struct PinContentView: View {
 
     @ViewBuilder
     private var contentBody: some View {
-        switch config.itemType {
+        switch state.itemType {
         case .text, .combined:
             textBody
         case .image:
             PinImageView(
-                imageData: config.imageData,
+                image: state.displayImage,
                 zoom: Binding(
-                    get: { config.imageZoom },
+                    get: { state.imageZoom },
                     set: { controller.setImageZoom($0) }
                 )
             )
@@ -98,17 +96,18 @@ struct PinContentView: View {
     @ViewBuilder
     private var textBody: some View {
         if settings.pinAllowTextEdit {
-            TextEditor(text: $editedText)
+            TextEditor(text: $state.editedText)
                 .font(.system(size: 13))
                 .padding(8)
                 .focused($isEditing)
                 .scrollContentBackground(.hidden)
-                .onChange(of: editedText) { _, newValue in
-                    config.content = newValue
+                .onChange(of: isEditing) { _, editing in
+                    // Persist when the field loses focus.
+                    if !editing { controller.commitTextEdit(state.editedText) }
                 }
         } else {
             ScrollView {
-                Text(config.content ?? "")
+                Text(state.content ?? "")
                     .font(.system(size: 13))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
@@ -121,7 +120,7 @@ struct PinContentView: View {
     private var fileBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                if let data = config.fileData, let img = NSImage(data: data) {
+                if let img = state.displayImage {
                     Image(nsImage: img)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -133,10 +132,10 @@ struct PinContentView: View {
                         .frame(width: 48, height: 48)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(config.fileName ?? "Unknown")
+                    Text(state.fileName ?? "Unknown")
                         .font(.system(size: 12, weight: .semibold))
                         .lineLimit(2)
-                    Text(byteString(config.fileData?.count ?? 0))
+                    Text(byteString(state.fileData?.count ?? 0))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }

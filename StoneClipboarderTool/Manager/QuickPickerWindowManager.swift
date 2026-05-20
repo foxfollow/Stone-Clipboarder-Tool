@@ -123,8 +123,22 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         // Hide our other windows so the QuickPicker is the only one visible.
         // orderOut on its own does NOT trigger a Space switch — only NSApp.activate
         // and activation-policy changes do. Safe to do this in any context.
-        for window in NSApp.windows {
-            window.orderOut(nil)
+        //
+        // Exceptions:
+        //  - Pinned windows (PinPanel) are meant to stay on top; only hide them
+        //    if the user opted in via the Pins setting.
+        //  - The Settings window is never auto-hidden, so opening Settings from
+        //    the picker doesn't make it vanish.
+        if settingsManager?.closeOtherWindowsOnQuickPicker ?? true {
+            let dismissPins = settingsManager?.pinQuickPickerDismissesPins ?? false
+            for window in NSApp.windows {
+                if window is PinPanel {
+                    if dismissPins { window.orderOut(nil) }
+                    continue
+                }
+                if Self.isSettingsWindow(window) { continue }
+                window.orderOut(nil)
+            }
         }
 
         // Create a borderless non-activating panel. .nonactivatingPanel is
@@ -262,11 +276,22 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
         self.window = nil
 
-        // Return focus to the previous app if we had stored one
-        if let previousApp = previousApp {
+        // If the user opened our Settings window while the picker was up,
+        // keep it focused instead of yanking focus back to the previous app
+        // (which would push Settings to the back / make it appear to close).
+        if let settingsWindow = NSApp.windows.first(where: {
+            Self.isSettingsWindow($0) && $0.isVisible
+        }) {
+            NSApp.activate(ignoringOtherApps: true)
+            settingsWindow.makeKeyAndOrderFront(nil)
+            previousApp = nil
+        } else if let previousApp = previousApp {
+            // Return focus to the previous app if we had stored one
             previousApp.activate(options: [])
+            self.previousApp = nil
+        } else {
+            previousApp = nil
         }
-        previousApp = nil
 
         // Refresh menubar after operations to fix any state issues
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -586,6 +611,18 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }
+    }
+
+    /// True for the app's Settings windows (the custom WindowGroup with id
+    /// "settings" and the standard Settings scene). Used to keep Settings
+    /// visible when the Quick Picker opens / closes.
+    private static func isSettingsWindow(_ window: NSWindow) -> Bool {
+        if window.title == "Settings" { return true }
+        if let id = window.identifier?.rawValue,
+           id.localizedCaseInsensitiveContains("settings") {
+            return true
+        }
+        return false
     }
 
     // MARK: - Fullscreen Detection

@@ -61,6 +61,14 @@ private struct AppearanceSection: View {
 
             Toggle("Hold or double-tap ⌘Q to quit", isOn: $settingsManager.confirmQuitOnCmdQ)
                 .help("Require holding ⌘Q for 1 second, or double-tapping ⌘Q, to quit — preventing accidental quits")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Hide other windows when Quick Picker opens", isOn: $settingsManager.closeOtherWindowsOnQuickPicker)
+                    .help("Hide the main window (and others) while the Quick Picker is shown.")
+                Text("Pinned windows and the Settings window are kept open. Use the Pins tab to let the Quick Picker dismiss pins.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
     }
 }

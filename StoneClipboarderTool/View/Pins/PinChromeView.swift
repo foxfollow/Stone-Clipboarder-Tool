@@ -4,22 +4,30 @@
 //
 //  Compact header bar shown on top of a pinned-window's content. Hosts the
 //  drag handle, opacity slider, lock / click-through / copy / collapse /
-//  close controls.
+//  close controls. Reads from PinViewState (context-free snapshot).
 //
 
 import SwiftUI
 
 struct PinChromeView: View {
-    @Bindable var config: PinnedItemConfig
+    @ObservedObject var state: PinViewState
     let controller: PinWindowController
     @ObservedObject var settings: SettingsManager
 
     private var typeIcon: String {
-        switch config.itemType {
+        switch state.itemType {
         case .text: return "doc.text"
         case .image: return "photo"
         case .file: return "doc"
         case .combined: return "doc.richtext"
+        }
+    }
+
+    private var openInAppHelp: String {
+        switch state.itemType {
+        case .text, .combined: return "Open in TextEdit"
+        case .image: return "Open in Preview"
+        case .file: return "Open in default app"
         }
     }
 
@@ -30,7 +38,7 @@ struct PinChromeView: View {
                 .foregroundStyle(.secondary)
 
             // Drag affordance / title. The whole panel is draggable via
-            // isMovableByWindowBackground, but the icon gives users a target.
+            // isMovableByWindowBackground; double-click toggles collapse.
             Text(titleText)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -41,11 +49,19 @@ struct PinChromeView: View {
                     controller.toggleCollapsed()
                 }
 
+            // Click-through hint so the user knows how to regain interaction.
+            if state.isClickThrough {
+                Text("⌘ to interact")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.orange)
+                    .help("Click-through is on. Hold ⌘ to interact with this pin, then click the hand icon to turn it off.")
+            }
+
             // Opacity slider (compact)
-            if !config.isCollapsed {
+            if !state.isCollapsed {
                 Slider(
                     value: Binding(
-                        get: { config.opacity },
+                        get: { state.opacity },
                         set: { controller.setOpacity($0) }
                     ),
                     in: 0.2...1.0
@@ -57,20 +73,20 @@ struct PinChromeView: View {
 
             // Lock toggle
             iconButton(
-                systemName: config.isLocked ? "lock.fill" : "lock.open",
-                help: config.isLocked ? "Unlock position & size" : "Lock position & size",
-                tint: config.isLocked ? .accentColor : nil
+                systemName: state.isLocked ? "lock.fill" : "lock.open",
+                help: state.isLocked ? "Unlock position & size" : "Lock position & size",
+                tint: state.isLocked ? .accentColor : nil
             ) {
-                controller.setLocked(!config.isLocked)
+                controller.setLocked(!state.isLocked)
             }
 
             // Click-through toggle
             iconButton(
-                systemName: config.isClickThrough ? "hand.tap" : "hand.tap.fill",
-                help: config.isClickThrough ? "Disable click-through" : "Enable click-through (clicks pass through)",
-                tint: config.isClickThrough ? .accentColor : nil
+                systemName: state.isClickThrough ? "hand.tap.fill" : "hand.tap",
+                help: state.isClickThrough ? "Disable click-through" : "Enable click-through (clicks pass through to apps beneath)",
+                tint: state.isClickThrough ? .orange : nil
             ) {
-                controller.setClickThrough(!config.isClickThrough)
+                controller.setClickThrough(!state.isClickThrough)
             }
 
             // Copy button
@@ -81,10 +97,18 @@ struct PinChromeView: View {
                 controller.copyToClipboard()
             }
 
+            // Open in default app (Preview / TextEdit / etc.)
+            iconButton(
+                systemName: "arrow.up.forward.app",
+                help: openInAppHelp
+            ) {
+                controller.openInDefaultApp()
+            }
+
             // Collapse / expand
             iconButton(
-                systemName: config.isCollapsed ? "chevron.down" : "chevron.up",
-                help: config.isCollapsed ? "Expand" : "Collapse to header"
+                systemName: state.isCollapsed ? "chevron.down" : "chevron.up",
+                help: state.isCollapsed ? "Expand" : "Collapse to header"
             ) {
                 controller.toggleCollapsed()
             }
@@ -113,16 +137,16 @@ struct PinChromeView: View {
     }
 
     private var titleText: String {
-        switch config.itemType {
+        switch state.itemType {
         case .text, .combined:
-            let s = (config.content ?? "")
+            let s = (state.content ?? "")
                 .replacingOccurrences(of: "\n", with: " ")
                 .trimmingCharacters(in: .whitespaces)
             return s.isEmpty ? "Pinned text" : String(s.prefix(40))
         case .image:
             return "Pinned image"
         case .file:
-            return config.fileName ?? "Pinned file"
+            return state.fileName ?? "Pinned file"
         }
     }
 

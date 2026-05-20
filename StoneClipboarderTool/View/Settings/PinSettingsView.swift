@@ -42,9 +42,6 @@ struct PinSettingsView: View {
             Toggle("Always show pin controls", isOn: $settingsManager.pinAlwaysShowChrome)
                 .help("When off, the close / lock / opacity controls only appear on hover.")
 
-            Toggle("Show on all Spaces", isOn: $settingsManager.pinShowOnAllSpaces)
-                .help("Pins follow you to every Mission Control Space. When off they stay on the Space where they were created.")
-
             Toggle("Show over fullscreen apps", isOn: $settingsManager.pinShowOverFullscreen)
                 .help("Render pins on top of another app's fullscreen Space.")
 
@@ -52,6 +49,14 @@ struct PinSettingsView: View {
                 .help("Stick a pin to a nearby screen edge while dragging.")
 
             Toggle("Drop shadow", isOn: $settingsManager.pinShadowEnabled)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Quick Picker dismisses pins", isOn: $settingsManager.pinQuickPickerDismissesPins)
+                    .help("When on, opening the Quick Picker also hides your pinned windows.")
+                Text("Off by default — pins stay on screen when the Quick Picker opens.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
