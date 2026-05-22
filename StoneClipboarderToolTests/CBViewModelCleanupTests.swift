@@ -152,6 +152,63 @@ final class CBViewModelCleanupTests: XCTestCase {
         XCTAssertNil(viewModel.selectedItem, "Selected item must be cleared before its backing data is detached")
     }
 
+    // MARK: - delete paths (also exercise the pin item-deleted notifications)
+
+    func testDeleteItemRemovesItAndPostsNotification() async throws {
+        let item = CBItem(timestamp: Date(), content: "to-delete", itemType: .text)
+        context.insert(item)
+        try context.save()
+
+        let observed = expectation(description: "clipboardItemDeleted posted")
+        let token = NotificationCenter.default.addObserver(
+            forName: .clipboardItemDeleted, object: nil, queue: .main
+        ) { _ in observed.fulfill() }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        viewModel.deleteItem(item)
+        await fulfillment(of: [observed], timeout: 2)
+        try await waitForMainQueueDrain()
+
+        viewModel.refreshItemCounts()
+        XCTAssertEqual(viewModel.totalItemCount, 0)
+    }
+
+    func testDeleteItemsRemovesSelectedOffsets() async throws {
+        let base = Date(timeIntervalSince1970: 4_000_000)
+        var items: [CBItem] = []
+        for i in 0..<3 {
+            let item = CBItem(timestamp: base.addingTimeInterval(Double(i)), content: "d\(i)", itemType: .text)
+            context.insert(item)
+            items.append(item)
+        }
+        try context.save()
+
+        viewModel.deleteItems(at: IndexSet(integer: 0), from: items)
+        try await waitForMainQueueDrain()
+
+        viewModel.refreshItemCounts()
+        XCTAssertEqual(viewModel.totalItemCount, 2)
+    }
+
+    func testDeleteAllItemsClearsStoreAndPostsNotification() async throws {
+        insertItems(nonFavoriteCount: 3, favoriteCount: 0)
+        try context.save()
+
+        let observed = expectation(description: "clipboardItemDeleted posted")
+        let token = NotificationCenter.default.addObserver(
+            forName: .clipboardItemDeleted, object: nil, queue: .main
+        ) { _ in observed.fulfill() }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        viewModel.deleteAllItems()
+        await fulfillment(of: [observed], timeout: 2)
+        try await waitForMainQueueDrain()
+
+        viewModel.refreshItemCounts()
+        XCTAssertEqual(viewModel.totalItemCount, 0)
+        XCTAssertTrue(viewModel.items.isEmpty)
+    }
+
     // MARK: - Helpers
 
     private func insertItems(nonFavoriteCount: Int, favoriteCount: Int) {
