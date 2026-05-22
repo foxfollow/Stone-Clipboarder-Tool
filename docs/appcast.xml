@@ -10,6 +10,17 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
+        <new>
+            <li>🪟 NEW: Pin clipboard items as floating windows — press ⌥P in the Quick Picker (or right-click → Pin to Screen) to keep text, images, or files on top of every Space. Pins are resizable, movable, dimmable, lockable, click-through, and collapsible, and reopen after relaunch.</li>
+            <li>🔍 NEW: Zoomable image pins — pinch to zoom (centered on the cursor), drag to pan, double-click to reset; pin windows are sized to the image's aspect ratio so it fills the window.</li>
+            <li>✨ NEW: Multi-select in the Quick Picker — extend a selection with Shift+↑/↓ and paste several items at once.</li>
+            <li>👁️ NEW: Multi-item OCR — press ⌥⏎ on a multi-selection to extract and combine text from images and text items.</li>
+            <li>⌨️ IMPROVED: Opening the Quick Picker keeps the Settings window and your pins visible; the pin shortcuts (⌃⌥P pin most recent, ⌃⌥⇧P dismiss all) are configurable in the Hotkeys tab.</li>
+            <li>🛠️ FIXED: The Quick Picker search field no longer loses focus while typing.</li>
+            <li>🛡️ FIXED: Settings can no longer leave the app inaccessible — the menu bar and main window can't both be turned off.</li>
+            <li>🧹 IMPROVED: Updated Sparkle to 2.9.2.</li>
+        </new>
+
     <item>
         <title>Version 1.5.5</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
@@ -53,34 +64,6 @@
     </item>
 
     <item>
-        <title>Version VERSION_NUMBER</title>
-        <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
-        <sparkle:version>VERSION_NUMBER</sparkle:version>
-        <sparkle:shortVersionString>VERSION_NUMBER</sparkle:shortVersionString>
-        <description
-        ><![CDATA[
-            <h2>StoneClipboarderTool VERSION_NUMBER</h2>
-            <ul>
-                <li>🪟 NEW: Quick Picker tabs — filter by All / Favorites / Text / Images / Files; cycle tabs with Tab / Shift+Tab without losing search focus</li>
-                <li>✨ NEW: Toggle favorite on the selected Quick Picker row with Option+Space; image rows show an OCR hint badge when OCR is enabled in Settings</li>
-                <li>🛡️ NEW: Optional confirm-quit — hold ⌘Q for 1 second (or double-tap ⌘Q) to quit, with on-screen HUD; protects against accidental quits and is toggleable in Settings</li>
-                <li>🎨 IMPROVED: Settings rebuilt as a sidebar NavigationSplitView; larger 720×540 minimum window size for both Settings and the main window</li>
-                <li>🛠️ FIXED: SwiftData "backing data detached" crashes during auto-cleanup — favorites are now excluded from cleanup counts, the selected item is cleared before deletion, and context deletes are deferred with proper save/rollback</li>
-                <li>🛠️ FIXED: Quick Look previews are now written to Application Support/StoneClipboarderTool/Previews so external apps can open them; stale preview sessions older than one hour are cleaned up on launch</li>
-            </ul>
-        ]]></description>
-        <pubDate>RELEASE_DATE</pubDate>
-        <enclosure
-            url="https://github.com/REPO_OWNER/REPO_NAME/releases/download/vVERSION_NUMBER/StoneClipboarderTool.zip"
-            sparkle:version="VERSION_NUMBER"
-            sparkle:shortVersionString="VERSION_NUMBER"
-            sparkle:edSignature="SIGNATURE_PLACEHOLDER"
-            length="FILE_SIZE"
-            type="application/octet-stream"
-        />
-    </item>
-
-    <item>
         <title>Version 1.5.3</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
         <sparkle:version>15</sparkle:version>
@@ -101,36 +84,6 @@
         />
     </item>
 
-    <item>
-        <title>Version VERSION_NUMBER</title>
-        <link>https://REPO_OWNER.github.io/REPO_NAME/</link>
-        <sparkle:version>VERSION_NUMBER</sparkle:version>
-        <sparkle:shortVersionString>VERSION_NUMBER</sparkle:shortVersionString>
-        <description
-            ><![CDATA[
-            <h2>StoneClipboarderTool VERSION_NUMBER</h2>
-            <ul>
-                <li>🪟 NEW: Quick Picker now renders over other apps' fullscreen Spaces — open it without leaving the app you're in</li>
-                <li>🖼️ NEW: Menu bar popover now appears alongside other apps' fullscreen apps too</li>
-                <li>🔍 NEW: Smart preview fallback — when you trigger preview while in another app's fullscreen Space, the custom preview is used automatically (Apple Quick Look is system-managed and can't render in another app's fullscreen)</li>
-                <li>⌨️ IMPROVED: Search field cursor now lands in the Quick Picker on open and is restored after closing the preview</li>
-                <li>🛠️ FIXED: Quick Picker no longer pulls you out of another app's fullscreen Space when triggered</li>
-                <li>🛠️ FIXED: QuickLook stability — temp files are cleaned up with a delay so "Open with…" actions have time to read them</li>
-                <li>🛠️ IMPROVED: Window resignation handling — Quick Picker now closes cleanly when an external app activates (e.g. via "Open with…")</li>
-                <li>🧹 IMPROVED: Code quality refactor based on SonarCloud scanner issues</li>
-            </ul>
-        ]]></description>
-        <pubDate>RELEASE_DATE</pubDate>
-        <enclosure
-                url="https://github.com/REPO_OWNER/REPO_NAME/releases/download/vVERSION_NUMBER/StoneClipboarderTool.zip"
-                sparkle:version="VERSION_NUMBER"
-                sparkle:shortVersionString="VERSION_NUMBER"
-                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
-                length="FILE_SIZE"
-                type="application/octet-stream"
-            />
-    </item>
-    
     <item>
         <title>Version 1.5.2</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
@@ -179,41 +132,6 @@
                 sparkle:shortVersionString="1.4.0"
                 sparkle:edSignature="zfo2vhXZC55I/XiJIafed+WAFREv/3eHfWi9pn/MQ/xlFhOpDpK5xxvAV7EK+SD3DdAs3WyK51OxXRveCABvBQ=="
                 length="4417177"
-                type="application/octet-stream"
-            />
-    </item>
-
-    <item>
-        <title>Version 1.4.0</title>
-        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
-        <sparkle:version>1.4.0</sparkle:version>
-        <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
-        <description
-            ><![CDATA[
-            <h2>StoneClipboarderTool 1.4.0</h2>
-            <ul>
-                <li>🛡️ Separated database storage for clipboard history and settings — corruption in one won't affect the other</li>
-                <li>🛡️ Crash protection: automatic recovery from database corruption instead of crashes</li>
-                <li>🛡️ All database operations now safely roll back on errors</li>
-                <li>📝 New optional error logging setting for debugging</li>
-                <li>✨ Native macOS Quick Look support: press Space or Arrow Right to preview clipboard items</li>
-                <li>⚙️ Configurable trigger key and preview mode (Native, Custom, Disabled) in Settings</li>
-                <li>⌨️ Smart spacebar handling: only previews when search is empty or ends with a space</li>
-                <li>➡️ Smart arrow navigation: right arrow previews only at end of search text</li>
-                <li>⚡️ Improved performance for large text previews</li>
-                <li>👁️ Option+Enter on image in QuickPicker extracts text via OCR</li>
-                <li>⚙️ New setting to toggle OCR feature</li>
-                <li>🖱️ New context menu in QuickPicker: right-click to Open in Preview or TextEdit</li>
-                <li>⚠️ Excluded apps and hotkey configurations will be reset due to database restructuring</li>
-            </ul>
-        ]]></description>
-        <pubDate>RELEASE_DATE</pubDate>
-        <enclosure
-                url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.4.0/StoneClipboarderTool.zip"
-                sparkle:version="1.4.0"
-                sparkle:shortVersionString="1.4.0"
-                sparkle:edSignature="SIGNATURE_PLACEHOLDER"
-                length="FILE_SIZE"
                 type="application/octet-stream"
             />
     </item>

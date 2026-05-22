@@ -145,6 +145,7 @@ docs/api/
 # AI & CI Tool Files
 # ===========================
 CLAUDE.md
+CLAUDE.local.md
 GEMINI.md
 ACTIONS_SETUP.md
 .gemini/

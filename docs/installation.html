@@ -573,6 +573,47 @@
             </div>
         </section>
 
+        <!-- Alternative: Terminal Command -->
+        <section class="max-w-4xl mx-auto px-4 mb-12">
+            <div class="card-gradient p-6 md:p-8 rounded-2xl" style="border-left: 4px solid #3b82f6;">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
+                        <i class="fa-solid fa-terminal text-xl text-blue-400"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold">Alternative: Terminal Command</h2>
+                        <p class="text-sm text-gray-400 mt-1">
+                            If the steps above don't work, you can clear the quarantine flag macOS adds to downloads
+                            with a single command.
+                        </p>
+                    </div>
+                </div>
+                <p class="text-gray-400 leading-relaxed mb-4">
+                    After moving <code class="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono">StoneClipboarderTool.app</code>
+                    to <code class="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono">/Applications</code>, open
+                    Terminal and run:
+                </p>
+                <div class="code-box flex items-center justify-between gap-4 bg-[#1e1e1e] p-4 rounded-xl border border-white/10 font-mono text-[13px]">
+                    <code class="text-blue-400 leading-relaxed">xattr -cr /Applications/StoneClipboarderTool.app</code>
+                    <button class="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 flex-shrink-0"
+                        id="copy-xattr-btn" onclick="copyXattrCmd()">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+                <p class="text-gray-400 leading-relaxed mt-4">
+                    Then launch the app normally. This removes the quarantine attributes so macOS allows the
+                    ad-hoc–signed app to run.
+                </p>
+                <div class="note-box border-l-4 border-blue-500/50 bg-blue-500/5 rounded-r-xl p-4 mt-4">
+                    <p class="text-sm text-blue-300/80">
+                        <strong class="text-blue-400">Note:</strong> If you installed the app somewhere other than
+                        <code class="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono">/Applications</code>,
+                        adjust the path in the command accordingly.
+                    </p>
+                </div>
+            </div>
+        </section>
+
         <!-- Security & Privacy Box -->
         <section class="max-w-4xl mx-auto px-4 mb-16">
             <div class="warning-card card-gradient p-6 md:p-8 rounded-2xl border border-amber-500/20"
@@ -674,6 +715,22 @@
         function showCopied(icon) {
             icon.className = 'fa-solid fa-check text-green-500';
             setTimeout(() => { icon.className = 'fa-regular fa-copy'; }, 2000);
+        }
+
+        // Terminal xattr command copy
+        function copyXattrCmd() {
+            const cmd = "xattr -cr /Applications/StoneClipboarderTool.app";
+            const btn = document.getElementById('copy-xattr-btn');
+            const icon = btn.querySelector('i');
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(cmd).then(() => showCopied(icon));
+            } else {
+                const ta = document.createElement("textarea");
+                ta.value = cmd; ta.style.position = "fixed"; ta.style.left = "-9999px";
+                document.body.appendChild(ta); ta.focus(); ta.select();
+                try { document.execCommand('copy'); showCopied(icon); } catch (e) { }
+                document.body.removeChild(ta);
+            }
         }
 
         // Modal
