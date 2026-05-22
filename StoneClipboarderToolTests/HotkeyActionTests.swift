@@ -4,8 +4,8 @@ import XCTest
 final class HotkeyActionTests: XCTestCase {
 
     func testAllCasesCount() {
-        // 10 last + 10 favorite + 1 main panel
-        XCTAssertEqual(HotkeyAction.allCases.count, 21)
+        // 10 last + 10 favorite + 1 main panel + 2 pin actions
+        XCTAssertEqual(HotkeyAction.allCases.count, 23)
     }
 
     func testLastActionsClassification() {
@@ -72,6 +72,19 @@ final class HotkeyActionTests: XCTestCase {
 
     func testMainPanelDefaultShortcut() {
         XCTAssertEqual(HotkeyAction.mainPanel.defaultShortcut, "⌃⌥Space")
+    }
+
+    func testPinActionsClassification() {
+        for action in [HotkeyAction.togglePinLastItem, .dismissAllPins] {
+            XCTAssertFalse(action.isLastAction)
+            XCTAssertFalse(action.isFavoriteAction)
+            XCTAssertEqual(action.index, -1)
+        }
+    }
+
+    func testPinActionsDefaultShortcuts() {
+        XCTAssertEqual(HotkeyAction.togglePinLastItem.defaultShortcut, "⌃⌥P")
+        XCTAssertEqual(HotkeyAction.dismissAllPins.defaultShortcut, "⌃⌥⇧P")
     }
 
     func testDisplayNamesNonEmpty() {
