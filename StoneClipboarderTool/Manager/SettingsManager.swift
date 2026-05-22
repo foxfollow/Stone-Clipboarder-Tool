@@ -182,7 +182,13 @@ class SettingsManager: ObservableObject {
     }
 
     @Published var pinMaxConcurrent: Int {
-        didSet { UserDefaults.standard.set(pinMaxConcurrent, forKey: "pinMaxConcurrent") }
+        didSet {
+            if pinMaxConcurrent < 0 {
+                pinMaxConcurrent = 0  // re-enters didSet once, then persists
+                return
+            }
+            UserDefaults.standard.set(pinMaxConcurrent, forKey: "pinMaxConcurrent")
+        }
     }
 
     @Published var pinCornerRadius: Double {

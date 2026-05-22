@@ -26,12 +26,9 @@ struct PinContentView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            if !state.isCollapsed {
-                contentBody
-                    .padding(.top, (settings.pinAlwaysShowChrome || state.isClickThrough) ? chromeHeight : 0)
-            }
-
+        // VStack (not ZStack): the chrome sits *above* the content and pushes
+        // it down, so a hover-revealed control bar never covers the text.
+        VStack(spacing: 0) {
             if showChrome {
                 PinChromeView(
                     state: state,
@@ -39,7 +36,11 @@ struct PinContentView: View {
                     settings: settings
                 )
                 .frame(height: chromeHeight)
-                .transition(.opacity)
+            }
+
+            if !state.isCollapsed {
+                contentBody
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(.regularMaterial)
@@ -101,13 +102,15 @@ struct PinContentView: View {
                 .padding(8)
                 .focused($isEditing)
                 .scrollContentBackground(.hidden)
-                .onChange(of: isEditing) { _, editing in
-                    // Persist when the field loses focus.
-                    if !editing { controller.commitTextEdit(state.editedText) }
+                .onChange(of: state.editedText) { _, newValue in
+                    // Persist edits live (debounced disk write inside).
+                    controller.commitTextEdit(newValue)
                 }
         } else {
             ScrollView {
-                Text(state.content ?? "")
+                // Use editedText so any prior edit is reflected even when
+                // editing is currently disabled.
+                Text(state.editedText)
                     .font(.system(size: 13))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)

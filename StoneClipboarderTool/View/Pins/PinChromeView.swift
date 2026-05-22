@@ -139,7 +139,7 @@ struct PinChromeView: View {
     private var titleText: String {
         switch state.itemType {
         case .text, .combined:
-            let s = (state.content ?? "")
+            let s = state.editedText
                 .replacingOccurrences(of: "\n", with: " ")
                 .trimmingCharacters(in: .whitespaces)
             return s.isEmpty ? "Pinned text" : String(s.prefix(40))

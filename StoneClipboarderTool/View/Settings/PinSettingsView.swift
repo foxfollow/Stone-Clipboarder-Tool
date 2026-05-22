@@ -62,14 +62,14 @@ struct PinSettingsView: View {
                 HStack {
                     Text("Maximum simultaneous pins")
                     Spacer()
-                    Stepper(value: $settingsManager.pinMaxConcurrent, in: 1...50) {
-                        Text("\(settingsManager.pinMaxConcurrent)")
-                            .monospacedDigit()
-                            .frame(width: 28, alignment: .trailing)
-                    }
-                    .labelsHidden()
+                    TextField("", value: $settingsManager.pinMaxConcurrent, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 56)
+                    Stepper("", value: $settingsManager.pinMaxConcurrent, in: 0...999)
+                        .labelsHidden()
                 }
-                Text("Attempting to pin past this cap shows a brief HUD instead of opening the pin.")
+                Text("0 = unlimited. When the limit is reached, pinning a new item closes the oldest pin.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -123,7 +123,7 @@ struct PinSettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Hotkeys")
                     .font(.subheadline.weight(.semibold))
-                Text("Customize the pin shortcuts in the Hotkeys tab. Defaults: ⌃⌥P pin most recent · ⌃⌥⇧P dismiss all.")
+                Text("Pin Most Recent (⌃⌥P) and Dismiss All Pins (⌃⌥⇧P) are enabled by default. Reassign or disable them in the Hotkeys tab.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

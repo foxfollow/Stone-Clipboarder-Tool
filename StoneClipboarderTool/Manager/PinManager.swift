@@ -73,12 +73,16 @@ final class PinManager: ObservableObject {
     func pin(_ item: CBItem) {
         guard let settings = settingsManager else { return }
 
-        // Enforce the user-set cap. Cheap HUD instead of a modal: pins are
-        // intentional, and a dialog would steal focus from whatever the user
-        // is working on.
-        if controllers.count >= max(1, settings.pinMaxConcurrent) {
-            showHUD("Pin limit reached (\(settings.pinMaxConcurrent))")
-            return
+        // Enforce the cap. 0 (or negative) == unlimited. When at the limit,
+        // close the oldest pin(s) so the new one can open (FIFO eviction).
+        let limit = settings.pinMaxConcurrent
+        if limit > 0 {
+            while controllers.count >= limit {
+                guard let oldest = controllers.values.min(by: {
+                    $0.config.createdAt < $1.config.createdAt
+                }) else { break }
+                unpin(configId: oldest.config.id)
+            }
         }
 
         let config = makeConfig(for: item, settings: settings)
@@ -253,7 +257,7 @@ final class PinManager: ObservableObject {
     // MARK: - Internals
 
     private func makeConfig(for item: CBItem, settings: SettingsManager) -> PinnedItemConfig {
-        let (w, h) = defaultSize(for: item.itemType, settings: settings)
+        let (w, h) = pinSize(for: item, settings: settings)
         let origin = nextSpawnOrigin(for: NSSize(width: w, height: h))
 
         return PinnedItemConfig(
@@ -272,15 +276,45 @@ final class PinManager: ObservableObject {
         )
     }
 
-    private func defaultSize(for type: CBItemType, settings: SettingsManager) -> (Double, Double) {
-        switch type {
+    /// Window size at pin time. For images the window is sized to the image's
+    /// aspect ratio scaled to fit within the default image box, so the image
+    /// fills the pin edge-to-edge (no letterboxing) rather than sitting inside
+    /// a fixed square.
+    private func pinSize(for item: CBItem, settings: SettingsManager) -> (Double, Double) {
+        switch item.itemType {
         case .text:
             return (settings.pinDefaultTextWidth, settings.pinDefaultTextHeight)
         case .image, .combined:
-            return (settings.pinDefaultImageWidth, settings.pinDefaultImageHeight)
+            return aspectFitSize(
+                for: item.image,
+                maxW: settings.pinDefaultImageWidth,
+                maxH: settings.pinDefaultImageHeight
+            )
         case .file:
+            if item.isImageFile {
+                return aspectFitSize(
+                    for: item.filePreviewImage,
+                    maxW: settings.pinDefaultImageWidth,
+                    maxH: settings.pinDefaultImageHeight
+                )
+            }
             return (settings.pinDefaultFileWidth, settings.pinDefaultFileHeight)
         }
+    }
+
+    /// Largest size that preserves the image's aspect ratio while fitting
+    /// inside maxW × maxH. Falls back to the full box when the image size is
+    /// unavailable.
+    private func aspectFitSize(for image: NSImage?, maxW: Double, maxH: Double) -> (Double, Double) {
+        guard let image, image.size.width > 0, image.size.height > 0 else {
+            return (maxW, maxH)
+        }
+        let iw = Double(image.size.width)
+        let ih = Double(image.size.height)
+        let scale = min(maxW / iw, maxH / ih)
+        let w = (iw * scale).rounded()
+        let h = (ih * scale).rounded()
+        return (max(120, w), max(80, h))
     }
 
     /// Cascade new pins ~30pt down-right of the most recently created pin so

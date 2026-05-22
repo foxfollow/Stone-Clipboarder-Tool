@@ -144,7 +144,8 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
         pb.clearContents()
         switch state.itemType {
         case .text, .combined:
-            if let s = state.content { pb.setString(s, forType: .string) }
+            // Use the live (possibly edited) text, not the original snapshot.
+            pb.setString(state.editedText, forType: .string)
             if state.itemType == .combined,
                let data = state.imageData, let img = NSImage(data: data) {
                 pb.writeObjects([img])
@@ -174,7 +175,8 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
 
         switch state.itemType {
         case .text, .combined:
-            if let text = state.content, !text.isEmpty {
+            let text = state.editedText
+            if !text.isEmpty {
                 let url = tempDir.appendingPathComponent("pinned_text_\(UUID().uuidString).txt")
                 do {
                     try text.write(to: url, atomically: true, encoding: .utf8)
