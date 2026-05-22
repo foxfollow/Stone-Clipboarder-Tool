@@ -486,6 +486,52 @@ jobs:
           echo "📄 Updated appcast.xml:"
           cat "$APPCAST_PATH"
 
+          # 6. Build the GitHub Release notes. The feature bullets come from
+          # the <new> section above (single source of truth) — this workflow
+          # never hardcodes per-release bullets. Only the static install /
+          # update boilerplate lives here. Consumed via body_path below.
+          RELEASE_NOTES_FILE="release/RELEASE_NOTES.md"
+          mkdir -p release
+          {
+            echo "## ✨ What's New"
+            echo ""
+            if [[ -n "$DESCRIPTION_CONTENT" ]]; then
+              echo "$DESCRIPTION_CONTENT" | sed -E 's#</?li>##g' | sed -E 's/^/- /'
+            else
+              echo "- See the full changelog for details."
+            fi
+            echo ""
+            echo "📖 **Full changelog:** https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html"
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 📥 Installation"
+            echo ""
+            echo "Distributed without an Apple Developer ID (free/indie), so macOS needs a one-time approval."
+            echo ""
+            echo "**Quickest:** drag \`${{ env.APP_NAME }}.app\` to \`/Applications\`, then run in Terminal:"
+            echo ""
+            echo '```bash'
+            echo "xattr -cr /Applications/${{ env.APP_NAME }}.app"
+            echo '```'
+            echo ""
+            echo "Or right-click the app → **Open** → **Open** (one time only)."
+            echo ""
+            echo "📖 **Full step-by-step guide (with screenshots):** https://foxfollow.github.io/Stone-Clipboarder-Tool/installation.html"
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 🔄 Auto-Updates"
+            echo ""
+            echo "After first launch, the app checks for updates automatically. Updates are cryptographically signed."
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Sparkle Signature:** \`${{ env.SPARKLE_SIGNATURE }}\`  "
+            echo "**File Size:** ${{ env.FILE_SIZE }} bytes"
+          } > "$RELEASE_NOTES_FILE"
+          echo "✅ Wrote release notes to $RELEASE_NOTES_FILE"
+
       # =========================================================================
       # RELEASE
       # =========================================================================
@@ -499,37 +545,10 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: release/${{ env.APP_NAME }}.zip
-          body: |
-            ## 📥 Installation
-
-            This app is distributed without Apple Developer ID (free/indie distribution).
-
-            ### Method 1: Right-Click to Open (Easiest)
-
-            1. Download and extract the ZIP
-            2. Drag `${{ env.APP_NAME }}.app` to `/Applications`
-            3. **Right-click** the app → Select **"Open"**
-            4. Click **"Open"** in the dialog
-
-            > You only need to do this once. Future launches work normally.
-
-            ### Method 2: Terminal Command
-
-            ```bash
-            xattr -cr /Applications/${{ env.APP_NAME }}.app
-            ```
-
-            ---
-
-            ## 🔄 Auto-Updates
-
-            After first launch, the app will automatically check for updates.
-            Updates are cryptographically signed for security.
-
-            ---
-
-            **Sparkle Signature:** `${{ env.SPARKLE_SIGNATURE }}`
-            **File Size:** ${{ env.FILE_SIZE }} bytes
+          # Body is built in the "Update appcast.xml" step from the appcast
+          # <new> bullets — keeps release notes single-sourced, no per-release
+          # edits to this workflow.
+          body_path: release/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

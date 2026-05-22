@@ -319,10 +319,13 @@ struct ContentView: View {
 
 struct DetailedCardView: View {
     @EnvironmentObject var cbViewModel: CBViewModel
+    @EnvironmentObject var pinManager: PinManager
     @Binding var editingMode: Bool
     @Binding var selectedItem: CBItem?
     var item: CBItem
     var showFavoriteControls: Bool = false
+
+    private var isPinned: Bool { pinManager.isPinned(item) }
 
     var body: some View {
         HStack {
@@ -347,6 +350,13 @@ struct DetailedCardView: View {
 
             Spacer()
 
+            if isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.accentColor)
+                    .help("Pinned to screen")
+            }
+
             // Favorite button
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
@@ -363,6 +373,14 @@ struct DetailedCardView: View {
             .help(item.isFavorite ? "Remove from favorites" : "Add to favorites")
         }
         .animation(.easeInOut(duration: 0.2), value: editingMode)
+        .contextMenu {
+            Button(isPinned ? "Unpin from Screen" : "Pin to Screen", systemImage: "pin") {
+                pinManager.togglePin(item)
+            }
+            if !isPinned {
+                Divider()
+            }
+        }
     }
 }
 
@@ -372,11 +390,13 @@ struct DetailedCardView: View {
     let viewModel = CBViewModel()
     let settingsManager = SettingsManager()
     let hotkeyManager = HotkeyManager()
+    let pinManager = PinManager()
 
     ContentView()
         .environmentObject(viewModel)
         .environmentObject(settingsManager)
         .environmentObject(hotkeyManager)
+        .environmentObject(pinManager)
         .modelContainer(container)
         .onAppear {
             viewModel.setModelContext(container.mainContext)

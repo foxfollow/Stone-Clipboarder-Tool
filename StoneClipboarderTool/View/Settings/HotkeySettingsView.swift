@@ -50,6 +50,19 @@ struct HotkeySettingsView: View {
                 }
             }
 
+            Section("Pins") {
+                if let pinConfig = hotkeyManager.hotkeyConfigs.first(where: {
+                    $0.hotkeyAction == .togglePinLastItem
+                }) {
+                    HotkeyConfigRow(config: pinConfig, currentlyRecordingID: $currentlyRecordingID)
+                }
+                if let dismissConfig = hotkeyManager.hotkeyConfigs.first(where: {
+                    $0.hotkeyAction == .dismissAllPins
+                }) {
+                    HotkeyConfigRow(config: dismissConfig, currentlyRecordingID: $currentlyRecordingID)
+                }
+            }
+
             Section("Last Items Hotkeys") {
                 ForEach(lastItemConfigs, id: \.id) { config in
                     HotkeyConfigRow(config: config, currentlyRecordingID: $currentlyRecordingID)

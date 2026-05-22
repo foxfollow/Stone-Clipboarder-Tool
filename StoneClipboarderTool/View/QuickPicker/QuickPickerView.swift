@@ -35,10 +35,14 @@ enum QPTab: Hashable, CaseIterable, Identifiable {
 
 struct QuickPickerView: View {
     @ObservedObject var viewModel: CBViewModel
+    @ObservedObject var pinManager: PinManager
     @StateObject private var tabInterceptor = TabKeyInterceptor()
     @State private var activeTab: QPTab = .all
     @State private var searchText = ""
     @State private var selectedIndex = 0
+    // Shift+Arrow multi-select. nil = single-selection; otherwise the selected
+    // range is min(anchor, selectedIndex)...max(anchor, selectedIndex).
+    @State private var selectionAnchor: Int? = nil
     @State private var quickPickerItems: [CBItem] = []
     @State private var isLoadingItems = false
     @State private var hasMoreItems = true
@@ -57,6 +61,7 @@ struct QuickPickerView: View {
 
     init(
         viewModel: CBViewModel,
+        pinManager: PinManager,
         settingsManager: SettingsManager? = nil,
         onClose: @escaping () -> Void,
         onPreviewToggle: @escaping (CBItem) -> Void = { _ in },
@@ -64,6 +69,7 @@ struct QuickPickerView: View {
         isPreviewVisible: @escaping () -> Bool = { false }
     ) {
         self.viewModel = viewModel
+        self.pinManager = pinManager
         self.settingsManager = settingsManager
         self.onClose = onClose
         self.onPreviewToggle = onPreviewToggle
@@ -117,27 +123,21 @@ struct QuickPickerView: View {
                 }
                 return .handled
             }
-            .onKeyPress(.upArrow) {
-                if selectedIndex > 0 {
-                    selectedIndex -= 1
-                    if let item = filteredItems[safe: selectedIndex] {
-                        onPreviewUpdate(item)
-                    }
-                }
+            .onKeyPress(keys: [.upArrow]) { keyPress in
+                moveSelection(by: -1, extendingWith: keyPress.modifiers.contains(.shift))
                 return .handled
             }
-            .onKeyPress(.downArrow) {
-                if selectedIndex < filteredItems.count - 1 {
-                    selectedIndex += 1
-                    if let item = filteredItems[safe: selectedIndex] {
-                        onPreviewUpdate(item)
-                    }
-                }
+            .onKeyPress(keys: [.downArrow]) { keyPress in
+                moveSelection(by: +1, extendingWith: keyPress.modifiers.contains(.shift))
                 return .handled
             }
             .onKeyPress(keys: [.return]) { keyPress in
-                if keyPress.modifiers.contains(.option),
-                   settingsManager?.enableOCROptionKey == true {
+                let optionHeld = keyPress.modifiers.contains(.option)
+                let hasMultiSelection = (selectedRange()?.count ?? 0) > 1
+                // ⌥⏎ on a Shift-extended range is always OCR intent — bypass
+                // the per-user `enableOCROptionKey` toggle, which only gates
+                // the single-item shortcut.
+                if optionHeld && (hasMultiSelection || settingsManager?.enableOCROptionKey == true) {
                     performOCRAction()
                 } else {
                     performAction()
@@ -168,6 +168,7 @@ struct QuickPickerView: View {
             }
             .onChange(of: searchText) { _, newValue in
                 selectedIndex = 0
+                selectionAnchor = nil
 
                 // Cancel previous search task
                 searchTask?.cancel()
@@ -194,6 +195,7 @@ struct QuickPickerView: View {
             }
             .onChange(of: activeTab) { _, _ in
                 selectedIndex = 0
+                selectionAnchor = nil
                 searchTask?.cancel()
                 reloadForActiveTab()
                 isSearchFocused = true
@@ -201,6 +203,10 @@ struct QuickPickerView: View {
             .onChange(of: filteredItems.count) { _, newCount in
                 if selectedIndex >= newCount {
                     selectedIndex = max(0, newCount - 1)
+                }
+                // Drop anchor if it now points past the list.
+                if let anchor = selectionAnchor, anchor >= newCount {
+                    selectionAnchor = nil
                 }
             }
     }
@@ -219,6 +225,12 @@ struct QuickPickerView: View {
                 isLoading: isLoadingItems,
                 hasMoreItems: hasMoreItems,
                 ocrEnabled: settingsManager?.enableOCROptionKey == true,
+                isItemPinned: { item in pinManager.isPinned(item) },
+                onTogglePin: { item in pinManager.togglePin(item) },
+                multiSelectionRange: selectedRange(),
+                onClearMultiSelection: {
+                    selectionAnchor = nil
+                },
                 onLoadMore: {
                     loadMoreItems()
                 },
@@ -249,13 +261,27 @@ struct QuickPickerView: View {
             // Forward-Tab and Shift-Tab cycle tabs. We intercept at the
             // NSEvent layer because AppKit's field editor consumes Shift-Tab
             // for focus traversal before SwiftUI's .onKeyPress runs.
+            //
+            // Toggle focus false→true on the next tick: AppKit's responder
+            // can desync from SwiftUI's @FocusState during the Tab event,
+            // and re-assigning `true` to an already-`true` state is a no-op
+            // that won't re-grab focus from the field editor.
             tabInterceptor.onTab = {
                 activeTab = activeTab.next
-                isSearchFocused = true
+                isSearchFocused = false
+                DispatchQueue.main.async {
+                    isSearchFocused = true
+                }
             }
             tabInterceptor.onShiftTab = {
                 activeTab = activeTab.previous
-                isSearchFocused = true
+                isSearchFocused = false
+                DispatchQueue.main.async {
+                    isSearchFocused = true
+                }
+            }
+            tabInterceptor.onOptionP = {
+                togglePinForSelection()
             }
             tabInterceptor.start()
 
@@ -353,8 +379,12 @@ struct QuickPickerView: View {
         return Button {
             activeTab = tab
             // Click must NOT steal focus from the search field — otherwise
-            // shortcuts like Tab/Space/⏎ would stop working.
-            isSearchFocused = true
+            // shortcuts like Tab/Space/⏎ would stop working. Toggle to force
+            // SwiftUI to re-grab focus if AppKit's responder desynced.
+            isSearchFocused = false
+            DispatchQueue.main.async {
+                isSearchFocused = true
+            }
         } label: {
             HStack(spacing: 5) {
                 if tab == .favorites {
@@ -364,12 +394,15 @@ struct QuickPickerView: View {
                 }
                 Text(tabTitle(tab))
                     .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
                 Text("\(tabCount(tab))")
                     .font(.system(size: 10))
+                    .lineLimit(1)
                     .foregroundStyle(
                         isActive ? Color.white.opacity(0.85) : Color.secondary
                     )
             }
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(isActive ? Color.white : Color.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
@@ -392,7 +425,7 @@ struct QuickPickerView: View {
     private func tabTitle(_ tab: QPTab) -> String {
         switch tab {
         case .all: return "All"
-        case .favorites: return "Favorites"
+        case .favorites: return "Favs"
         case .text: return "Text"
         case .images: return "Images"
         case .files: return "Files"
@@ -440,8 +473,17 @@ struct QuickPickerView: View {
             // Right side: only the shortcuts that aren't shown in the row
             // (Paste/OCR live on the selected row now) or in the tab bar.
             HStack(spacing: 6) {
+                if let range = selectedRange(), range.count > 1 {
+                    Text("\(range.count) selected")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    shortcutBadge("⇧↑↓", label: "Extend")
+                } else {
+                    shortcutBadge("⇧↑↓", label: "Multi-select")
+                }
                 shortcutBadge("ESC", label: "Close")
                 favoriteToggleBadge()
+                pinToggleBadge()
 
                 if settingsManager?.quickLookMode != .disabled {
                     let key = settingsManager?.quickLookTriggerKey ?? .space
@@ -452,6 +494,27 @@ struct QuickPickerView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    private func pinToggleBadge() -> some View {
+        HStack(spacing: 3) {
+            Text("⌥P")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+            Image(systemName: "pin")
+                .font(.system(size: 9))
+        }
+        .foregroundStyle(.tertiary)
+        .help("Pin / unpin the selected item to the screen")
     }
 
     private func favoriteToggleBadge() -> some View {
@@ -514,14 +577,28 @@ struct QuickPickerView: View {
         }
     }
 
+    private func togglePinForSelection() {
+        // If there's a Shift-extended range, pin each item in it; otherwise
+        // toggle on the cursor row. Already-pinned items inside a range get
+        // toggled off, which mirrors the single-item behavior.
+        if let range = selectedRange(), range.count > 1 {
+            let items = range.compactMap { filteredItems[safe: $0] }
+            items.forEach { pinManager.togglePin($0) }
+            return
+        }
+        guard selectedIndex < filteredItems.count else { return }
+        pinManager.togglePin(filteredItems[selectedIndex])
+    }
+
     private func toggleFavoriteForSelected() {
         guard selectedIndex < filteredItems.count else { return }
         let item = filteredItems[selectedIndex]
         viewModel.toggleFavorite(item)
         loadTabCounts()
+        // Toggling favorite can re-filter the list (Favorites tab) — drop
+        // the multi-select anchor so the range doesn't reference stale rows.
+        selectionAnchor = nil
 
-        // If we unfavorited an item while on the Favorites tab the row
-        // disappears (filteredItems re-filters). Clamp selection.
         if activeTab == .favorites {
             let newCount = filteredItems.count
             if selectedIndex >= newCount {
@@ -580,6 +657,11 @@ struct QuickPickerView: View {
     }
 
     private func performAction() {
+        if let range = selectedRange(), range.count > 1 {
+            performMultiPaste(range: range)
+            return
+        }
+
         guard selectedIndex < filteredItems.count else { return }
 
         let item = filteredItems[selectedIndex]
@@ -591,6 +673,91 @@ struct QuickPickerView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             simulatePaste()
+        }
+    }
+
+    // Resolved Shift+Arrow selection range, clamped to current items.
+    // Returns nil when no anchor (= single selection on `selectedIndex`).
+    private func selectedRange() -> ClosedRange<Int>? {
+        guard let anchor = selectionAnchor, !filteredItems.isEmpty else { return nil }
+        let lastValid = filteredItems.count - 1
+        let lo = max(0, min(anchor, selectedIndex))
+        let hi = min(lastValid, max(anchor, selectedIndex))
+        guard hi >= lo else { return nil }
+        return lo...hi
+    }
+
+    private func moveSelection(by delta: Int, extendingWith extending: Bool) {
+        let newIndex = selectedIndex + delta
+        guard newIndex >= 0, newIndex < filteredItems.count else { return }
+
+        if extending {
+            if selectionAnchor == nil { selectionAnchor = selectedIndex }
+        } else {
+            selectionAnchor = nil
+        }
+
+        selectedIndex = newIndex
+        if let item = filteredItems[safe: selectedIndex] {
+            onPreviewUpdate(item)
+        }
+    }
+
+    // Multi-paste strategy:
+    //   - All text/combined items → join `content` with newlines and paste
+    //     once (snappy, no flicker, works in any text field).
+    //   - Anything else (images, files, mixed) → paste each item sequentially:
+    //     copy to clipboard, ⌘V, wait, repeat. The receiving app sees a
+    //     separate paste per item, so images come through as images and files
+    //     as files. Apps that don't support a given type ignore that step.
+    // Multi-OCR (⌥⏎) is handled separately in performOCRAction.
+    private func performMultiPaste(range: ClosedRange<Int>) {
+        let items = range.compactMap { filteredItems[safe: $0] }
+        guard !items.isEmpty else { return }
+
+        let allTextLike = items.allSatisfy { item in
+            (item.itemType == .text || item.itemType == .combined)
+                && (item.content?.isEmpty == false)
+        }
+
+        if allTextLike {
+            let joined = items.compactMap { $0.content }.joined(separator: "\n")
+            items.forEach { viewModel.markItemAccessed($0) }
+
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(joined, forType: .string)
+
+            onClose()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                simulatePaste()
+            }
+        } else {
+            items.forEach { viewModel.markItemAccessed($0) }
+            onClose()
+            // Let focus return to the previously-active window first, then
+            // start the sequential paste chain.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                pasteSequentially(items, at: 0)
+            }
+        }
+    }
+
+    // Per-step timing matches the single-item path (~0.05s between copy and
+    // ⌘V) plus a 0.25s gap between items so the receiving app finishes
+    // handling one paste before the next clipboard write.
+    private func pasteSequentially(_ items: [CBItem], at index: Int) {
+        guard index < items.count else { return }
+        let item = items[index]
+        viewModel.copyAndUpdateItem(item)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            simulatePaste()
+            let next = index + 1
+            guard next < items.count else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                pasteSequentially(items, at: next)
+            }
         }
     }
 
@@ -625,6 +792,14 @@ struct QuickPickerView: View {
     }
 
     private func performOCRAction() {
+        // Multi-select: combine text from text items + OCR'd text from
+        // images, preserving order.
+        if let range = selectedRange(), range.count > 1 {
+            let items = range.compactMap { filteredItems[safe: $0] }
+            performMultiOCR(items: items, range: range)
+            return
+        }
+
         guard selectedIndex < filteredItems.count else { return }
 
         let item = filteredItems[selectedIndex]
@@ -656,46 +831,127 @@ struct QuickPickerView: View {
         onClose()
 
         // Run OCR on background thread
-        let request = VNRecognizeTextRequest { request, error in
-            if let error = error {
-                print("OCR error: \(error.localizedDescription)")
-                return
-            }
-
-            guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                return
-            }
-
-            let recognizedText = observations.compactMap { observation in
-                observation.topCandidates(1).first?.string
-            }.joined(separator: "\n")
-
-            guard !recognizedText.isEmpty else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let recognizedText = Self.recognizeText(in: cgImage),
+                  !recognizedText.isEmpty else { return }
 
             DispatchQueue.main.async {
-                // Copy recognized text to pasteboard
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(recognizedText, forType: .string)
 
-                // Simulate paste
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                     self.simulatePaste()
                 }
             }
         }
+    }
 
+    // Each item contributes one chunk to the final paste: text items use
+    // their `content` verbatim, image items get OCR'd via Vision, image
+    // files use their preview image. Non-image files contribute nothing.
+    // Order matches the visible selection (top-to-bottom). Bails to
+    // performMultiPaste if nothing in the range yields OCR-able input
+    // (e.g. all non-image files), so ⌥⏎ always does something useful.
+    private func performMultiOCR(items: [CBItem], range: ClosedRange<Int>) {
+        enum OCRSource {
+            case text(String)
+            case image(CGImage)
+        }
+
+        let sources: [OCRSource] = items.compactMap { item -> OCRSource? in
+            switch item.itemType {
+            case .text, .combined:
+                // Prefer existing text. For combined items the text portion
+                // is already the user's intent — skip OCR on its image.
+                if let c = item.content, !c.isEmpty { return .text(c) }
+                if item.itemType == .combined,
+                   let img = item.image,
+                   let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                    return .image(cg)
+                }
+                return nil
+            case .image:
+                guard let img = item.image,
+                      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                    return nil
+                }
+                return .image(cg)
+            case .file:
+                guard item.isImageFile,
+                      let img = item.filePreviewImage,
+                      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                    return nil
+                }
+                return .image(cg)
+            }
+        }
+
+        guard !sources.isEmpty else {
+            // Nothing OCR-able (e.g. all non-image files) — fall back to
+            // the regular multi-paste behavior.
+            performMultiPaste(range: range)
+            return
+        }
+
+        items.forEach { viewModel.markItemAccessed($0) }
+        onClose()
+
+        // Process sources off the main thread, preserving order. Each image
+        // gets its own request + handler (no shared mutable state). We use
+        // a serial loop on a background queue — Vision is heavy enough that
+        // parallelism wouldn't help much and pulls in Sendable headaches.
+        DispatchQueue.global(qos: .userInitiated).async {
+            var parts: [String] = []
+            for source in sources {
+                switch source {
+                case .text(let s):
+                    parts.append(s)
+                case .image(let cg):
+                    if let recognized = Self.recognizeText(in: cg) {
+                        parts.append(recognized)
+                    }
+                }
+            }
+
+            let combined = parts.joined(separator: "\n")
+            guard !combined.isEmpty else { return }
+
+            DispatchQueue.main.async {
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(combined, forType: .string)
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    simulatePaste()
+                }
+            }
+        }
+    }
+
+    // Synchronous Vision OCR. Safe to call concurrently — each invocation
+    // creates its own request and handler with no captured mutable state.
+    private static func recognizeText(in cgImage: CGImage) -> String? {
+        final class Box { var text: String = "" }
+        let box = Box()
+
+        let request = VNRecognizeTextRequest { req, _ in
+            guard let observations = req.results as? [VNRecognizedTextObservation] else {
+                return
+            }
+            box.text = observations.compactMap { $0.topCandidates(1).first?.string }
+                .joined(separator: "\n")
+        }
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try handler.perform([request])
-            } catch {
-                print("Failed to perform OCR: \(error.localizedDescription)")
-            }
+        do {
+            try handler.perform([request])
+        } catch {
+            return nil
         }
+        return box.text.isEmpty ? nil : box.text
     }
 
     private func simulatePaste() {
@@ -849,14 +1105,22 @@ private extension Array {
 final class TabKeyInterceptor: ObservableObject {
     var onTab: (() -> Void)?
     var onShiftTab: (() -> Void)?
+    // ⌥P pin toggle. Matched by physical key code, not character, so it works
+    // on non-Latin layouts (e.g. Ukrainian ЙЦУКЕН, where the P key types "з").
+    var onOptionP: (() -> Void)?
 
     private var monitor: Any?
     private static let tabKeyCode: UInt16 = 48
+    private static let pKeyCode: UInt16 = 35
 
     func start() {
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.intercept(event) ?? event
+            // NOTE: must NOT use `intercept(event) ?? event` — that turns a
+            // deliberate nil (swallow) back into the event, so the keystroke
+            // (e.g. the "p" in ⌥P) would leak into the search field.
+            guard let self else { return event }
+            return self.intercept(event)
         }
     }
 
@@ -867,12 +1131,27 @@ final class TabKeyInterceptor: ObservableObject {
         }
         onTab = nil
         onShiftTab = nil
+        onOptionP = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
+        let flags = event.modifierFlags
+
+        // ⌥P (Option held, no Control/Command — the latter is the global pin
+        // hotkey handled elsewhere). Key code is layout-independent.
+        if event.keyCode == Self.pKeyCode,
+           flags.contains(.option),
+           !flags.contains(.control),
+           !flags.contains(.command) {
+            DispatchQueue.main.async { [weak self] in
+                self?.onOptionP?()
+            }
+            return nil  // swallow so no character is typed into the search field
+        }
+
         guard event.keyCode == Self.tabKeyCode else { return event }
 
-        let shift = event.modifierFlags.contains(.shift)
+        let shift = flags.contains(.shift)
         // Defer to next runloop tick — mutating SwiftUI state directly inside
         // an event-dispatch callback can fight with the active event cycle.
         DispatchQueue.main.async { [weak self] in
@@ -894,7 +1173,7 @@ final class TabKeyInterceptor: ObservableObject {
 
 
 #Preview {
-    QuickPickerView(viewModel: CBViewModel()) {
+    QuickPickerView(viewModel: CBViewModel(), pinManager: PinManager()) {
         print("Closed")
     }
 }

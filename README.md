@@ -48,26 +48,15 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.5.x
-- **🪟 Quick Picker Tabs (1.5.5)**: Filter Quick Picker by All / Favorites / Text / Images / Files; cycle tabs with Tab / Shift+Tab without losing search focus
-- **✨ Favorite from Quick Picker (1.5.5)**: Toggle favorite on the selected row with Option+Space; image rows show an OCR hint badge when OCR is enabled
-- **🛡️ Confirm-Quit (1.5.5)**: Optionally require holding ⌘Q for 1s (or a double-tap) to quit, with on-screen HUD — protects against accidental quits
-- **🎨 Sidebar Settings (1.5.5)**: Settings rebuilt as a NavigationSplitView with a sidebar; larger 720×540 minimum window size
-- **🛠️ SwiftData Stability (1.5.5)**: Fixed "backing data detached" crashes during auto-cleanup; favorites are now excluded from cleanup
-- **🛠️ Quick Look Reliability (1.5.5)**: Preview files now live in Application Support so external apps can open them; stale session files are cleaned up on launch
-- **🛠️ Apple Quick Look Fix (1.5.4)**: Fullscreen detection refined — Apple Quick Look now stays selected in regular and "Fill"/maximized windows; the Custom Preview fallback only kicks in for true "Entire Screen" Spaces
-- **⌨️ QL Arrow Navigation (1.5.4)**: ↑/↓ in Quick Picker now reliably moves the highlight and reloads the Apple Quick Look preview to the new item even when QL has grabbed the key window
-- **🪟 Fullscreen Support (1.5.3)**: Quick Picker and menu bar popover now render over other apps' fullscreen Spaces — open them without leaving the app you're in
-- **🔍 Smart Preview Fallback (1.5.3)**: When triggering preview inside a fullscreen app, the custom preview is used automatically (Apple Quick Look is system-managed and can't render there)
-- **🛠️ Quick Picker Stability (1.5.3)**: Fixed Quick Picker pulling you out of fullscreen, improved QuickLook temp-file cleanup timing, cleaner window resignation handling
-- **🧹 Code Quality (1.5.3)**: SonarCloud refactor — code quality improvements across the codebase
-- **🛡️ Accessibility Settings Tab**: New settings tab showing accessibility permission status with direct link to System Settings
-- **🚀 Launch at Login**: Toggle auto-start at login via SMAppService, with first-launch prompt
-- **🎨 Improved Quick Picker**: Better item row layout, footer bar with keyboard shortcut hints, pagination and search improvements
-- **🧹 Unified Alerts**: Consolidated clipboard alerts into a shared component for consistency
-- **🐛 Bug Fixes**: Fixed GUI layout issue (#5), fixed deleted items still visible after deletion (#6), prevented crashes on delete
+### 🆕 New in Version 1.6.0
+- **🪟 Pinned Clipboard Windows**: Press ⌥P in the Quick Picker (or right-click → Pin to Screen) to keep text, images, or files floating on top of every Space — resizable, movable, dimmable, lockable, click-through, collapsible, editable (text), and restored after relaunch
+- **🔍 Zoomable Image Pins**: Pinch to zoom (centered on the cursor), drag to pan, double-click to reset; pin windows are sized to the image's aspect ratio
+- **✨ Quick Picker Multi-Select**: Extend a selection with Shift+↑/↓ and paste several items at once
+- **👁️ Multi-Item OCR**: Press ⌥⏎ on a multi-selection to extract and combine text from images and text items
+- **⌨️ Quick Picker Polish**: Opening the Quick Picker keeps the Settings window and pins visible; pin shortcuts (⌃⌥P / ⌃⌥⇧P) are configurable in the Hotkeys tab
+- **🛠️ Fixes**: Quick Picker search field no longer loses focus; Settings can't leave the app inaccessible; updated Sparkle to 2.9.2
 
-[View Full Version History](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)
+**📖 [See the full changelog →](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)**
 
 ### Core Features
 - **Automatic Clipboard Monitoring**: Captures everything you copy while the app is running

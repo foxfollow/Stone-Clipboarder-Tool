@@ -182,6 +182,11 @@ class CBViewModel: ObservableObject {
             NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
         }
 
+        // Tell PinManager so any open pin for this item closes.
+        NotificationCenter.default.post(
+            name: .clipboardItemDeleted, object: item.persistentModelID
+        )
+
         // Remove from published array so SwiftUI drops the view
         items.removeAll { $0.id == item.id }
 
@@ -204,6 +209,14 @@ class CBViewModel: ObservableObject {
 
         let idsToDelete = Set(offsets.map { sourceItems[$0].id })
         let itemsToDelete = offsets.map { sourceItems[$0] }
+
+        // Notify PinManager so pins referencing the about-to-be-deleted
+        // items close themselves.
+        for item in itemsToDelete {
+            NotificationCenter.default.post(
+                name: .clipboardItemDeleted, object: item.persistentModelID
+            )
+        }
 
         // Clear selection if deleted item is selected
         if let sel = selectedItem, idsToDelete.contains(sel.id) {
@@ -569,6 +582,8 @@ class CBViewModel: ObservableObject {
         selectedItem = nil
         items = []
         NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+        // Tell PinManager — `object: nil` means "all items wiped".
+        NotificationCenter.default.post(name: .clipboardItemDeleted, object: nil)
 
         // 2. Defer actual context deletion to the NEXT run loop iteration.
         //    This gives SwiftUI a full layout pass to drop views that reference
@@ -759,6 +774,12 @@ class CBViewModel: ObservableObject {
             if let sel = selectedItem, idsToDelete.contains(sel.id) {
                 selectedItem = nil
                 NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+            }
+
+            for item in nonFavoriteOldItems {
+                NotificationCenter.default.post(
+                    name: .clipboardItemDeleted, object: item.persistentModelID
+                )
             }
 
             items.removeAll { idsToDelete.contains($0.id) }

@@ -18,6 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var menuBarManager: MenuBarManager?
     var hotkeyManager: HotkeyManager?
     var quickPickerManager: QuickPickerWindowManager?
+    var pinManager: PinManager?
     var clipboardContainer: ModelContainer?
     var settingsContainer: ModelContainer?
 
@@ -47,6 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let menuBarManager,
             let hotkeyManager,
             let quickPickerManager,
+            let pinManager,
             let clipboardContainer,
             let settingsContainer
         else {
@@ -67,9 +69,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager.setModelContext(settingsContainer.mainContext)
         hotkeyManager.setCBViewModel(cbViewModel)
         hotkeyManager.setSettingsManager(settingsManager)
+        hotkeyManager.setPinManager(pinManager)
         quickPickerManager.setCBViewModel(cbViewModel)
         quickPickerManager.setSettingsManager(settingsManager)
+        quickPickerManager.setPinManager(pinManager)
         hotkeyManager.quickPickerDelegate = quickPickerManager
+
+        // PinManager shares the settings container (PinnedItemConfig lives there)
+        pinManager.viewModel = cbViewModel
+        pinManager.settingsManager = settingsManager
+        pinManager.modelContext = settingsContainer.mainContext
+        pinManager.startObservingItemDeletes()
+        pinManager.restorePersistedPins()
 
         // Give ClipboardManager a separate context from the settings container for ExcludedApp queries
         cbViewModel.getClipboardManager().setSettingsModelContext(settingsContainer.mainContext)
@@ -311,9 +322,9 @@ enum ModelContainerFactory {
         }
     }
 
-    /// Settings container: stores HotkeyConfig and ExcludedApp
+    /// Settings container: stores HotkeyConfig, ExcludedApp, and PinnedItemConfig
     static func makeSettingsContainer() -> ModelContainer {
-        let schema = Schema([HotkeyConfig.self, ExcludedApp.self])
+        let schema = Schema([HotkeyConfig.self, ExcludedApp.self, PinnedItemConfig.self])
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let storeURL = appSupport
             .appendingPathComponent("StoneClipboarderTool")
@@ -368,6 +379,7 @@ struct StoneClipboarderToolApp: App {
     @StateObject private var menuBarManager = MenuBarManager()
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var quickPickerManager = QuickPickerWindowManager()
+    @StateObject private var pinManager = PinManager()
 
     private let updaterController: SPUStandardUpdaterController
 
@@ -393,6 +405,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(cbViewModel)
                     .environmentObject(settingsManager)
                     .environmentObject(hotkeyManager)
+                    .environmentObject(pinManager)
                     .onChange(of: settingsManager.showInMenubar) { _, newValue in
                         updateMenuBarVisibility()
                     }
@@ -418,6 +431,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(settingsManager)
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
+                    .environmentObject(pinManager)
                     .frame(minWidth: 720, minHeight: 540)
             }
             .modelContainer(settingsContainer)
@@ -429,6 +443,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(settingsManager)
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
+                    .environmentObject(pinManager)
             }
             .modelContainer(settingsContainer)
         }
@@ -442,6 +457,7 @@ struct StoneClipboarderToolApp: App {
         appDelegate.menuBarManager = menuBarManager
         appDelegate.hotkeyManager = hotkeyManager
         appDelegate.quickPickerManager = quickPickerManager
+        appDelegate.pinManager = pinManager
         appDelegate.clipboardContainer = clipboardContainer
         appDelegate.settingsContainer = settingsContainer
 

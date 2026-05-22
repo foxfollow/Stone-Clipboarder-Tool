@@ -33,6 +33,9 @@ enum HotkeyAction: String, Codable, CaseIterable {
 
     case mainPanel = "main_panel"
 
+    case togglePinLastItem = "toggle_pin_last_item"
+    case dismissAllPins = "dismiss_all_pins"
+
     var displayName: String {
         switch self {
         case .last1: return "Last Item 1"
@@ -56,6 +59,8 @@ enum HotkeyAction: String, Codable, CaseIterable {
         case .fav9: return "Favorite 9"
         case .fav0: return "Favorite 10"
         case .mainPanel: return "Quick Picker"
+        case .togglePinLastItem: return "Pin Most Recent Item"
+        case .dismissAllPins: return "Dismiss All Pins"
         }
     }
 
@@ -82,6 +87,8 @@ enum HotkeyAction: String, Codable, CaseIterable {
         case .fav9: return "⌃⇧9"
         case .fav0: return "⌃⇧0"
         case .mainPanel: return "⌃⌥Space"
+        case .togglePinLastItem: return "⌃⌥P"
+        case .dismissAllPins: return "⌃⌥⇧P"
         }
     }
 
@@ -115,7 +122,7 @@ enum HotkeyAction: String, Codable, CaseIterable {
         case .last8, .fav8: return 7
         case .last9, .fav9: return 8
         case .last0, .fav0: return 9
-        case .mainPanel: return -1
+        case .mainPanel, .togglePinLastItem, .dismissAllPins: return -1
         }
     }
 }

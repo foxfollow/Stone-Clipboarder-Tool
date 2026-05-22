@@ -97,7 +97,9 @@ struct MenuBarView: View {
 
                 Menu("Settings") {
                     Toggle("Show in Menu Bar", isOn: $settingsManager.showInMenubar)
-                    Toggle("Show Main Window", isOn: $settingsManager.showMainWindow)
+                        .disabled(!settingsManager.showMainWindow)
+                    Toggle("Show Main Window (in Dock & Cmd+Tab)", isOn: $settingsManager.showMainWindow)
+                        .disabled(!settingsManager.showInMenubar)
                     Divider()
                     Button("Quit") {
                         NSApp.terminate(nil)

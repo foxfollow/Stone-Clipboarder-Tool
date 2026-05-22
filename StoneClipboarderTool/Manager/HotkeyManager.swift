@@ -20,6 +20,7 @@ class HotkeyManager: ObservableObject {
     private var cbViewModel: CBViewModel?
     private var modelContext: ModelContext?
     private var settingsManager: SettingsManager?
+    private weak var pinManager: PinManager?
 
     weak var quickPickerDelegate: QuickPickerDelegate?
 
@@ -50,6 +51,10 @@ class HotkeyManager: ObservableObject {
 
     func setSettingsManager(_ manager: SettingsManager) {
         self.settingsManager = manager
+    }
+
+    func setPinManager(_ manager: PinManager) {
+        self.pinManager = manager
     }
 
     private func setupEventHandler() {
@@ -122,6 +127,11 @@ class HotkeyManager: ObservableObject {
 
             if hotkeyConfigs.isEmpty {
                 createDefaultHotkeyConfigs()
+            } else {
+                // Migrate: on upgrades, ensure every HotkeyAction has a row.
+                // New actions (e.g. pin shortcuts added in a later version)
+                // wouldn't otherwise be registerable.
+                ensureMissingHotkeyConfigs()
             }
 
             refreshHotkeyRegistrations()
@@ -129,6 +139,25 @@ class HotkeyManager: ObservableObject {
         } catch {
             ErrorLogger.shared.log("Failed to load hotkey configs", category: "SwiftData", error: error)
             createDefaultHotkeyConfigs()
+        }
+    }
+
+    private func ensureMissingHotkeyConfigs() {
+        guard let modelContext = modelContext else { return }
+        let existingActions = Set(hotkeyConfigs.compactMap { $0.hotkeyAction })
+        let missing = HotkeyAction.allCases.filter { !existingActions.contains($0) }
+        guard !missing.isEmpty else { return }
+
+        for action in missing {
+            let config = HotkeyConfig(action: action)
+            modelContext.insert(config)
+            hotkeyConfigs.append(config)
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to add missing hotkey configs", category: "SwiftData", error: error)
         }
     }
 
@@ -223,6 +252,14 @@ class HotkeyManager: ObservableObject {
             let index = action.index
             actionClosure = { [weak self] in
                 self?.executeFavoriteAction(index: index)
+            }
+        case .togglePinLastItem:
+            actionClosure = { [weak self] in
+                self?.pinManager?.togglePinForLastItem()
+            }
+        case .dismissAllPins:
+            actionClosure = { [weak self] in
+                self?.pinManager?.dismissAll()
             }
         }
 

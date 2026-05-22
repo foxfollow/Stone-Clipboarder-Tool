@@ -35,14 +35,40 @@ private struct AppearanceSection: View {
 
     var body: some View {
         Section("Appearance") {
-            Toggle("Show in Menu Bar", isOn: $settingsManager.showInMenubar)
-                .help("Show clipboard history in the menu bar for quick access")
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Show in Menu Bar", isOn: $settingsManager.showInMenubar)
+                    .disabled(!settingsManager.showMainWindow)
+                    .help("Show clipboard history in the menu bar for quick access")
 
-            Toggle("Show Main Window", isOn: $settingsManager.showMainWindow)
-                .help("Keep the main window visible in the dock")
+                Text("Display the app icon in the macOS menu bar for quick access.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Show Main Window (in Dock & Cmd+Tab)", isOn: $settingsManager.showMainWindow)
+                    .disabled(!settingsManager.showInMenubar)
+                    .help("Show the app icon in the Dock and the Command+Tab switcher")
+
+                Text("Show the app in the Dock and Command+Tab switcher; the main window opens normally.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Text("At least one of the above must stay on so the app remains accessible.")
+                .font(.caption)
+                .foregroundColor(.secondary.opacity(0.8))
 
             Toggle("Hold or double-tap ⌘Q to quit", isOn: $settingsManager.confirmQuitOnCmdQ)
                 .help("Require holding ⌘Q for 1 second, or double-tapping ⌘Q, to quit — preventing accidental quits")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Hide other windows when Quick Picker opens", isOn: $settingsManager.closeOtherWindowsOnQuickPicker)
+                    .help("Hide the main window (and others) while the Quick Picker is shown.")
+                Text("Pinned windows and the Settings window are kept open. Use the Pins tab to let the Quick Picker dismiss pins.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
     }
 }
