@@ -10,16 +10,36 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
-        <new>
-            <li>🪟 NEW: Pin clipboard items as floating windows — press ⌥P in the Quick Picker (or right-click → Pin to Screen) to keep text, images, or files on top of every Space. Pins are resizable, movable, dimmable, lockable, click-through, and collapsible, and reopen after relaunch.</li>
-            <li>🔍 NEW: Zoomable image pins — pinch to zoom (centered on the cursor), drag to pan, double-click to reset; pin windows are sized to the image's aspect ratio so it fills the window.</li>
-            <li>✨ NEW: Multi-select in the Quick Picker — extend a selection with Shift+↑/↓ and paste several items at once.</li>
-            <li>👁️ NEW: Multi-item OCR — press ⌥⏎ on a multi-selection to extract and combine text from images and text items.</li>
-            <li>⌨️ IMPROVED: Opening the Quick Picker keeps the Settings window and your pins visible; the pin shortcuts (⌃⌥P pin most recent, ⌃⌥⇧P dismiss all) are configurable in the Hotkeys tab.</li>
-            <li>🛠️ FIXED: The Quick Picker search field no longer loses focus while typing.</li>
-            <li>🛡️ FIXED: Settings can no longer leave the app inaccessible — the menu bar and main window can't both be turned off.</li>
-            <li>🧹 IMPROVED: Updated Sparkle to 2.9.2.</li>
-        </new>
+    <item>
+        <title>Version 1.6.0</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <sparkle:version>18</sparkle:version>
+        <sparkle:shortVersionString>1.6.0</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>Version 1.6.0</h2>
+            <ul>
+<li>🪟 NEW: Pin clipboard items as floating windows — press ⌥P in the Quick Picker (or right-click → Pin to Screen) to keep text, images, or files on top of every Space. Pins are resizable, movable, dimmable, lockable, click-through, and collapsible, and reopen after relaunch.</li>
+<li>🔍 NEW: Zoomable image pins — pinch to zoom (centered on the cursor), drag to pan, double-click to reset; pin windows are sized to the image's aspect ratio so it fills the window.</li>
+<li>✨ NEW: Multi-select in the Quick Picker — extend a selection with Shift+↑/↓ and paste several items at once.</li>
+<li>👁️ NEW: Multi-item OCR — press ⌥⏎ on a multi-selection to extract and combine text from images and text items.</li>
+<li>⌨️ IMPROVED: Opening the Quick Picker keeps the Settings window and your pins visible; the pin shortcuts (⌃⌥P pin most recent, ⌃⌥⇧P dismiss all) are configurable in the Hotkeys tab.</li>
+<li>🛠️ FIXED: The Quick Picker search field no longer loses focus while typing.</li>
+<li>🛡️ FIXED: Settings can no longer leave the app inaccessible — the menu bar and main window can't both be turned off.</li>
+<li>🧹 IMPROVED: Updated Sparkle to 2.9.2.</li>
+            </ul>
+        ]]></description>
+        <pubDate>Sat, 23 May 2026 14:25:27 +0000</pubDate>
+        <enclosure
+            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.6.0/StoneClipboarderTool.zip"
+            sparkle:version="18"
+            sparkle:shortVersionString="1.6.0"
+            sparkle:edSignature="8nPNHJuBhTr6XKRo+fdOzi/KDQ5c72/NwFuSeLUQFzAnYfyBD8YVjP7EXsllXs3t6JOzHX82hZaRhOFR+DPsDA=="
+            length="5619589"
+            type="application/octet-stream"
+        />
+    </item>
+
 
     <item>
         <title>Version 1.5.5</title>
