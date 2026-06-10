@@ -10,6 +10,11 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
+        <new>
+            <li>🛠️ FIXED: "Show Main Window" disabled now correctly persists across cold launches — after a reboot or login-item relaunch the app no longer reappears in the Dock and Cmd+Tab when that setting is off</li>
+            <li>🧹 IMPROVED: Updated Sparkle auto-updater to 2.9.3</li>
+        </new>
+
     <item>
         <title>Version 1.6.0</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>

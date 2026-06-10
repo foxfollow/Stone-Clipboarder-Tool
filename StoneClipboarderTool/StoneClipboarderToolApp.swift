@@ -39,6 +39,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize app in background, even if no window appears
         // If managers aren't ready yet, this will be called again after registration
         performSetup()
+
+        // The activation policy MUST be (re)applied here, after the app has finished
+        // launching. performSetup() usually already ran during SwiftUI body evaluation
+        // (via registerWithAppDelegate), which is *before* this point — and a
+        // setActivationPolicy(.accessory) call that early is reset by AppKit to the
+        // Info.plist default (.regular) once launch completes. Because performSetup() is
+        // guarded by isInitialized, it won't re-apply the policy here on its own, so the
+        // app would stay in the Dock & Cmd+Tab after a cold launch (e.g. login-item
+        // relaunch after a reboot) despite "Show Main Window" being off — until the user
+        // toggled the setting off and on again. Re-applying here makes the setting stick.
+        if let settingsManager {
+            updateWindowVisibility(settingsManager: settingsManager)
+        }
     }
 
     func performSetup() {
@@ -246,8 +259,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         } else {
-            NSApp.setActivationPolicy(.accessory)
+            // Hide the auto-created "Clipboard History" WindowGroup window and drop to
+            // accessory (no Dock icon / not in Cmd+Tab). See applicationDidFinishLaunching
+            // for why this must also be re-applied after launch: an accessory policy set
+            // too early (during SwiftUI body evaluation, before the app finishes launching)
+            // is reset by AppKit to the Info.plist default (.regular).
+            hideMainWindowAndDropToAccessory()
+            // The WindowGroup window may not exist yet on the first tick; re-apply once
+            // more after the runloop settles so it can't keep the app in the Dock.
+            DispatchQueue.main.async { [weak self] in
+                self?.hideMainWindowAndDropToAccessory()
+            }
         }
+    }
+
+    /// Hides the main window (keeping the NSWindow object alive so MenuBarView's
+    /// "Show Main Window" can re-show it later) and re-asserts the accessory policy.
+    private func hideMainWindowAndDropToAccessory() {
+        for window in NSApp.windows where window.title == "Clipboard History"
+            || window.contentView?.subviews.first is NSHostingView<ContentView>
+        {
+            window.orderOut(nil)
+        }
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 
