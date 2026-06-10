@@ -48,7 +48,11 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.6.0
+### 🆕 New in Version 1.6.1
+- **🛠️ Fix**: "Show Main Window" disabled now correctly persists across cold launches — after a reboot or login-item relaunch the app no longer reappears in the Dock and Cmd+Tab when that setting is off
+- **🧹 Improved**: Updated Sparkle auto-updater to 2.9.3
+
+### What's in Version 1.6.0
 - **🪟 Pinned Clipboard Windows**: Press ⌥P in the Quick Picker (or right-click → Pin to Screen) to keep text, images, or files floating on top of every Space — resizable, movable, dimmable, lockable, click-through, collapsible, editable (text), and restored after relaunch
 - **🔍 Zoomable Image Pins**: Pinch to zoom (centered on the cursor), drag to pan, double-click to reset; pin windows are sized to the image's aspect ratio
 - **✨ Quick Picker Multi-Select**: Extend a selection with Shift+↑/↓ and paste several items at once
