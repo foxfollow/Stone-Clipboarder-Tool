@@ -4,6 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <script>(function () { var d = document.documentElement; d.classList.add('js'); if ((localStorage.getItem('theme') || 'dark') !== 'dark') d.classList.remove('dark'); })();</script>
     <meta name="description"
         content="Безкоштовний менеджер буфера обміну для macOS з відкритим кодом. Зберігайте всю історію копіювання, отримуйте миттєвий доступ через глобальні гарячі клавіші або Quick Picker у стилі Spotlight. Розпізнавання тексту (OCR), розумні обрані та повна приватність." />
     <meta name="keywords"
@@ -12,6 +13,22 @@
     <link rel="icon" type="image/png" sizes="48x48" href="resources/index/favicon-48x48.png" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/png" sizes="48x48" href="resources/index/favicon-dark-48x48.png" media="(prefers-color-scheme: dark)" />
     <link rel="apple-touch-icon" href="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+    <link rel="canonical" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/index-ua.html" />
+    <link rel="alternate" hreflang="en" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/" />
+    <link rel="alternate" hreflang="uk" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/index-ua.html" />
+    <link rel="alternate" hreflang="x-default" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Stone Clipboarder Tool" />
+    <meta property="og:title" content="Stone Clipboarder Tool – Безкоштовний менеджер буфера обміну для macOS" />
+    <meta property="og:description" content="Безкоштовний менеджер історії буфера обміну для macOS з відкритим кодом. OCR, глобальні гарячі клавіші та повна приватність." />
+    <meta property="og:url" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/index-ua.html" />
+    <meta property="og:image" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png" />
+    <meta property="og:locale" content="uk_UA" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Stone Clipboarder Tool – Безкоштовний менеджер буфера обміну для macOS" />
+    <meta name="twitter:description" content="Безкоштовний менеджер історії буфера обміну для macOS з відкритим кодом. OCR, глобальні гарячі клавіші та повна приватність." />
+    <meta name="twitter:image" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -155,6 +172,69 @@
         .modal-close:hover { background: #ff3838; transform: scale(1.1); }
         .modal-caption { margin-top: 16px; background: rgba(255, 255, 255, 0.12); color: white; padding: 10px 24px; border-radius: 25px; font-size: 15px; text-align: center; backdrop-filter: blur(10px); white-space: nowrap; }
         .modal-hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.6); padding: 8px 16px; border-radius: 20px; font-size: 13px; backdrop-filter: blur(10px); }
+
+        /* Keyboard/touch access for the hover-only language dropdown */
+        #language-picker:focus-within .lang-dropdown { opacity: 1; visibility: visible; }
+
+        /* ===== Subtle animations ===== */
+        html { scroll-behavior: smooth; }
+
+        /* Scroll-reveal (gated on .js so content stays visible without JS) */
+        .js .reveal { opacity: 0; translate: 0 24px; transition: opacity 0.6s ease, translate 0.6s ease; }
+        .js .reveal.visible { opacity: 1; translate: 0 0; }
+
+        /* Hero entrance */
+        .anim-fade { animation: fadeUp 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+        .anim-d1 { animation-delay: 0.1s; }
+        .anim-d2 { animation-delay: 0.2s; }
+        .anim-d3 { animation-delay: 0.3s; }
+        .anim-d4 { animation-delay: 0.4s; }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Ambient glow behind hero */
+        .hero-glow {
+            position: absolute;
+            top: -140px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(760px, 95vw);
+            height: 520px;
+            background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.16), transparent 65%);
+            filter: blur(48px);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+            animation: glowBreathe 12s ease-in-out infinite;
+        }
+        @keyframes glowBreathe {
+            0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+            50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+        }
+        html:not(.dark) .hero-glow { background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.10), transparent 65%); }
+
+        /* Nav shadow once scrolled */
+        .glass-nav { transition: background 0.3s ease, box-shadow 0.3s ease; }
+        .glass-nav.scrolled { background: rgba(23, 23, 23, 0.95); box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35); }
+        html:not(.dark) .glass-nav.scrolled { background: rgba(255, 255, 255, 0.95); box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
+
+        /* Feature card hover lift */
+        .feat-card { transition: translate 0.3s ease, background 0.3s ease, border-color 0.3s ease; }
+        .feat-card:hover { translate: 0 -4px; border-color: rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.04); }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            .js .reveal { opacity: 1; translate: none; transition: none; }
+            .anim-fade { animation: none; }
+            .hero-glow { animation: none; }
+            .feat-card { transition: none; }
+            .feat-card:hover { translate: none; }
+            .screenshot-card, .screenshot-card img { transition: none; }
+            .screenshot-card:hover { transform: none; }
+            .screenshot-card:hover img { transform: none; }
+        }
     </style>
 </head>
 
@@ -198,19 +278,20 @@
 
     <main class="pt-32">
         <!-- Hero Section -->
-        <section class="max-w-7xl mx-auto px-4 text-center mb-24">
-            <div class="hero-badge inline-flex items-center px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-medium mb-8 font-mono tracking-wide">
+        <section class="relative max-w-7xl mx-auto px-4 text-center mb-24">
+            <div class="hero-glow" aria-hidden="true"></div>
+            <div class="anim-fade hero-badge inline-flex items-center px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-medium mb-8 font-mono tracking-wide">
                 Безкоштовно · Відкритий код · macOS 15+
             </div>
-            <h1 class="hero-title font-mono text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
+            <h1 class="anim-fade anim-d1 hero-title font-mono text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
                 Більше не втрачай скопійоване.
             </h1>
-            <p class="hero-sub text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+            <p class="anim-fade anim-d2 hero-sub text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
                 Безкоштовний менеджер історії буфера обміну для macOS з відкритим кодом. OCR, глобальні гарячі клавіші та повна приватність.
             </p>
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+            <div class="anim-fade anim-d3 flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
                 <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest"
-                    class="bg-primary hover:bg-blue-600 px-8 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 text-white no-underline">
+                    class="bg-primary hover:bg-blue-600 hover:-translate-y-0.5 hover:shadow-blue-500/30 px-8 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 text-white no-underline">
                     <i class="fa-solid fa-download"></i> Завантажити
                 </a>
                 <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool"
@@ -218,7 +299,7 @@
                     <i class="fa-brands fa-github text-xl"></i> GitHub
                 </a>
             </div>
-            <div class="flex flex-wrap items-center justify-center gap-3 mb-20">
+            <div class="anim-fade anim-d4 flex flex-wrap items-center justify-center gap-3 mb-20">
                 <a href="installation.html" class="sub-link text-sm text-gray-400 hover:text-white transition-colors no-underline">
                     <i class="fa-solid fa-book mr-1"></i> Інструкція з встановлення
                 </a>
@@ -235,35 +316,41 @@
 
         <!-- Screenshot Showcase -->
         <section class="max-w-6xl mx-auto px-4 mb-32" id="screenshots">
-            <div class="text-center mb-12">
+            <div class="reveal text-center mb-12">
                 <h2 class="section-title text-3xl font-bold mb-4">Огляд застосунку</h2>
                 <p class="section-sub text-gray-400">Ідеально вписується у ваш робочий процес macOS.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Головне вікно')">
-                    <img alt="Головне вікно" class="theme-image"
-                        data-light-src="resources/index/sct-light-basicwindow.png"
-                        data-dark-src="resources/index/sct-dark-basicwindow.png"
-                        src="resources/index/sct-dark-basicwindow.png" />
+                <div class="reveal">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Головне вікно')">
+                        <img alt="Головне вікно" class="theme-image"
+                            data-light-src="resources/index/sct-light-basicwindow.png"
+                            data-dark-src="resources/index/sct-dark-basicwindow.png"
+                            src="resources/index/sct-dark-basicwindow.png" />
+                    </div>
                 </div>
-                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Quick Picker')">
-                    <img alt="Quick Picker" class="theme-image"
-                        data-light-src="resources/index/sct-light-quickpicker.png"
-                        data-dark-src="resources/index/sct-dark-quickpicker.png"
-                        src="resources/index/sct-dark-quickpicker.png" />
+                <div class="reveal" style="transition-delay: 100ms">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Quick Picker')">
+                        <img alt="Quick Picker" class="theme-image"
+                            data-light-src="resources/index/sct-light-quickpicker.png"
+                            data-dark-src="resources/index/sct-dark-quickpicker.png"
+                            src="resources/index/sct-dark-quickpicker.png" />
+                    </div>
                 </div>
-                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Меню-бар')">
-                    <img alt="Меню-бар" class="theme-image"
-                        data-light-src="resources/index/sct-light-menubar.png"
-                        data-dark-src="resources/index/sct-dark-menubar.png"
-                        src="resources/index/sct-dark-menubar.png" />
+                <div class="reveal" style="transition-delay: 200ms">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Меню-бар')">
+                        <img alt="Меню-бар" class="theme-image"
+                            data-light-src="resources/index/sct-light-menubar.png"
+                            data-dark-src="resources/index/sct-dark-menubar.png"
+                            src="resources/index/sct-dark-menubar.png" />
+                    </div>
                 </div>
             </div>
         </section>
 
         <!-- Homebrew Installation -->
         <section class="max-w-4xl mx-auto px-4 mb-32">
-            <div class="card-gradient p-8 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="reveal card-gradient p-8 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
                 <div class="flex items-center gap-4">
                     <div class="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center border border-white/10">
                         <i class="fa-solid fa-terminal text-xl"></i>
@@ -287,27 +374,27 @@
 
         <!-- Features Carousel -->
         <section class="max-w-7xl mx-auto px-4 mb-32" id="features">
-            <div class="text-center mb-12">
+            <div class="reveal text-center mb-12">
                 <h2 class="section-title text-3xl font-bold mb-4">Все що вам потрібно</h2>
                 <p class="section-sub text-gray-400">Потужні функції, безкоштовно, повна приватність.</p>
             </div>
-            <div class="carousel-container" id="featureCarousel">
+            <div class="carousel-container reveal" id="featureCarousel">
                 <div class="carousel-track">
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-thumbtack text-3xl text-blue-400"></i></div><h4 class="text-xl font-bold mb-3">Закріплені вікна <span class="text-[10px] align-middle ml-1 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">v1.6.0</span></h4><p class="text-gray-400 leading-relaxed text-sm">Закріплюйте будь-який елемент буфера як плаваюче вікно поверх усіх Spaces — зі зміною розміру, переміщенням, прозорістю, блокуванням та режимом «клік наскрізь». Зображення масштабуються та переміщуються.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-clipboard-list text-3xl text-blue-400"></i></div><h4 class="text-xl font-bold mb-3">Історія буфера обміну</h4><p class="text-gray-400 leading-relaxed text-sm">Відстежуйте та керуйте історією буфера обміну з постійним зберіганням за допомогою Swift Data.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-expand text-3xl text-green-400"></i></div><h4 class="text-xl font-bold mb-3">Розпізнавання тексту (OCR)</h4><p class="text-gray-400 leading-relaxed text-sm">Витягуйте текст із зображень за допомогою Apple Vision framework для легкого редагування та пошуку.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-star text-3xl text-yellow-400"></i></div><h4 class="text-xl font-bold mb-3">Розумні обрані</h4><p class="text-gray-400 leading-relaxed text-sm">Закріплюйте часто використовувані елементи, захищені від автоматичного видалення. Завантаження всіх обраних.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-magnifying-glass text-3xl text-pink-400"></i></div><h4 class="text-xl font-bold mb-3">Розширений пошук</h4><p class="text-gray-400 leading-relaxed text-sm">Шукайте в історії буфера обміну за допомогою сучасної панелі пошуку з ефектом liquid glass macOS 15+.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-ban text-3xl text-red-400"></i></div><h4 class="text-xl font-bold mb-3">Виключені застосунки</h4><p class="text-gray-400 leading-relaxed text-sm">Вибирайте, які застосунки виключити з моніторингу буфера обміну. Ідеально для захисту конфіденційних даних.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-pause text-3xl text-cyan-400"></i></div><h4 class="text-xl font-bold mb-3">Призупинення моніторингу</h4><p class="text-gray-400 leading-relaxed text-sm">Тимчасово призупиняйте моніторинг буфера обміну з налаштовуваним таймером. Чудово для приватності.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-keyboard text-3xl text-orange-400"></i></div><h4 class="text-xl font-bold mb-3">Глобальні гарячі клавіші</h4><p class="text-gray-400 leading-relaxed text-sm">Системні комбінації клавіш (<kbd class="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">&#x2303;&#x2325;1-0</kbd>, <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">&#x2303;&#x21E7;1-0</kbd>) та Quick Picker для миттєвого доступу.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-sliders text-3xl text-violet-400"></i></div><h4 class="text-xl font-bold mb-3">Режими захоплення</h4><p class="text-gray-400 leading-relaxed text-sm">Вибирайте захоплення лише тексту, лише зображень або обох. Ідеально для робочих процесів Microsoft Word.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-layer-group text-3xl text-teal-400"></i></div><h4 class="text-xl font-bold mb-3">Комбіновані елементи (БЕТА)</h4><p class="text-gray-400 leading-relaxed text-sm">Зберігайте текст та зображення разом як один елемент буфера обміну для керування багатим контентом.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-bars text-3xl text-indigo-400"></i></div><h4 class="text-xl font-bold mb-3">Інтеграція в меню-бар</h4><p class="text-gray-400 leading-relaxed text-sm">Швидкий доступ до елементів буфера обміну безпосередньо з меню-бар з відображенням таймера паузи.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-rocket text-3xl text-amber-400"></i></div><h4 class="text-xl font-bold mb-3">Запуск при вході</h4><p class="text-gray-400 leading-relaxed text-sm">Автоматичний запуск StoneClipboarder при вході в систему. Керуйте через налаштування доступності або Системні параметри macOS.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-universal-access text-3xl text-lime-400"></i></div><h4 class="text-xl font-bold mb-3">Налаштування доступності</h4><p class="text-gray-400 leading-relaxed text-sm">Окрема вкладка налаштувань зі статусом дозволів та швидким доступом для надання доступності для автовставки та гарячих клавіш.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-arrows-rotate text-3xl text-emerald-400"></i></div><h4 class="text-xl font-bold mb-3">Автооновлення</h4><p class="text-gray-400 leading-relaxed text-sm">Безпечні автоматичні оновлення за допомогою фреймворку Sparkle з підписом EdDSA.</p></div></div>
-                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors"><div class="mb-6"><i class="fa-solid fa-eye-slash text-3xl text-purple-400"></i></div><h4 class="text-xl font-bold mb-3">Фокус на приватності</h4><p class="text-gray-400 leading-relaxed text-sm">Усі дані залишаються на вашому пристрої. Жодної синхронізації з хмарою чи збору даних. Виключення застосунків для підвищеної приватності.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-thumbtack text-3xl text-blue-400"></i></div><h4 class="text-xl font-bold mb-3">Закріплені вікна <span class="text-[10px] align-middle ml-1 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">v1.6.0</span></h4><p class="text-gray-400 leading-relaxed text-sm">Закріплюйте будь-який елемент буфера як плаваюче вікно поверх усіх Spaces — зі зміною розміру, переміщенням, прозорістю, блокуванням та режимом «клік наскрізь». Зображення масштабуються та переміщуються.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-clipboard-list text-3xl text-blue-400"></i></div><h4 class="text-xl font-bold mb-3">Історія буфера обміну</h4><p class="text-gray-400 leading-relaxed text-sm">Відстежуйте та керуйте історією буфера обміну з постійним зберіганням за допомогою Swift Data.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-expand text-3xl text-green-400"></i></div><h4 class="text-xl font-bold mb-3">Розпізнавання тексту (OCR)</h4><p class="text-gray-400 leading-relaxed text-sm">Витягуйте текст із зображень за допомогою Apple Vision framework для легкого редагування та пошуку.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-star text-3xl text-yellow-400"></i></div><h4 class="text-xl font-bold mb-3">Розумні обрані</h4><p class="text-gray-400 leading-relaxed text-sm">Закріплюйте часто використовувані елементи, захищені від автоматичного видалення. Завантаження всіх обраних.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-magnifying-glass text-3xl text-pink-400"></i></div><h4 class="text-xl font-bold mb-3">Розширений пошук</h4><p class="text-gray-400 leading-relaxed text-sm">Шукайте в історії буфера обміну за допомогою сучасної панелі пошуку з ефектом liquid glass macOS 15+.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-ban text-3xl text-red-400"></i></div><h4 class="text-xl font-bold mb-3">Виключені застосунки</h4><p class="text-gray-400 leading-relaxed text-sm">Вибирайте, які застосунки виключити з моніторингу буфера обміну. Ідеально для захисту конфіденційних даних.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-pause text-3xl text-cyan-400"></i></div><h4 class="text-xl font-bold mb-3">Призупинення моніторингу</h4><p class="text-gray-400 leading-relaxed text-sm">Тимчасово призупиняйте моніторинг буфера обміну з налаштовуваним таймером. Чудово для приватності.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-keyboard text-3xl text-orange-400"></i></div><h4 class="text-xl font-bold mb-3">Глобальні гарячі клавіші</h4><p class="text-gray-400 leading-relaxed text-sm">Системні комбінації клавіш (<kbd class="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">&#x2303;&#x2325;1-0</kbd>, <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">&#x2303;&#x21E7;1-0</kbd>) та Quick Picker для миттєвого доступу.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-sliders text-3xl text-violet-400"></i></div><h4 class="text-xl font-bold mb-3">Режими захоплення</h4><p class="text-gray-400 leading-relaxed text-sm">Вибирайте захоплення лише тексту, лише зображень або обох. Ідеально для робочих процесів Microsoft Word.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-layer-group text-3xl text-teal-400"></i></div><h4 class="text-xl font-bold mb-3">Комбіновані елементи (БЕТА)</h4><p class="text-gray-400 leading-relaxed text-sm">Зберігайте текст та зображення разом як один елемент буфера обміну для керування багатим контентом.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-bars text-3xl text-indigo-400"></i></div><h4 class="text-xl font-bold mb-3">Інтеграція в меню-бар</h4><p class="text-gray-400 leading-relaxed text-sm">Швидкий доступ до елементів буфера обміну безпосередньо з меню-бар з відображенням таймера паузи.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-rocket text-3xl text-amber-400"></i></div><h4 class="text-xl font-bold mb-3">Запуск при вході</h4><p class="text-gray-400 leading-relaxed text-sm">Автоматичний запуск StoneClipboarder при вході в систему. Керуйте через налаштування доступності або Системні параметри macOS.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-universal-access text-3xl text-lime-400"></i></div><h4 class="text-xl font-bold mb-3">Налаштування доступності</h4><p class="text-gray-400 leading-relaxed text-sm">Окрема вкладка налаштувань зі статусом дозволів та швидким доступом для надання доступності для автовставки та гарячих клавіш.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-arrows-rotate text-3xl text-emerald-400"></i></div><h4 class="text-xl font-bold mb-3">Автооновлення</h4><p class="text-gray-400 leading-relaxed text-sm">Безпечні автоматичні оновлення за допомогою фреймворку Sparkle з підписом EdDSA.</p></div></div>
+                    <div class="carousel-slide"><div class="card-gradient feat-card p-8 rounded-2xl h-full"><div class="mb-6"><i class="fa-solid fa-eye-slash text-3xl text-purple-400"></i></div><h4 class="text-xl font-bold mb-3">Фокус на приватності</h4><p class="text-gray-400 leading-relaxed text-sm">Усі дані залишаються на вашому пристрої. Жодної синхронізації з хмарою чи збору даних. Виключення застосунків для підвищеної приватності.</p></div></div>
                 </div>
             </div>
             <div class="scroll-progress"><div class="scroll-progress-bar" id="scrollProgress"></div></div>
@@ -315,11 +402,11 @@
 
         <!-- Comparison Section -->
         <section class="max-w-5xl mx-auto px-4 mb-32">
-            <div class="text-center mb-16">
+            <div class="reveal text-center mb-16">
                 <h2 class="section-title text-3xl font-bold mb-4">Чому обрати Stone Clipboarder?</h2>
                 <p class="section-sub text-gray-400">Більше функцій. Безкоштовно. Без компромісів.</p>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto reveal">
                 <table class="w-full border-collapse">
                     <thead>
                         <tr class="text-left border-b border-white/10">
@@ -345,7 +432,7 @@
 
     <!-- Footer -->
     <footer class="footer-section border-t border-white/10 pt-16 pb-8">
-        <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+        <div class="reveal max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div>
                 <div class="flex items-center gap-2 mb-6">
                     <img alt="Logo" class="w-6 h-6 rounded-md block dark:hidden" src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
@@ -380,7 +467,7 @@
         </div>
         <div class="footer-bottom max-w-7xl mx-auto px-4 border-t border-white/5 pt-8 text-center text-[11px] text-gray-500">
             <p><strong>Системні вимоги:</strong> macOS 15.0 або новіша · Створено з SwiftUI · Оновлення через Sparkle</p>
-            <p class="mt-2">© 2025 Heorhii Savoiskyi</p>
+            <p class="mt-2">© 2025–2026 Heorhii Savoiskyi</p>
         </div>
     </footer>
 
@@ -468,7 +555,27 @@
             setTimeout(() => { modal.style.display = 'none'; document.body.style.overflow = 'auto'; }, 300);
         }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-        document.addEventListener('DOMContentLoaded', () => { setTheme(currentTheme); initCarousel(); });
+
+        // Scroll-reveal + nav shadow
+        function initScrollFx() {
+            const els = document.querySelectorAll('.reveal');
+            if ('IntersectionObserver' in window) {
+                const io = new IntersectionObserver(entries => {
+                    entries.forEach(e => {
+                        if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+                    });
+                }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+                els.forEach(el => io.observe(el));
+            } else {
+                els.forEach(el => el.classList.add('visible'));
+            }
+            const header = document.querySelector('.glass-nav');
+            const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 8);
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { setTheme(currentTheme); initCarousel(); initScrollFx(); });
     </script>
 </body>
 

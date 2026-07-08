@@ -4,6 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <script>(function () { var d = document.documentElement; d.classList.add('js'); if ((localStorage.getItem('theme') || 'dark') !== 'dark') d.classList.remove('dark'); })();</script>
     <meta name="description"
         content="Free, open-source clipboard manager for macOS. Save your entire copy-paste history, access it instantly with global hotkeys or Spotlight-like Quick Picker. Features OCR text recognition, smart favorites, and 100% local privacy." />
     <meta name="keywords"
@@ -12,6 +13,21 @@
     <link rel="icon" type="image/png" sizes="48x48" href="resources/index/favicon-48x48.png" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/png" sizes="48x48" href="resources/index/favicon-dark-48x48.png" media="(prefers-color-scheme: dark)" />
     <link rel="apple-touch-icon" href="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
+    <link rel="canonical" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/" />
+    <link rel="alternate" hreflang="en" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/" />
+    <link rel="alternate" hreflang="uk" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/index-ua.html" />
+    <link rel="alternate" hreflang="x-default" href="https://foxfollow.github.io/Stone-Clipboarder-Tool/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Stone Clipboarder Tool" />
+    <meta property="og:title" content="Stone Clipboarder Tool – Free Clipboard Manager for macOS" />
+    <meta property="og:description" content="Free, open-source clipboard history manager for macOS with OCR, global hotkeys, and complete privacy." />
+    <meta property="og:url" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/" />
+    <meta property="og:image" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Stone Clipboarder Tool – Free Clipboard Manager for macOS" />
+    <meta name="twitter:description" content="Free, open-source clipboard history manager for macOS with OCR, global hotkeys, and complete privacy." />
+    <meta name="twitter:image" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -174,6 +190,69 @@
         .modal-close:hover { background: #ff3838; transform: scale(1.1); }
         .modal-caption { margin-top: 16px; background: rgba(255, 255, 255, 0.12); color: white; padding: 10px 24px; border-radius: 25px; font-size: 15px; text-align: center; backdrop-filter: blur(10px); white-space: nowrap; }
         .modal-hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.6); padding: 8px 16px; border-radius: 20px; font-size: 13px; backdrop-filter: blur(10px); }
+
+        /* Keyboard/touch access for the hover-only language dropdown */
+        #language-picker:focus-within .lang-dropdown { opacity: 1; visibility: visible; }
+
+        /* ===== Subtle animations ===== */
+        html { scroll-behavior: smooth; }
+
+        /* Scroll-reveal (gated on .js so content stays visible without JS) */
+        .js .reveal { opacity: 0; translate: 0 24px; transition: opacity 0.6s ease, translate 0.6s ease; }
+        .js .reveal.visible { opacity: 1; translate: 0 0; }
+
+        /* Hero entrance */
+        .anim-fade { animation: fadeUp 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+        .anim-d1 { animation-delay: 0.1s; }
+        .anim-d2 { animation-delay: 0.2s; }
+        .anim-d3 { animation-delay: 0.3s; }
+        .anim-d4 { animation-delay: 0.4s; }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Ambient glow behind hero */
+        .hero-glow {
+            position: absolute;
+            top: -140px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(760px, 95vw);
+            height: 520px;
+            background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.16), transparent 65%);
+            filter: blur(48px);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+            animation: glowBreathe 12s ease-in-out infinite;
+        }
+        @keyframes glowBreathe {
+            0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+            50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+        }
+        html:not(.dark) .hero-glow { background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.10), transparent 65%); }
+
+        /* Nav shadow once scrolled */
+        .glass-nav { transition: background 0.3s ease, box-shadow 0.3s ease; }
+        .glass-nav.scrolled { background: rgba(23, 23, 23, 0.95); box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35); }
+        html:not(.dark) .glass-nav.scrolled { background: rgba(255, 255, 255, 0.95); box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
+
+        /* Feature card hover lift */
+        .feat-card { transition: translate 0.3s ease, background 0.3s ease, border-color 0.3s ease; }
+        .feat-card:hover { translate: 0 -4px; border-color: rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.04); }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            .js .reveal { opacity: 1; translate: none; transition: none; }
+            .anim-fade { animation: none; }
+            .hero-glow { animation: none; }
+            .feat-card { transition: none; }
+            .feat-card:hover { translate: none; }
+            .screenshot-card, .screenshot-card img { transition: none; }
+            .screenshot-card:hover { transform: none; }
+            .screenshot-card:hover img { transform: none; }
+        }
     </style>
 </head>
 
@@ -217,19 +296,20 @@
 
     <main class="pt-32">
         <!-- Hero Section -->
-        <section class="max-w-7xl mx-auto px-4 text-center mb-24">
-            <div class="hero-badge inline-flex items-center px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-medium mb-8 font-mono tracking-wide">
+        <section class="relative max-w-7xl mx-auto px-4 text-center mb-24">
+            <div class="hero-glow" aria-hidden="true"></div>
+            <div class="anim-fade hero-badge inline-flex items-center px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-medium mb-8 font-mono tracking-wide">
                 Free · Open Source · macOS 15+
             </div>
-            <h1 class="hero-title font-mono text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
+            <h1 class="anim-fade anim-d1 hero-title font-mono text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
                 Never lose what you copy.
             </h1>
-            <p class="hero-sub text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+            <p class="anim-fade anim-d2 hero-sub text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
                 A free, open-source clipboard history manager for macOS with OCR, global hotkeys, and complete privacy.
             </p>
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+            <div class="anim-fade anim-d3 flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
                 <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest"
-                    class="bg-primary hover:bg-blue-600 px-8 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 text-white no-underline">
+                    class="bg-primary hover:bg-blue-600 hover:-translate-y-0.5 hover:shadow-blue-500/30 px-8 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 text-white no-underline">
                     <i class="fa-solid fa-download"></i>
                     Download Latest
                 </a>
@@ -239,7 +319,7 @@
                     View on GitHub
                 </a>
             </div>
-            <div class="flex flex-wrap items-center justify-center gap-3 mb-20">
+            <div class="anim-fade anim-d4 flex flex-wrap items-center justify-center gap-3 mb-20">
                 <a href="installation.html" class="sub-link text-sm text-gray-400 hover:text-white transition-colors no-underline">
                     <i class="fa-solid fa-book mr-1"></i> Installation Guide
                 </a>
@@ -256,35 +336,41 @@
 
         <!-- Screenshot Showcase -->
         <section class="max-w-6xl mx-auto px-4 mb-32" id="screenshots">
-            <div class="text-center mb-12">
+            <div class="reveal text-center mb-12">
                 <h2 class="section-title text-3xl font-bold mb-4">App Preview</h2>
                 <p class="section-sub text-gray-400">Fits perfectly into your macOS workflow.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Main Window')">
-                    <img alt="Main Window" class="theme-image"
-                        data-light-src="resources/index/sct-light-basicwindow.png"
-                        data-dark-src="resources/index/sct-dark-basicwindow.png"
-                        src="resources/index/sct-dark-basicwindow.png" />
+                <div class="reveal">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Main Window')">
+                        <img alt="Main Window" class="theme-image"
+                            data-light-src="resources/index/sct-light-basicwindow.png"
+                            data-dark-src="resources/index/sct-dark-basicwindow.png"
+                            src="resources/index/sct-dark-basicwindow.png" />
+                    </div>
                 </div>
-                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Quick Picker')">
-                    <img alt="Quick Picker" class="theme-image"
-                        data-light-src="resources/index/sct-light-quickpicker.png"
-                        data-dark-src="resources/index/sct-dark-quickpicker.png"
-                        src="resources/index/sct-dark-quickpicker.png" />
+                <div class="reveal" style="transition-delay: 100ms">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Quick Picker')">
+                        <img alt="Quick Picker" class="theme-image"
+                            data-light-src="resources/index/sct-light-quickpicker.png"
+                            data-dark-src="resources/index/sct-dark-quickpicker.png"
+                            src="resources/index/sct-dark-quickpicker.png" />
+                    </div>
                 </div>
-                <div class="screenshot-card" onclick="openModal(this.querySelector('img'), 'Menu Bar')">
-                    <img alt="Menu Bar" class="theme-image"
-                        data-light-src="resources/index/sct-light-menubar.png"
-                        data-dark-src="resources/index/sct-dark-menubar.png"
-                        src="resources/index/sct-dark-menubar.png" />
+                <div class="reveal" style="transition-delay: 200ms">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Menu Bar')">
+                        <img alt="Menu Bar" class="theme-image"
+                            data-light-src="resources/index/sct-light-menubar.png"
+                            data-dark-src="resources/index/sct-dark-menubar.png"
+                            src="resources/index/sct-dark-menubar.png" />
+                    </div>
                 </div>
             </div>
         </section>
 
         <!-- Homebrew Installation -->
         <section class="max-w-4xl mx-auto px-4 mb-32">
-            <div class="card-gradient p-8 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="reveal card-gradient p-8 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
                 <div class="flex items-center gap-4">
                     <div class="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center border border-white/10">
                         <i class="fa-solid fa-terminal text-xl"></i>
@@ -308,15 +394,15 @@
 
         <!-- Features Carousel -->
         <section class="max-w-7xl mx-auto px-4 mb-32" id="features">
-            <div class="text-center mb-12">
+            <div class="reveal text-center mb-12">
                 <h2 class="section-title text-3xl font-bold mb-4">Everything You Need</h2>
                 <p class="section-sub text-gray-400">Powerful features, zero cost, complete privacy.</p>
             </div>
-            <div class="carousel-container" id="featureCarousel">
+            <div class="carousel-container reveal" id="featureCarousel">
                 <div class="carousel-track">
                     <!-- Slide: Pinned Windows (1.6.0) -->
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-thumbtack text-3xl text-blue-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">
                                 Pinned Windows
@@ -327,21 +413,21 @@
                     </div>
                     <!-- Slide 1 -->
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-clipboard-list text-3xl text-blue-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Clipboard History</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Track and manage your clipboard history with persistent storage using Swift Data.</p>
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-expand text-3xl text-green-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">OCR Text Recognition</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Extract text from images using Apple Vision framework for easy editing and searching.</p>
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-star text-3xl text-yellow-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Smart Favorites</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Pin frequently-used items that are protected from auto-deletion. Load all favorites even when not in memory.</p>
@@ -349,21 +435,21 @@
                     </div>
                     <!-- Slide 2 -->
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-magnifying-glass text-3xl text-pink-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Advanced Search</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Search through your clipboard history with a modern search bar featuring macOS 15+ liquid glass effect.</p>
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-ban text-3xl text-red-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Excluded Apps</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Choose which apps to exclude from clipboard monitoring. Perfect for protecting sensitive data from password managers.</p>
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-pause text-3xl text-cyan-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Pause Monitoring</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Temporarily pause clipboard monitoring with a customizable timer. Great for privacy with sensitive info.</p>
@@ -371,7 +457,7 @@
                     </div>
                     <!-- Slide 3 -->
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-keyboard text-3xl text-orange-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Global Hotkeys</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">System-wide shortcuts
@@ -381,14 +467,14 @@
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-sliders text-3xl text-violet-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Capture Modes</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Choose to capture only text, only images, or both. Perfect for Microsoft Word workflows.</p>
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-layer-group text-3xl text-teal-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Combined Items (BETA)</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Save text and images together as a single clipboard item for rich content management.</p>
@@ -396,21 +482,21 @@
                     </div>
                     <!-- Slide 4 -->
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-bars text-3xl text-indigo-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Menu Bar Integration</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Quick access to clipboard items directly from the menu bar with pause timer display.</p>
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-rocket text-3xl text-amber-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Launch at Login</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Start StoneClipboarder automatically when you log in. Manage via Accessibility settings or macOS System Settings.</p>
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-universal-access text-3xl text-lime-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Accessibility Settings</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Dedicated settings tab showing permission status with quick access to grant accessibility for auto-paste and global hotkeys.</p>
@@ -418,14 +504,14 @@
                     </div>
                     <!-- Slide 5 -->
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-arrows-rotate text-3xl text-emerald-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Auto Updates</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">Secure automatic updates using Sparkle framework with EdDSA signing.</p>
                         </div>
                     </div>
                     <div class="carousel-slide">
-                        <div class="card-gradient feat-card p-8 rounded-2xl h-full transition-colors">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
                             <div class="mb-6"><i class="fa-solid fa-eye-slash text-3xl text-purple-400"></i></div>
                             <h4 class="text-xl font-bold mb-3">Privacy Focused</h4>
                             <p class="text-gray-400 leading-relaxed text-sm">All data stays on your device. No cloud sync or data collection. App exclusion for enhanced privacy.</p>
@@ -438,11 +524,11 @@
 
         <!-- Comparison Section -->
         <section class="max-w-5xl mx-auto px-4 mb-32">
-            <div class="text-center mb-16">
+            <div class="reveal text-center mb-16">
                 <h2 class="section-title text-3xl font-bold mb-4">Why Choose Stone Clipboarder?</h2>
                 <p class="section-sub text-gray-400">More features. No cost. No compromises.</p>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto reveal">
                 <table class="w-full border-collapse">
                     <thead>
                         <tr class="text-left border-b border-white/10">
@@ -468,7 +554,7 @@
 
     <!-- Footer -->
     <footer class="footer-section border-t border-white/10 pt-16 pb-8">
-        <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+        <div class="reveal max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
             <div>
                 <div class="flex items-center gap-2 mb-6">
                     <img alt="Logo" class="w-6 h-6 rounded-md block dark:hidden" src="resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png" />
@@ -503,7 +589,7 @@
         </div>
         <div class="footer-bottom max-w-7xl mx-auto px-4 border-t border-white/5 pt-8 text-center text-[11px] text-gray-500">
             <p><strong>System Requirements:</strong> macOS 15.0 or later · Built with SwiftUI · Powered by Sparkle Updates</p>
-            <p class="mt-2">&copy; 2025 Heorhii Savoiskyi</p>
+            <p class="mt-2">&copy; 2025–2026 Heorhii Savoiskyi</p>
         </div>
     </footer>
 
@@ -596,8 +682,27 @@
         }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
+        // Scroll-reveal + nav shadow
+        function initScrollFx() {
+            const els = document.querySelectorAll('.reveal');
+            if ('IntersectionObserver' in window) {
+                const io = new IntersectionObserver(entries => {
+                    entries.forEach(e => {
+                        if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+                    });
+                }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+                els.forEach(el => io.observe(el));
+            } else {
+                els.forEach(el => el.classList.add('visible'));
+            }
+            const header = document.querySelector('.glass-nav');
+            const onScroll = () => header.classList.toggle('scrolled', window.scrollY > 8);
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+        }
+
         // Init
-        document.addEventListener('DOMContentLoaded', () => { setTheme(currentTheme); initCarousel(); });
+        document.addEventListener('DOMContentLoaded', () => { setTheme(currentTheme); initCarousel(); initScrollFx(); });
     </script>
 </body>
 
