@@ -10,11 +10,31 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
-        <new>
-            <li>✨ NEW: Type-out paste in the Quick Picker — press ⌘⇧Return to type the selected text out character by character instead of pasting, so it lands in fields that block ⌘V (secure fields, some remote desktops and terminals)</li>
-            <li>🛠️ FIXED: "Show Main Window" disabled now correctly persists across cold launches — after a reboot or login-item relaunch the app no longer reappears in the Dock and Cmd+Tab when that setting is off</li>
-            <li>🧹 IMPROVED: Updated Sparkle auto-updater to 2.9.3</li>
-        </new>
+    <item>
+        <title>Version 1.7.0</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <sparkle:version>20</sparkle:version>
+        <sparkle:shortVersionString>1.7.0</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>Version 1.7.0</h2>
+            <ul>
+<li>✨ NEW: Type-out paste in the Quick Picker — press ⌘⇧Return to type the selected text out character by character instead of pasting, so it lands in fields that block ⌘V (secure fields, some remote desktops and terminals)</li>
+<li>🛠️ FIXED: "Show Main Window" disabled now correctly persists across cold launches — after a reboot or login-item relaunch the app no longer reappears in the Dock and Cmd+Tab when that setting is off</li>
+<li>🧹 IMPROVED: Updated Sparkle auto-updater to 2.9.3</li>
+            </ul>
+        ]]></description>
+        <pubDate>Thu, 16 Jul 2026 11:53:42 +0000</pubDate>
+        <enclosure
+            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.7.0/StoneClipboarderTool.zip"
+            sparkle:version="20"
+            sparkle:shortVersionString="1.7.0"
+            sparkle:edSignature="HmJmYeLJ8ieU4l80Ihcj9Pmf09tL7lO/5CoCjBxQF5dgWnlMlsSKKIwjGn/7LhjEbd1UqbRCNDY9xzYdR/8sDw=="
+            length="5636071"
+            type="application/octet-stream"
+        />
+    </item>
+
 
     <item>
         <title>Version 1.6.0</title>
