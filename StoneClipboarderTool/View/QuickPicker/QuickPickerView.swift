@@ -132,6 +132,12 @@ struct QuickPickerView: View {
                 return .handled
             }
             .onKeyPress(keys: [.return]) { keyPress in
+                // ⌘⇧⏎ → type the selected text out character by character
+                // instead of the normal pasteboard + ⌘V.
+                if keyPress.modifiers.contains(.command) && keyPress.modifiers.contains(.shift) {
+                    performTypePaste()
+                    return .handled
+                }
                 let optionHeld = keyPress.modifiers.contains(.option)
                 let hasMultiSelection = (selectedRange()?.count ?? 0) > 1
                 // ⌥⏎ on a Shift-extended range is always OCR intent — bypass
@@ -482,6 +488,9 @@ struct QuickPickerView: View {
                     shortcutBadge("⇧↑↓", label: "Multi-select")
                 }
                 shortcutBadge("ESC", label: "Close")
+                if selectionIsTypeable {
+                    typePasteBadge()
+                }
                 favoriteToggleBadge()
                 pinToggleBadge()
 
@@ -515,6 +524,27 @@ struct QuickPickerView: View {
         }
         .foregroundStyle(.tertiary)
         .help("Pin / unpin the selected item to the screen")
+    }
+
+    private func typePasteBadge() -> some View {
+        HStack(spacing: 3) {
+            Text("⌘⇧⏎")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.primary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+            Image(systemName: "keyboard")
+                .font(.system(size: 9))
+        }
+        .foregroundStyle(.tertiary)
+        .help("Type the selected text character by character (⌘⇧Return)")
     }
 
     private func favoriteToggleBadge() -> some View {
@@ -974,6 +1004,83 @@ struct QuickPickerView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             keyUp?.post(tap: location)
+        }
+    }
+
+    // Whether the current selection is something performTypePaste can act on:
+    // a single text/combined item with content, or a Shift-extended range
+    // that's entirely text/combined. Drives the footer hint's visibility.
+    private var selectionIsTypeable: Bool {
+        if let range = selectedRange(), range.count > 1 {
+            let items = range.compactMap { filteredItems[safe: $0] }
+            return !items.isEmpty && items.allSatisfy { isTextLikeWithContent($0) }
+        }
+        guard let item = filteredItems[safe: selectedIndex] else { return false }
+        return isTextLikeWithContent(item)
+    }
+
+    private func isTextLikeWithContent(_ item: CBItem) -> Bool {
+        (item.itemType == .text || item.itemType == .combined)
+            && (item.content?.isEmpty == false)
+    }
+
+    // "Type" paste (both ⌘ keys + Return): instead of writing to the pasteboard
+    // and simulating ⌘V, emit the text as synthetic keystrokes so it lands in
+    // apps that block programmatic paste (some password/secure fields, remote
+    // desktops, terminals). Text-only — images/files have nothing to type.
+    private func performTypePaste() {
+        let targetText: String?
+
+        if let range = selectedRange(), range.count > 1 {
+            let items = range.compactMap { filteredItems[safe: $0] }
+            guard !items.isEmpty, items.allSatisfy({ isTextLikeWithContent($0) }) else { return }
+            items.forEach { viewModel.markItemAccessed($0) }
+            targetText = items.compactMap { $0.content }.joined(separator: "\n")
+        } else {
+            guard let item = filteredItems[safe: selectedIndex],
+                  isTextLikeWithContent(item),
+                  let content = item.content else { return }
+            viewModel.markItemAccessed(item)
+            targetText = content
+        }
+
+        guard let text = targetText, !text.isEmpty else { return }
+
+        if !AccessibilityAlertHelper.isAccessibilityGranted {
+            AccessibilityAlertHelper.showAccessibilityAlert()
+            return
+        }
+
+        onClose()
+        // Let focus return to the previously-active window before typing.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            typeTextByCharacter(text)
+        }
+    }
+
+    // Posts each character as its own key-down/key-up pair carrying a Unicode
+    // string (virtualKey 0), so any character types regardless of keyboard
+    // layout. Runs off the main thread with a small inter-key delay so the
+    // receiving app can keep up; posting from a background queue is safe.
+    private func typeTextByCharacter(_ text: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+            let location = CGEventTapLocation.cghidEventTap
+
+            for character in text {
+                let utf16 = Array(String(character).utf16)
+
+                if let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) {
+                    down.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
+                    down.post(tap: location)
+                }
+                if let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
+                    up.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
+                    up.post(tap: location)
+                }
+
+                usleep(1500)  // ~1.5ms between keystrokes
+            }
         }
     }
 
