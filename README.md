@@ -48,7 +48,8 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.6.1
+### 🆕 New in Version 1.7.0
+- **✨ Type-Out Paste**: In the Quick Picker, press ⌘⇧Return to type the selected text out character by character instead of pasting — so it lands in fields that block ⌘V (secure fields, some remote desktops and terminals)
 - **🛠️ Fix**: "Show Main Window" disabled now correctly persists across cold launches — after a reboot or login-item relaunch the app no longer reappears in the Dock and Cmd+Tab when that setting is off
 - **🧹 Improved**: Updated Sparkle auto-updater to 2.9.3
 
