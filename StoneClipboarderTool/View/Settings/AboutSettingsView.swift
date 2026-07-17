@@ -134,25 +134,6 @@ struct AboutSettingsView: View {
                     }
                 }
                 .foregroundStyle(.primary)
-                
-                Link(destination: URL(string: "https://www.threads.com/@kyivstar.official")!) {
-                    HStack {
-                        Image(.kyivstar)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 20, height: 20)
-                            .cornerRadius(4)
-                        
-                        Text("I promise them to add them to my app")
-                            .font(.caption)
-                        
-                        Spacer()
-                        
-                        Image(systemName: "link")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .foregroundStyle(.primary)
             }
         }
         .formStyle(.grouped)

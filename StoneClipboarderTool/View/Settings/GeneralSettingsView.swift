@@ -14,7 +14,6 @@ struct GeneralSettingsView: View {
     var body: some View {
         Form {
             AppearanceSection()
-            QuickLookSection()
             ClipboardBehaviorSection()
             MemoryOptimizationSection(activeAlert: $activeAlert)
             MenuBarDisplaySection()
@@ -69,35 +68,6 @@ private struct AppearanceSection: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-        }
-    }
-}
-
-private struct QuickLookSection: View {
-    @EnvironmentObject var settingsManager: SettingsManager
-
-    var body: some View {
-        Section("Quick Look") {
-            Picker("Preview mode:", selection: $settingsManager.quickLookMode) {
-                ForEach(QuickLookMode.allCases, id: \.self) { mode in
-                    Text(mode.displayName).tag(mode)
-                }
-            }
-            .pickerStyle(.menu)
-            .help("Choose preview style when pressing the trigger key in QuickPicker")
-
-            Picker("Trigger key:", selection: $settingsManager.quickLookTriggerKey) {
-                ForEach(QuickLookTriggerKey.allCases, id: \.self) { key in
-                    Text(key.displayName).tag(key)
-                }
-            }
-            .pickerStyle(.menu)
-            .disabled(settingsManager.quickLookMode == .disabled)
-            .opacity(settingsManager.quickLookMode == .disabled ? 0.5 : 1)
-            .help("Key to open preview in QuickPicker")
-
-            Toggle("⌥ Enter to extract text (Apple Vision)", isOn: $settingsManager.enableOCROptionKey)
-                .help("When enabled, pressing Option+Enter on an image in QuickPicker will extract and paste text using Apple Vision OCR instead of the image")
         }
     }
 }
