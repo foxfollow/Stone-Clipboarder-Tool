@@ -10,11 +10,31 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
-        <new>
-            <li>✨ NEW: New "Quick Picker" settings tab — Quick Look preview options plus the new type-out paste controls live here</li>
-            <li>⌨️ IMPROVED: Type-out paste speed is now adjustable (Settings › Quick Picker) — raise the per-character delay for text fields that drop characters when typing too fast</li>
-            <li>⌨️ IMPROVED: Stop an in-progress type-out anytime — press Escape or reopen the Quick Picker</li>
-        </new>
+    <item>
+        <title>Version 1.7.1</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <sparkle:version>21</sparkle:version>
+        <sparkle:shortVersionString>1.7.1</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>Version 1.7.1</h2>
+            <ul>
+<li>✨ NEW: New "Quick Picker" settings tab — Quick Look preview options plus the new type-out paste controls live here</li>
+<li>⌨️ IMPROVED: Type-out paste speed is now adjustable (Settings › Quick Picker) — raise the per-character delay for text fields that drop characters when typing too fast</li>
+<li>⌨️ IMPROVED: Stop an in-progress type-out anytime — press Escape or reopen the Quick Picker</li>
+            </ul>
+        ]]></description>
+        <pubDate>Fri, 17 Jul 2026 10:56:19 +0000</pubDate>
+        <enclosure
+            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.7.1/StoneClipboarderTool.zip"
+            sparkle:version="21"
+            sparkle:shortVersionString="1.7.1"
+            sparkle:edSignature="ByaHqclPi6OFITAcjgxGOZfP6N0G+7u9OJzuWuQ9mj1xw/aK/dCGqX3PSMS1U54BERZ1tgG+4h2eSDJVte7wDA=="
+            length="5648221"
+            type="application/octet-stream"
+        />
+    </item>
+
 
     <item>
         <title>Version 1.7.0</title>
