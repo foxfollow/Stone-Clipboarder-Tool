@@ -48,18 +48,10 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.7.0
-- **✨ Type-Out Paste**: In the Quick Picker, press ⌘⇧Return to type the selected text out character by character instead of pasting — so it lands in fields that block ⌘V (secure fields, some remote desktops and terminals)
-- **🛠️ Fix**: "Show Main Window" disabled now correctly persists across cold launches — after a reboot or login-item relaunch the app no longer reappears in the Dock and Cmd+Tab when that setting is off
-- **🧹 Improved**: Updated Sparkle auto-updater to 2.9.3
-
-### What's in Version 1.6.0
-- **🪟 Pinned Clipboard Windows**: Press ⌥P in the Quick Picker (or right-click → Pin to Screen) to keep text, images, or files floating on top of every Space — resizable, movable, dimmable, lockable, click-through, collapsible, editable (text), and restored after relaunch
-- **🔍 Zoomable Image Pins**: Pinch to zoom (centered on the cursor), drag to pan, double-click to reset; pin windows are sized to the image's aspect ratio
-- **✨ Quick Picker Multi-Select**: Extend a selection with Shift+↑/↓ and paste several items at once
-- **👁️ Multi-Item OCR**: Press ⌥⏎ on a multi-selection to extract and combine text from images and text items
-- **⌨️ Quick Picker Polish**: Opening the Quick Picker keeps the Settings window and pins visible; pin shortcuts (⌃⌥P / ⌃⌥⇧P) are configurable in the Hotkeys tab
-- **🛠️ Fixes**: Quick Picker search field no longer loses focus; Settings can't leave the app inaccessible; updated Sparkle to 2.9.2
+### 🆕 New in Version 1.7.1
+- **✨ Quick Picker Settings Tab**: A dedicated Quick Picker tab in Settings — Quick Look preview options plus the new type-out paste controls
+- **⌨️ Adjustable Type-Out Speed**: Set the per-character delay for type-out paste (⌘⇧Return) — raise it for text fields that drop characters when typing too fast
+- **⌨️ Cancel Type-Out**: Stop an in-progress type-out anytime by pressing Escape or reopening the Quick Picker
 
 **📖 [See the full changelog →](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)**
 

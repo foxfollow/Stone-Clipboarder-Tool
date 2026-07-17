@@ -10,6 +10,12 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
+        <new>
+            <li>✨ NEW: New "Quick Picker" settings tab — Quick Look preview options plus the new type-out paste controls live here</li>
+            <li>⌨️ IMPROVED: Type-out paste speed is now adjustable (Settings › Quick Picker) — raise the per-character delay for text fields that drop characters when typing too fast</li>
+            <li>⌨️ IMPROVED: Stop an in-progress type-out anytime — press Escape or reopen the Quick Picker</li>
+        </new>
+
     <item>
         <title>Version 1.7.0</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
