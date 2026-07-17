@@ -70,6 +70,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     private var window: NSPanel?
     private let quickLookCoordinator = QPQuickLookCoordinator()
     private let customPreviewManager = QPCustomPreviewManager()
+    // Runs the Quick Picker's ⌘⇧Return type-out. Lives here (not in the
+    // SwiftUI view) so an in-flight type-out survives the picker closing and
+    // can be cancelled by Escape or by reopening the picker.
+    private let typePaster = TypePaster()
     private weak var cbViewModel: CBViewModel?
     private weak var settingsManager: SettingsManager?
     private weak var pinManager: PinManager?
@@ -106,6 +110,9 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     }
 
     func showQuickPicker() {
+        // Opening (or toggling) the Quick Picker stops any in-flight type-out.
+        typePaster.cancel()
+
         // If already visible, hide it (toggle behavior)
         if window?.isVisible == true {
             hideQuickPicker()
@@ -197,6 +204,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             },
             isPreviewVisible: { [weak self] in
                 self?.isPreviewPanelVisible() ?? false
+            },
+            onTypePaste: { [weak self] text in
+                guard let self else { return }
+                self.typePaster.type(text, charDelayMs: self.settingsManager?.typePasteCharDelayMs ?? 5)
             }
         )
 

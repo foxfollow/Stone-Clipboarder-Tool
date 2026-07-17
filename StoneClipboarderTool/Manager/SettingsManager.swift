@@ -137,6 +137,19 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    /// Delay in milliseconds between each synthetic keystroke when using the
+    /// Quick Picker's type-out paste (⌘⇧Return). Higher = slower/steadier for
+    /// text fields that drop characters; 0 = as fast as possible.
+    @Published var typePasteCharDelayMs: Int {
+        didSet {
+            if typePasteCharDelayMs < 0 {
+                typePasteCharDelayMs = 0  // re-enters didSet once, then persists
+                return
+            }
+            UserDefaults.standard.set(typePasteCharDelayMs, forKey: "typePasteCharDelayMs")
+        }
+    }
+
     @Published var startAtLogin: Bool {
         didSet {
             UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin")
@@ -295,6 +308,7 @@ class SettingsManager: ObservableObject {
         }
 
         self.enableOCROptionKey = UserDefaults.standard.object(forKey: "enableOCROptionKey") as? Bool ?? true
+        self.typePasteCharDelayMs = UserDefaults.standard.object(forKey: "typePasteCharDelayMs") as? Int ?? 5
         self.startAtLogin = UserDefaults.standard.object(forKey: "startAtLogin") as? Bool ?? false
         self.hasShownAutoStartPrompt = UserDefaults.standard.object(forKey: "hasShownAutoStartPrompt") as? Bool ?? false
 

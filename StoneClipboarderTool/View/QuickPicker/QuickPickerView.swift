@@ -57,6 +57,10 @@ struct QuickPickerView: View {
     let onPreviewToggle: (CBItem) -> Void
     let onPreviewUpdate: (CBItem) -> Void
     let isPreviewVisible: () -> Bool
+    // Type the given text out character by character (⌘⇧Return). Handled by
+    // the window manager's TypePaster so it survives the picker closing and
+    // stays cancellable.
+    let onTypePaste: (String) -> Void
     private let settingsManager: SettingsManager?
 
     init(
@@ -66,7 +70,8 @@ struct QuickPickerView: View {
         onClose: @escaping () -> Void,
         onPreviewToggle: @escaping (CBItem) -> Void = { _ in },
         onPreviewUpdate: @escaping (CBItem) -> Void = { _ in },
-        isPreviewVisible: @escaping () -> Bool = { false }
+        isPreviewVisible: @escaping () -> Bool = { false },
+        onTypePaste: @escaping (String) -> Void = { _ in }
     ) {
         self.viewModel = viewModel
         self.pinManager = pinManager
@@ -75,6 +80,7 @@ struct QuickPickerView: View {
         self.onPreviewToggle = onPreviewToggle
         self.onPreviewUpdate = onPreviewUpdate
         self.isPreviewVisible = isPreviewVisible
+        self.onTypePaste = onTypePaste
     }
 
     private var filteredItems: [CBItem] {
@@ -1054,33 +1060,7 @@ struct QuickPickerView: View {
         onClose()
         // Let focus return to the previously-active window before typing.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            typeTextByCharacter(text)
-        }
-    }
-
-    // Posts each character as its own key-down/key-up pair carrying a Unicode
-    // string (virtualKey 0), so any character types regardless of keyboard
-    // layout. Runs off the main thread with a small inter-key delay so the
-    // receiving app can keep up; posting from a background queue is safe.
-    private func typeTextByCharacter(_ text: String) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            guard let source = CGEventSource(stateID: .hidSystemState) else { return }
-            let location = CGEventTapLocation.cghidEventTap
-
-            for character in text {
-                let utf16 = Array(String(character).utf16)
-
-                if let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) {
-                    down.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
-                    down.post(tap: location)
-                }
-                if let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
-                    up.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
-                    up.post(tap: location)
-                }
-
-                usleep(1500)  // ~1.5ms between keystrokes
-            }
+            onTypePaste(text)
         }
     }
 
