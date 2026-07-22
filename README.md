@@ -48,10 +48,9 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.7.1
-- **✨ Quick Picker Settings Tab**: A dedicated Quick Picker tab in Settings — Quick Look preview options plus the new type-out paste controls
-- **⌨️ Adjustable Type-Out Speed**: Set the per-character delay for type-out paste (⌘⇧Return) — raise it for text fields that drop characters when typing too fast
-- **⌨️ Cancel Type-Out**: Stop an in-progress type-out anytime by pressing Escape or reopening the Quick Picker
+### 🆕 New in Version 1.7.3
+- **🛠️ Type-Out Paste Fix**: Type-out paste (⌘⇧Return) typed every character as "A" in apps that read key codes — terminals, virtual machines, remote desktops. Characters are now sent using the real key for your active keyboard layout
+- **🐛 Modifier Fix**: Type-out paste no longer picks up the ⌘⇧ still held from the trigger shortcut, which typed the first few characters in uppercase
 
 **📖 [See the full changelog →](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)**
 
