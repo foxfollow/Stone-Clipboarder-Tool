@@ -10,10 +10,30 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
-        <new>
-            <li>🛠️ FIXED: Type-out paste (⌘⇧Return) typed every character as "A" in apps that read key codes — terminals, virtual machines, remote desktops. Characters are now sent using the real key for your active keyboard layout</li>
-            <li>🐛 FIXED: Type-out paste no longer picks up the ⌘⇧ still held from the trigger shortcut, which typed the first few characters in uppercase</li>
-        </new>
+    <item>
+        <title>Version 1.7.3</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <sparkle:version>22</sparkle:version>
+        <sparkle:shortVersionString>1.7.3</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>Version 1.7.3</h2>
+            <ul>
+<li>🛠️ FIXED: Type-out paste (⌘⇧Return) typed every character as "A" in apps that read key codes — terminals, virtual machines, remote desktops. Characters are now sent using the real key for your active keyboard layout</li>
+<li>🐛 FIXED: Type-out paste no longer picks up the ⌘⇧ still held from the trigger shortcut, which typed the first few characters in uppercase</li>
+            </ul>
+        ]]></description>
+        <pubDate>Thu, 23 Jul 2026 10:46:36 +0000</pubDate>
+        <enclosure
+            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.7.3/StoneClipboarderTool.zip"
+            sparkle:version="22"
+            sparkle:shortVersionString="1.7.3"
+            sparkle:edSignature="jZCxpcJKxGSeqL3uaejJ2mE+0UeH8nKEH+h5l+NCynDUQ5AHjtjGeWtZmWwwK7uwMZLBXp6Sa8g+e0vg8M/pDw=="
+            length="5656793"
+            type="application/octet-stream"
+        />
+    </item>
+
 
 
     <item>
