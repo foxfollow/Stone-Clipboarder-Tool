@@ -6,6 +6,7 @@
 //
 
 import Carbon
+import SwiftData
 import SwiftUI
 
 struct HotkeySettingsView: View {

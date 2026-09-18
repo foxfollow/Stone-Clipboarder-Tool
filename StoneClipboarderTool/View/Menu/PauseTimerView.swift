@@ -5,6 +5,7 @@
 //  Created by Claude Code
 //
 
+import Combine
 import SwiftUI
 
 struct PauseTimerView: View {
