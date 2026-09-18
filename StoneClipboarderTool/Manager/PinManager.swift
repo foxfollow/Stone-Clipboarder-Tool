@@ -20,6 +20,12 @@ final class PinManager: ObservableObject {
     /// re-render when a pin opens or closes.
     @Published private(set) var pinnedItemIds: Set<PersistentIdentifier> = []
 
+    /// Rows for the Settings "Active pins" list. Published (and rebuilt on
+    /// every pin change) because pins without a linked history item change
+    /// `controllers` without touching `pinnedItemIds`, so a computed list
+    /// never refreshed for them.
+    @Published private(set) var activePinSnapshots: [PinSnapshot] = []
+
     /// Active controllers keyed by PinnedItemConfig.id. The CBItem-id map
     /// above is a secondary index for fast UI lookups.
     private var controllers: [UUID: PinWindowController] = [:]
@@ -107,6 +113,7 @@ final class PinManager: ObservableObject {
         controllers[config.id] = controller
         configIdsByItemId[item.persistentModelID] = config.id
         pinnedItemIds.insert(item.persistentModelID)
+        refreshSnapshots()
 
         controller.showWindow()
     }
@@ -126,6 +133,7 @@ final class PinManager: ObservableObject {
             configIdsByItemId.removeValue(forKey: itemId)
             pinnedItemIds.remove(itemId)
         }
+        refreshSnapshots()
 
         if let ctx = modelContext, settingsManager?.pinPersistAcrossLaunches == true {
             ctx.delete(controller.config)
@@ -207,15 +215,18 @@ final class PinManager: ObservableObject {
             )
             controllers[config.id] = controller
 
-            // Best-effort link back to a live CBItem so the pin indicator
-            // works after restore. Match by timestamp + content equality.
-            if let item = findSourceItem(for: config) {
+            // Link back to the history item with the same content so its row
+            // shows the pin badge and deleting it closes the pin. Looked up in
+            // the store: at launch `items` isn't loaded yet, which is why this
+            // used to find nothing.
+            if let item = viewModel?.existingItem(matching: config.contentKey) {
                 configIdsByItemId[item.persistentModelID] = config.id
                 pinnedItemIds.insert(item.persistentModelID)
             }
 
             controller.showWindow()
         }
+        refreshSnapshots()
     }
 
     func handlePersistenceSettingChanged() {
@@ -226,7 +237,12 @@ final class PinManager: ObservableObject {
             for controller in controllers.values {
                 ctx.insert(controller.config)
             }
-            try? ctx.save()
+            do {
+                try ctx.save()
+            } catch {
+                ctx.rollback()
+                ErrorLogger.shared.log("Failed to persist open pins", category: "SwiftData", error: error)
+            }
         } else {
             purgeAllPersistedConfigs()
         }
@@ -239,10 +255,8 @@ final class PinManager: ObservableObject {
         unpin(itemId: itemId)
     }
 
-    /// Visible-pin snapshots for the Settings "Active pins" list. Returned as
-    /// an array so SwiftUI's ForEach is happy without exposing the controllers.
-    var activePinSnapshots: [PinSnapshot] {
-        controllers.values
+    private func refreshSnapshots() {
+        activePinSnapshots = controllers.values
             .sorted(by: { $0.config.createdAt < $1.config.createdAt })
             .map { ctrl in
                 PinSnapshot(
@@ -353,26 +367,6 @@ final class PinManager: ObservableObject {
         config.y = Double(v.midY - frame.height / 2)
     }
 
-    private func findSourceItem(for config: PinnedItemConfig) -> CBItem? {
-        guard let vm = viewModel else { return nil }
-        guard let ts = config.sourceTimestamp else { return nil }
-
-        // Tight timestamp window first (cheap). If multiple items share a
-        // second-truncated timestamp, fall back to content equality.
-        let candidates = vm.recentItems.filter { abs($0.timestamp.timeIntervalSince(ts)) < 1.0 }
-        return candidates.first(where: { matches(config: config, item: $0) }) ?? candidates.first
-    }
-
-    private func matches(config: PinnedItemConfig, item: CBItem) -> Bool {
-        guard config.itemType == item.itemType else { return false }
-        switch config.itemType {
-        case .text: return config.content == item.content
-        case .image: return config.imageData == item.imageData
-        case .combined: return config.content == item.content && config.imageData == item.imageData
-        case .file: return config.fileName == item.fileName
-        }
-    }
-
     private func purgeAllPersistedConfigs() {
         guard let ctx = modelContext else { return }
         do {
@@ -380,6 +374,7 @@ final class PinManager: ObservableObject {
             for c in all { ctx.delete(c) }
             try ctx.save()
         } catch {
+            ctx.rollback()
             ErrorLogger.shared.log("Failed to purge pinned configs", category: "SwiftData", error: error)
         }
     }
