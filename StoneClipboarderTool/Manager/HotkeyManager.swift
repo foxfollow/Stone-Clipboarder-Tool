@@ -133,6 +133,7 @@ class HotkeyManager: ObservableObject {
                 // wouldn't otherwise be registerable.
                 ensureMissingHotkeyConfigs()
             }
+            clearUnusableShortcuts()
 
             refreshHotkeyRegistrations()
 
@@ -158,6 +159,32 @@ class HotkeyManager: ObservableObject {
         } catch {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to add missing hotkey configs", category: "SwiftData", error: error)
+        }
+    }
+
+    /// Stored shortcuts that can't be registered — e.g. keys recorded by older
+    /// versions whose recorder accepted more keys than registration knew, or
+    /// the legacy "None" string — become nil, which the UI shows as "None".
+    /// Done once at load so registration never has to touch the model.
+    private func clearUnusableShortcuts() {
+        guard let modelContext = modelContext else { return }
+        let unusable = hotkeyConfigs.filter { config in
+            config.shortcutKeys != nil && HotkeyShortcut(config.shortcutKeys) == nil
+        }
+        guard !unusable.isEmpty else { return }
+
+        for config in unusable {
+            if let keys = config.shortcutKeys, !keys.isEmpty, keys != "None" {
+                ErrorLogger.shared.log(
+                    "Cleared unusable shortcut \(keys) for \(config.action)", category: "Hotkeys")
+            }
+            config.shortcutKeys = nil
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to clear unusable shortcuts", category: "SwiftData", error: error)
         }
     }
 
@@ -214,28 +241,16 @@ class HotkeyManager: ObservableObject {
         for config in hotkeyConfigs {
             guard config.isEnabled,
                 let action = config.hotkeyAction,
-                let shortcut = config.shortcutKeys,
-                !shortcut.isEmpty,
-                shortcut != "None"
+                let shortcut = HotkeyShortcut(config.shortcutKeys)
             else {
                 continue
             }
 
-            registerHotkeyFromConfig(config: config, action: action, shortcut: shortcut)
+            registerHotkey(shortcut, for: action)
         }
     }
 
-    @MainActor
-    private func registerHotkeyFromConfig(
-        config: HotkeyConfig, action: HotkeyAction, shortcut: String
-    ) {
-        guard let (keyCode, modifiers) = parseShortcut(shortcut) else {
-            ErrorLogger.shared.log("Failed to parse shortcut \(shortcut), setting to None", category: "Hotkeys")
-            // Set invalid shortcuts to None
-            config.shortcutKeys = "None"
-            return
-        }
-
+    private func registerHotkey(_ shortcut: HotkeyShortcut, for action: HotkeyAction) {
         let actionClosure: () -> Void
 
         switch action {
@@ -263,17 +278,8 @@ class HotkeyManager: ObservableObject {
             }
         }
 
-        registerHotkey(keyCode: keyCode, modifiers: modifiers, action: actionClosure)
-    }
-
-    @MainActor
-    private func registerHotkey(
-        keyCode: UInt32, modifiers: [KeyModifier], action: @escaping () -> Void
-    ) {
-        let modifierFlags = modifiers.reduce(0) { result, modifier in
-            result | modifier.carbonFlag
-        }
-
+        let keyCode = UInt32(shortcut.keyCode)
+        let modifierFlags = shortcut.carbonModifiers
         let hotkeyID = generateHotkeyID(keyCode: keyCode, modifiers: modifierFlags)
         var eventHotKeyRef: EventHotKeyRef?
 
@@ -290,9 +296,10 @@ class HotkeyManager: ObservableObject {
 
         if status == noErr, let hotKeyRef = eventHotKeyRef {
             registeredHotkeys[hotkeyID] = hotKeyRef
-            hotkeyActions[hotkeyID] = action
+            hotkeyActions[hotkeyID] = actionClosure
         } else {
-            ErrorLogger.shared.log("Failed to register hotkey keyCode=\(keyCode) (OSStatus \(status))", category: "Hotkeys")
+            ErrorLogger.shared.log(
+                "Failed to register hotkey \(shortcut.stringValue) (OSStatus \(status))", category: "Hotkeys")
         }
     }
 
@@ -307,54 +314,6 @@ class HotkeyManager: ObservableObject {
 
     private func generateHotkeyID(keyCode: UInt32, modifiers: UInt32) -> UInt32 {
         return (modifiers << 16) | keyCode
-    }
-
-    // MARK: - Shortcut Parsing
-
-    private func parseShortcut(_ shortcut: String) -> (keyCode: UInt32, modifiers: [KeyModifier])? {
-        let components = shortcut.components(separatedBy: CharacterSet.whitespacesAndNewlines)
-            .joined()
-
-        var modifiers: [KeyModifier] = []
-        var keyChar = ""
-
-        for char in components {
-            switch char {
-            case "⌃":
-                modifiers.append(.control)
-            case "⌥":
-                modifiers.append(.option)
-            case "⇧":
-                modifiers.append(.shift)
-            case "⌘":
-                modifiers.append(.command)
-            default:
-                keyChar.append(char)
-            }
-        }
-
-        // Must have both modifiers and a key character
-        guard !modifiers.isEmpty, !keyChar.isEmpty, let keyCode = keyCodeForCharacter(keyChar)
-        else {
-            return nil
-        }
-
-        return (keyCode, modifiers)
-    }
-
-    private func keyCodeForCharacter(_ character: String) -> UInt32? {
-        let characterMap: [String: UInt32] = [
-            "1": 18, "2": 19, "3": 20, "4": 21, "5": 23,
-            "6": 22, "7": 26, "8": 28, "9": 25, "0": 29,
-            "space": 49,
-            "a": 0, "b": 11, "c": 8, "d": 2, "e": 14,
-            "f": 3, "g": 5, "h": 4, "i": 34, "j": 38,
-            "k": 40, "l": 37, "m": 46, "n": 45, "o": 31,
-            "p": 35, "q": 12, "r": 15, "s": 1, "t": 17,
-            "u": 32, "v": 9, "w": 13, "x": 7, "y": 16,
-            "z": 6
-        ]
-        return characterMap[character.lowercased()]
     }
 
     // MARK: - Actions
@@ -527,24 +486,6 @@ class HotkeyManager: ObservableObject {
         }
         return bytes.withUnsafeBytes { ptr in
             ptr.load(as: FourCharCode.self)
-        }
-    }
-}
-
-// MARK: - Key Modifier Enum
-
-enum KeyModifier {
-    case control
-    case option
-    case shift
-    case command
-
-    var carbonFlag: UInt32 {
-        switch self {
-        case .control: return UInt32(controlKey)
-        case .option: return UInt32(optionKey)
-        case .shift: return UInt32(shiftKey)
-        case .command: return UInt32(cmdKey)
         }
     }
 }
