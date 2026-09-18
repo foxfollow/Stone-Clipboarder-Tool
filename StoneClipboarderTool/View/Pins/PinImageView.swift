@@ -91,7 +91,6 @@ struct PinImageView: NSViewRepresentable {
         var fitMagnification: CGFloat = 1.0
         private var didInitialFit = false
         private var magnifyMonitor: Any?
-        private var scrollProbe: Any?
 
         init(zoom: Binding<Double>) {
             self.zoom = zoom
@@ -105,12 +104,6 @@ struct PinImageView: NSViewRepresentable {
                 self?.handleMagnify(event)
                 return event
             }
-            // Diagnostic: also watch scroll wheel so we can tell whether ANY
-            // trackpad events reach our app over the pin window.
-            scrollProbe = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-                self?.probeScroll(event)
-                return event
-            }
             PinZoomLog.log("startMagnifyMonitor: installed local .magnify monitor")
         }
 
@@ -119,16 +112,6 @@ struct PinImageView: NSViewRepresentable {
                 NSEvent.removeMonitor(m)
                 magnifyMonitor = nil
             }
-            if let m = scrollProbe {
-                NSEvent.removeMonitor(m)
-                scrollProbe = nil
-            }
-        }
-
-        private func probeScroll(_ event: NSEvent) {
-            guard let win = scrollView?.window else { return }
-            let mine = event.window === win
-            PinZoomLog.log("scrollWheel: eventWindow=\(Self.desc(event.window)) myWindow=\(Self.desc(win)) mine=\(mine)")
         }
 
         private func handleMagnify(_ event: NSEvent) {
