@@ -18,7 +18,8 @@ import os
 ///
 /// Log metadata only (item type, counts, error descriptions) — never
 /// clipboard content: the file is plaintext.
-final class ErrorLogger {
+/// Thread-safe: file access is serialized on `fileQueue`, os.Logger is thread-safe.
+final class ErrorLogger: @unchecked Sendable {
     static let shared = ErrorLogger()
 
     /// UserDefaults key for the logging toggle

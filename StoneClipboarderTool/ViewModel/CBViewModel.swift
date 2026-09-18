@@ -268,12 +268,12 @@ class CBViewModel: ObservableObject {
         switch clipboardContent {
         case .text(let content):
             addOrUpdateTextItem(content: content)
-        case .image(let image):
-            addOrUpdateImageItem(image: image)
+        case .image(let imageData):
+            addOrUpdateImageItem(imageData: imageData)
         case .file(let url, let uti, let data):
             addOrUpdateFileItem(url: url, uti: uti, data: data)
-        case .combined(let content, let image):
-            addOrUpdateCombinedItem(content: content, image: image)
+        case .combined(let content, let imageData):
+            addOrUpdateCombinedItem(content: content, imageData: imageData)
         }
     }
 
@@ -302,13 +302,8 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    func addImageItem(image: NSImage) {
-        addOrUpdateImageItem(image: image)
-    }
-
-    private func addOrUpdateImageItem(image: NSImage) {
+    private func addOrUpdateImageItem(imageData: Data) {
         guard let modelContext = _modelContext else { return }
-        guard let imageData = image.tiffRepresentation else { return }
 
         let tempItem = CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
 
@@ -328,9 +323,8 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    private func addOrUpdateCombinedItem(content: String, image: NSImage) {
+    private func addOrUpdateCombinedItem(content: String, imageData: Data) {
         guard let modelContext = _modelContext else { return }
-        guard let imageData = image.tiffRepresentation else { return }
 
         let tempItem = CBItem(
             timestamp: Date(),
@@ -353,10 +347,6 @@ class CBViewModel: ObservableObject {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to save combined item", category: "SwiftData", error: error)
         }
-    }
-
-    func addFileItem(url: URL, uti: String?, data: Data?) {
-        addOrUpdateFileItem(url: url, uti: uti, data: data)
     }
 
     private func addOrUpdateFileItem(url: URL, uti: String?, data: Data?) {

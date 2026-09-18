@@ -6,11 +6,11 @@
 //
 
 import Foundation
-import AppKit
 
-enum ClipboardContent {
+/// One capture from the pasteboard, handed from ClipboardManager to CBViewModel.
+enum ClipboardContent: Sendable {
     case text(String)
-    case image(NSImage)
-    case file(URL, String, Data) // URL, UTI, Data
-    case combined(String, NSImage) // Text + Image together
+    case image(Data)               // encoded image bytes (PNG, TIFF, …) as provided
+    case file(URL, String, Data)   // URL, UTI, Data
+    case combined(String, Data)    // Text + image bytes together
 }
