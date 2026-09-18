@@ -48,6 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize app in background, even if no window appears
         // If managers aren't ready yet, this will be called again after registration
         performSetup()
+        guard !AppEnvironment.isRunningUnitTests else { return }
 
         // The activation policy MUST be (re)applied here, after the app has finished
         // launching. performSetup() usually already ran during SwiftUI body evaluation
@@ -130,6 +131,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         isInitialized = true
+
+        // When the app only hosts the unit-test bundle, stay inert: no
+        // clipboard monitoring, global hotkeys, menu bar item, pins or ⌘Q
+        // monitor. Tests build the objects they need themselves.
+        if AppEnvironment.isRunningUnitTests { return }
 
         cbViewModel.setModelContext(clipboardContainer.mainContext)
         cbViewModel.setSettingsManager(settingsManager)
@@ -370,11 +376,30 @@ enum ModelContainerFactory {
 
     /// Clipboard container: stores CBItem only
     static func makeClipboardContainer() -> ModelContainer {
-        let schema = Schema([CBItem.self])
+        makeContainer(schema: Schema([CBItem.self]), storeName: "ClipboardHistory")
+    }
+
+    /// Settings container: stores HotkeyConfig, ExcludedApp, and PinnedItemConfig
+    static func makeSettingsContainer() -> ModelContainer {
+        makeContainer(
+            schema: Schema([HotkeyConfig.self, ExcludedApp.self, PinnedItemConfig.self]),
+            storeName: "Settings"
+        )
+    }
+
+    /// Opens `Application Support/StoneClipboarderTool/<storeName>.store`.
+    /// Recovery: if opening fails, delete the store and its WAL/SHM companions
+    /// and retry; if that fails too, fall back to an in-memory container so the
+    /// app still launches. A unit-test host always gets an in-memory container.
+    private static func makeContainer(schema: Schema, storeName: String) -> ModelContainer {
+        guard !AppEnvironment.isRunningUnitTests else {
+            return makeInMemoryContainer(schema: schema, name: "\(storeName)Tests")
+        }
+
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let storeURL = appSupport
             .appendingPathComponent("StoneClipboarderTool")
-            .appendingPathComponent("ClipboardHistory.store")
+            .appendingPathComponent("\(storeName).store")
 
         // Ensure directory exists
         try? FileManager.default.createDirectory(
@@ -382,84 +407,43 @@ enum ModelContainerFactory {
             withIntermediateDirectories: true
         )
 
-        let config = ModelConfiguration("ClipboardHistory", schema: schema, url: storeURL)
+        let config = ModelConfiguration(storeName, schema: schema, url: storeURL)
 
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
-            logger.log("Clipboard container creation failed, attempting recovery", category: "SwiftData", error: error)
+            logger.log("\(storeName) container creation failed, attempting recovery", category: "SwiftData", error: error)
 
             // Recovery: delete corrupted DB and retry
             do {
                 // Remove the main store file and its WAL/SHM companions
                 let storeDir = storeURL.deletingLastPathComponent()
-                let storeName = storeURL.lastPathComponent
+                let storeFileName = storeURL.lastPathComponent
                 let fm = FileManager.default
                 if let files = try? fm.contentsOfDirectory(atPath: storeDir.path) {
-                    for file in files where file.hasPrefix(storeName) {
+                    for file in files where file.hasPrefix(storeFileName) {
                         try? fm.removeItem(at: storeDir.appendingPathComponent(file))
                     }
                 }
 
-                logger.log("Deleted corrupted clipboard DB, creating fresh container", category: "SwiftData")
+                logger.log("Deleted corrupted \(storeName) DB, creating fresh container", category: "SwiftData")
                 return try ModelContainer(for: schema, configurations: [config])
             } catch {
-                logger.log("CRITICAL: Cannot create clipboard container even after recovery", category: "SwiftData", error: error)
+                logger.log("CRITICAL: Cannot create \(storeName) container even after recovery", category: "SwiftData", error: error)
                 // Last resort: in-memory container so the app doesn't crash
-                let memConfig = ModelConfiguration("ClipboardHistoryMemory", schema: schema, isStoredInMemoryOnly: true)
-                do {
-                    return try ModelContainer(for: schema, configurations: [memConfig])
-                } catch {
-                    // This should never happen but we absolutely must not crash
-                    fatalError("Cannot create even in-memory clipboard container: \(error)")
-                }
+                return makeInMemoryContainer(schema: schema, name: "\(storeName)Memory")
             }
         }
     }
 
-    /// Settings container: stores HotkeyConfig, ExcludedApp, and PinnedItemConfig
-    static func makeSettingsContainer() -> ModelContainer {
-        let schema = Schema([HotkeyConfig.self, ExcludedApp.self, PinnedItemConfig.self])
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let storeURL = appSupport
-            .appendingPathComponent("StoneClipboarderTool")
-            .appendingPathComponent("Settings.store")
-
-        // Ensure directory exists
-        try? FileManager.default.createDirectory(
-            at: storeURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-
-        let config = ModelConfiguration("Settings", schema: schema, url: storeURL)
-
+    private static func makeInMemoryContainer(schema: Schema, name: String) -> ModelContainer {
+        let config = ModelConfiguration(name, schema: schema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
-            logger.log("Settings container creation failed, attempting recovery", category: "SwiftData", error: error)
-
-            // Recovery: delete and retry
-            do {
-                let storeDir = storeURL.deletingLastPathComponent()
-                let storeName = storeURL.lastPathComponent
-                let fm = FileManager.default
-                if let files = try? fm.contentsOfDirectory(atPath: storeDir.path) {
-                    for file in files where file.hasPrefix(storeName) {
-                        try? fm.removeItem(at: storeDir.appendingPathComponent(file))
-                    }
-                }
-
-                logger.log("Deleted corrupted settings DB, creating fresh container", category: "SwiftData")
-                return try ModelContainer(for: schema, configurations: [config])
-            } catch {
-                logger.log("CRITICAL: Cannot create settings container even after recovery", category: "SwiftData", error: error)
-                let memConfig = ModelConfiguration("SettingsMemory", schema: schema, isStoredInMemoryOnly: true)
-                do {
-                    return try ModelContainer(for: schema, configurations: [memConfig])
-                } catch {
-                    fatalError("Cannot create even in-memory settings container: \(error)")
-                }
-            }
+            // The only sanctioned fatalError: without even an in-memory store
+            // there is nothing the app can do.
+            fatalError("Cannot create even an in-memory \(name) container: \(error)")
         }
     }
 }
@@ -485,8 +469,10 @@ struct StoneClipboarderToolApp: App {
     var settingsContainer: ModelContainer = ModelContainerFactory.makeSettingsContainer()
 
     init() {
+        // A unit-test host must not check for (or offer) updates.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+            startingUpdater: !AppEnvironment.isRunningUnitTests,
+            updaterDelegate: nil, userDriverDelegate: nil)
     }
 
     var body: some Scene {

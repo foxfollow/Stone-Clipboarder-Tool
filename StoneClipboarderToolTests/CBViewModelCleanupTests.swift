@@ -12,9 +12,11 @@ final class CBViewModelCleanupTests: XCTestCase {
     private var container: ModelContainer!
     private var context: ModelContext!
     private var viewModel: CBViewModel!
+    private var isolatedDefaults: IsolatedDefaults!
 
     override func setUp() async throws {
         try await super.setUp()
+        isolatedDefaults = IsolatedDefaults()
         let schema = Schema([CBItem.self])
         let config = ModelConfiguration("CBViewModelTests", schema: schema, isStoredInMemoryOnly: true)
         container = try ModelContainer(for: schema, configurations: [config])
@@ -27,6 +29,8 @@ final class CBViewModelCleanupTests: XCTestCase {
         viewModel = nil
         context = nil
         container = nil
+        isolatedDefaults.remove()
+        isolatedDefaults = nil
         try await super.tearDown()
     }
 
@@ -227,10 +231,10 @@ final class CBViewModelCleanupTests: XCTestCase {
     }
 
     private func makeSettingsManager(maxItemsToKeep: Int, enableAutoCleanup: Bool) -> SettingsManager {
-        let defaults = UserDefaults.standard
+        let defaults = isolatedDefaults.defaults
         defaults.set(maxItemsToKeep, forKey: "maxItemsToKeep")
         defaults.set(enableAutoCleanup, forKey: "enableAutoCleanup")
-        return SettingsManager()
+        return SettingsManager(defaults: defaults)
     }
 
     /// Cleanup enqueues its delete onto `DispatchQueue.main.async`. To observe its effect
