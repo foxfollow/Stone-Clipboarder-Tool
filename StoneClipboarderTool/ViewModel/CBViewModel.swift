@@ -266,84 +266,42 @@ class CBViewModel: ObservableObject {
     }
 
     private func addOrUpdateTextItem(content: String) {
-        guard let modelContext = _modelContext else { return }
-
-        let tempItem = CBItem(timestamp: Date(), content: content, itemType: .text)
-
-        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            existingItem.timestamp = Date()
-        } else {
-            modelContext.insert(tempItem)
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-            performCleanupIfNeeded()
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to save text item", category: "SwiftData", error: error)
+        insertOrBump(CBItem.ContentKey(type: .text, content: content), errorMessage: "Failed to save text item") {
+            CBItem(timestamp: Date(), content: content, itemType: .text)
         }
     }
 
     private func addOrUpdateImageItem(imageData: Data) {
-        guard let modelContext = _modelContext else { return }
-
-        let tempItem = CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
-
-        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            existingItem.timestamp = Date()
-        } else {
-            modelContext.insert(tempItem)
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-            performCleanupIfNeeded()
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to save image item", category: "SwiftData", error: error)
+        insertOrBump(CBItem.ContentKey(type: .image, imageData: imageData), errorMessage: "Failed to save image item") {
+            CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
         }
     }
 
     private func addOrUpdateCombinedItem(content: String, imageData: Data) {
-        guard let modelContext = _modelContext else { return }
-
-        let tempItem = CBItem(
-            timestamp: Date(),
-            content: content,
-            imageData: imageData,
-            itemType: .combined
-        )
-
-        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            existingItem.timestamp = Date()
-        } else {
-            modelContext.insert(tempItem)
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-            performCleanupIfNeeded()
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to save combined item", category: "SwiftData", error: error)
+        let key = CBItem.ContentKey(type: .combined, content: content, imageData: imageData)
+        insertOrBump(key, errorMessage: "Failed to save combined item") {
+            CBItem(timestamp: Date(), content: content, imageData: imageData, itemType: .combined)
         }
     }
 
     private func addOrUpdateFileItem(url: URL, uti: String?, data: Data?) {
+        let name = url.lastPathComponent
+        let key = CBItem.ContentKey(type: .file, fileData: data, fileName: name)
+        insertOrBump(key, errorMessage: "Failed to save file item") {
+            CBItem(timestamp: Date(), fileData: data, fileName: name, fileUTI: uti, itemType: .file)
+        }
+    }
+
+    /// Moves an existing identical item to the top, or inserts a new one.
+    /// `makeItem` runs only for new content: building a CBItem decodes the
+    /// image and renders its thumbnail.
+    private func insertOrBump(_ key: CBItem.ContentKey, errorMessage: String, makeItem: () -> CBItem) {
         guard let modelContext = _modelContext else { return }
 
-        let tempItem = CBItem(
-            timestamp: Date(), fileData: data, fileName: url.lastPathComponent, fileUTI: uti,
-            itemType: .file)
-
-        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            existingItem.timestamp = Date()
+        if let existing = existingItem(matching: key) {
+            existing.timestamp = Date()
         } else {
-            modelContext.insert(tempItem)
+            modelContext.insert(makeItem())
         }
 
         do {
@@ -352,7 +310,45 @@ class CBViewModel: ObservableObject {
             performCleanupIfNeeded()
         } catch {
             modelContext.rollback()
-            ErrorLogger.shared.log("Failed to save file item", category: "SwiftData", error: error)
+            ErrorLogger.shared.log(errorMessage, category: "SwiftData", error: error)
+        }
+    }
+
+    /// Candidates compared per lookup. Bounds the external data loaded: many
+    /// screenshots share one size, and each image comparison reads its blob.
+    private let duplicateCandidateLimit = 25
+
+    /// An item with the same content anywhere in the history, not only among
+    /// the loaded rows. An inline column (text preview, image size, file
+    /// name) selects the newest few candidates; only those are compared in
+    /// full.
+    func existingItem(matching key: CBItem.ContentKey) -> CBItem? {
+        guard let modelContext = _modelContext else { return nil }
+
+        let newestFirst = [SortDescriptor(\CBItem.timestamp, order: .reverse)]
+        var descriptor: FetchDescriptor<CBItem>
+        switch key.type {
+        // Predicate values stay optional to match the optional columns.
+        case .text, .combined:
+            let preview = key.preview
+            guard preview != nil else { return nil }
+            descriptor = FetchDescriptor(predicate: #Predicate { $0.contentPreview == preview }, sortBy: newestFirst)
+        case .image:
+            let size = key.imageSize
+            guard size != nil else { return nil }
+            descriptor = FetchDescriptor(predicate: #Predicate { $0.imageSize == size }, sortBy: newestFirst)
+        case .file:
+            let name = key.fileName
+            guard name != nil else { return nil }
+            descriptor = FetchDescriptor(predicate: #Predicate { $0.fileName == name }, sortBy: newestFirst)
+        }
+        descriptor.fetchLimit = duplicateCandidateLimit
+
+        do {
+            return try modelContext.fetch(descriptor).first { $0.hasSameContent(as: key) }
+        } catch {
+            ErrorLogger.shared.log("Failed to look up a duplicate item", category: "SwiftData", error: error)
+            return nil
         }
     }
 

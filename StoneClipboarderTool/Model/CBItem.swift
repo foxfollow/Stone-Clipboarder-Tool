@@ -52,12 +52,11 @@ final class CBItem {
         self.orderIndex = orderIndex
 
         // Generate lightweight previews
-        self.contentPreview = content?.prefix(100).description
+        self.contentPreview = content.map(Self.preview(of:))
 
         // Calculate image size and generate thumbnail
         if let imageData = imageData, let image = NSImage(data: imageData) {
-            let size = image.size
-            self.imageSize = "\(Int(size.width))×\(Int(size.height))"
+            self.imageSize = Self.sizeDescription(image.size)
             self.thumbnailData = generateThumbnail(from: image)
         }
 
@@ -253,19 +252,70 @@ final class CBItem {
         return thumbnail
     }
 
-    func isDuplicate(of other: CBItem) -> Bool {
-        guard itemType == other.itemType else { return false }
+    // MARK: - Deduplication
+
+    /// `contentPreview` holds this many leading characters of `content`.
+    static let previewLength = 100
+
+    static func preview(of content: String) -> String {
+        String(content.prefix(previewLength))
+    }
+
+    /// The "W×H" text stored in `imageSize` (points, as NSImage reports it).
+    static func sizeDescription(_ size: NSSize) -> String {
+        "\(Int(size.width))×\(Int(size.height))"
+    }
+
+    static func imageSizeDescription(for data: Data) -> String? {
+        NSImage(data: data).map { sizeDescription($0.size) }
+    }
+
+    /// The content an item is deduplicated on, plus the inline columns that
+    /// narrow a store lookup before any external data has to be loaded.
+    struct ContentKey {
+        let type: CBItemType
+        let content: String?
+        let imageData: Data?
+        let fileData: Data?
+        let fileName: String?
+        /// Matches `contentPreview` of an item with the same text.
+        let preview: String?
+        /// Matches `imageSize` of an item with the same image.
+        let imageSize: String?
+
+        init(
+            type: CBItemType, content: String? = nil, imageData: Data? = nil,
+            fileData: Data? = nil, fileName: String? = nil
+        ) {
+            self.type = type
+            self.content = content
+            self.imageData = imageData
+            self.fileData = fileData
+            self.fileName = fileName
+            self.preview = content.map(CBItem.preview(of:))
+            self.imageSize = imageData.flatMap(CBItem.imageSizeDescription(for:))
+        }
+    }
+
+    func hasSameContent(as key: ContentKey) -> Bool {
+        guard itemType == key.type else { return false }
 
         switch itemType {
         case .text:
-            return content == other.content
+            return content == key.content
         case .image:
-            return imageData == other.imageData
+            return imageData == key.imageData
         case .file:
-            return fileData == other.fileData && fileName == other.fileName
+            return fileData == key.fileData && fileName == key.fileName
         case .combined:
-            return content == other.content && imageData == other.imageData
+            return content == key.content && imageData == key.imageData
         }
+    }
+
+    func isDuplicate(of other: CBItem) -> Bool {
+        hasSameContent(as: ContentKey(
+            type: other.itemType, content: other.content, imageData: other.imageData,
+            fileData: other.fileData, fileName: other.fileName))
     }
 
     static func findExistingItem(in items: [CBItem], matching newItem: CBItem) -> CBItem? {
