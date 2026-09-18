@@ -284,12 +284,14 @@ struct ContentView: View {
                     object: nil,
                     queue: .main
                 ) { _ in
-                    // Force window to follow to new desktop if it's visible and main window is shown
-                    if settingsManager.showMainWindow && window.isVisible {
-                        // Temporarily hide and show to force move to current space
-                        window.orderOut(nil)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            window.makeKeyAndOrderFront(nil)
+                    MainActor.assumeIsolated {
+                        // Force window to follow to new desktop if it's visible and main window is shown
+                        if settingsManager.showMainWindow && window.isVisible {
+                            // Temporarily hide and show to force move to current space
+                            window.orderOut(nil)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                window.makeKeyAndOrderFront(nil)
+                            }
                         }
                     }
                 }

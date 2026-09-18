@@ -8,7 +8,8 @@
 import Foundation
 import ServiceManagement
 
-class SettingsManager: ObservableObject {
+@MainActor
+final class SettingsManager: ObservableObject {
     /// Where every setting is persisted. `.standard` in the app; tests pass an
     /// isolated suite so they never touch the real preferences.
     private let defaults: UserDefaults

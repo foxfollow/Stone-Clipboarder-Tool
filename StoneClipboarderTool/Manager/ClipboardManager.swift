@@ -10,7 +10,8 @@ import Foundation
 import SwiftData
 import UniformTypeIdentifiers
 
-class ClipboardManager: ObservableObject {
+@MainActor
+final class ClipboardManager: ObservableObject {
     private var timer: Timer?
     private var lastChangeCount: Int = 0
     private let pasteboard = NSPasteboard.general
@@ -65,8 +66,9 @@ class ClipboardManager: ObservableObject {
     }
     
     func startMonitoring() {
+        // Scheduled on the main run loop, so the block runs on the main actor.
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkClipboard()
+            MainActor.assumeIsolated { self?.checkClipboard() }
         }
     }
     
@@ -229,7 +231,6 @@ class ClipboardManager: ObservableObject {
         lastChangeCount = pasteboard.changeCount
     }
     
-    @MainActor
     private func createSavePanel() -> NSSavePanel? {
         // Try to create save panel safely
         let savePanel = NSSavePanel()
@@ -260,7 +261,6 @@ class ClipboardManager: ObservableObject {
         }
     }
     
-    @MainActor
     func saveItemToFile(_ item: CBItem) {
         // Try to create save panel - if it crashes, it's likely a sandbox issue
         guard let savePanel = createSavePanel() else {
@@ -361,12 +361,10 @@ class ClipboardManager: ObservableObject {
         }
     }
     
-    @MainActor
     private func logSuccessOnMain() {
         ErrorLogger.shared.debug("Item saved to file", category: "SaveToFile")
     }
     
-    @MainActor
     private func logErrorOnMain(_ error: Error) {
         ErrorLogger.shared.log("Failed to save item to file", category: "SaveToFile", error: error)
     }
@@ -420,7 +418,7 @@ class ClipboardManager: ObservableObject {
 
         // Schedule timer to resume monitoring
         pauseTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: false) { [weak self] _ in
-            self?.resumeMonitoring()
+            MainActor.assumeIsolated { self?.resumeMonitoring() }
         }
     }
 
