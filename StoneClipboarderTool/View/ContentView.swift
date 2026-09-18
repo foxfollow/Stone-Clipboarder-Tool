@@ -282,29 +282,13 @@ struct ContentView: View {
     }
 
     private func setupWindowBehavior() {
+        // Next turn: during the first onAppear the window isn't attached yet.
+        // (A Space-change observer used to live here too, but it listened on
+        // NotificationCenter.default while NSWorkspace posts
+        // activeSpaceDidChangeNotification to its own center, so it never
+        // fired; `.moveToActiveSpace` is what makes the window follow.)
         DispatchQueue.main.async {
-            if let window = NSApp.windows.first(where: { $0.title == "Clipboard History" }) {
-                // Set window behavior to automatically move to active space
-                window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
-
-                // Set up workspace observer to move window when user changes desktops
-                NotificationCenter.default.addObserver(
-                    forName: NSWorkspace.activeSpaceDidChangeNotification,
-                    object: nil,
-                    queue: .main
-                ) { _ in
-                    MainActor.assumeIsolated {
-                        // Force window to follow to new desktop if it's visible and main window is shown
-                        if settingsManager.showMainWindow && window.isVisible {
-                            // Temporarily hide and show to force move to current space
-                            window.orderOut(nil)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                window.makeKeyAndOrderFront(nil)
-                            }
-                        }
-                    }
-                }
-            }
+            MainWindow.find()?.collectionBehavior = MainWindow.collectionBehavior
         }
     }
 }

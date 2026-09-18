@@ -186,6 +186,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         startQuitKeyMonitor()
     }
 
+    /// Applies `showInMenubar`. Called at setup and when the setting changes.
+    func applyMenuBarVisibility() {
+        guard let settingsManager, let menuBarManager, let cbViewModel else { return }
+        updateMenuBarVisibility(settingsManager: settingsManager, menuBarManager: menuBarManager, cbViewModel: cbViewModel)
+    }
+
+    /// Applies `showMainWindow` (Dock / ⌘Tab presence and the main window).
+    /// Called at setup, after launch and when the setting changes.
+    func applyWindowVisibility() {
+        guard let settingsManager else { return }
+        updateWindowVisibility(settingsManager: settingsManager)
+    }
+
     private func updateMenuBarVisibility(
         settingsManager: SettingsManager, menuBarManager: MenuBarManager, cbViewModel: CBViewModel
     ) {
@@ -318,15 +331,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Configure main window to automatically follow across desktops
             DispatchQueue.main.async {
-                for window in NSApp.windows {
-                    if window.title == "Clipboard History"
-                        || window.contentView?.subviews.first is NSHostingView<ContentView>
-                    {
-                        // Set window to automatically move to active space
-                        window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
-                        break
-                    }
-                }
+                MainWindow.find()?.collectionBehavior = MainWindow.collectionBehavior
             }
         } else {
             // Hide the auto-created "Clipboard History" WindowGroup window and drop to
@@ -346,9 +351,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Hides the main window (keeping the NSWindow object alive so MenuBarView's
     /// "Show Main Window" can re-show it later) and re-asserts the accessory policy.
     private func hideMainWindowAndDropToAccessory() {
-        for window in NSApp.windows where window.title == "Clipboard History"
-            || window.contentView?.subviews.first is NSHostingView<ContentView>
-        {
+        for window in NSApp.windows where MainWindow.isMainWindow(window) {
             window.orderOut(nil)
         }
         NSApp.setActivationPolicy(.accessory)
@@ -490,11 +493,11 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(settingsManager)
                     .environmentObject(hotkeyManager)
                     .environmentObject(pinManager)
-                    .onChange(of: settingsManager.showInMenubar) { _, newValue in
-                        updateMenuBarVisibility()
+                    .onChange(of: settingsManager.showInMenubar) { _, _ in
+                        appDelegate.applyMenuBarVisibility()
                     }
-                    .onChange(of: settingsManager.showMainWindow) { _, newValue in
-                        updateWindowVisibility()
+                    .onChange(of: settingsManager.showMainWindow) { _, _ in
+                        appDelegate.applyWindowVisibility()
                     }
                     .onChange(of: settingsManager.enableHotkeys) { _, newValue in
                         hotkeyManager.refreshHotkeyRegistrations()
@@ -547,39 +550,5 @@ struct StoneClipboarderToolApp: App {
 
         // Trigger setup (will only run once)
         appDelegate.performSetup()
-    }
-
-    private func updateMenuBarVisibility() {
-        if settingsManager.showInMenubar {
-            menuBarManager.setupMenuBar(cbViewModel: cbViewModel, settingsManager: settingsManager, clipboardManager: cbViewModel.getClipboardManager())
-
-            // Monitor and refresh menubar state periodically to prevent corruption
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                menuBarManager.refreshMenuBar()
-            }
-        } else {
-            menuBarManager.hideMenuBar()
-        }
-    }
-
-    private func updateWindowVisibility() {
-        if settingsManager.showMainWindow {
-            NSApp.setActivationPolicy(.regular)
-
-            // Configure main window to automatically follow across desktops
-            DispatchQueue.main.async {
-                for window in NSApp.windows {
-                    if window.title == "Clipboard History"
-                        || window.contentView?.subviews.first is NSHostingView<ContentView>
-                    {
-                        // Set window to automatically move to active space
-                        window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
-                        break
-                    }
-                }
-            }
-        } else {
-            NSApp.setActivationPolicy(.accessory)
-        }
     }
 }
