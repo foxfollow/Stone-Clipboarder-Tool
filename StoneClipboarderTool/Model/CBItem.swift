@@ -96,46 +96,51 @@ final class CBItem {
         return NSImage(data: imageData)
     }
 
-    // Memory-efficient thumbnail for UI display
+    // MARK: - Thumbnails
+
+    /// Decoded thumbnails by item. Rows read `thumbnail` on every render;
+    /// decoding `thumbnailData` each time — or, as before, regenerating from
+    /// the full image and writing the result into the model mid-render — was
+    /// wasted work and dirtied the context. NSCache also sheds entries under
+    /// memory pressure.
+    private static let thumbnailCache: NSCache<ThumbnailCacheKey, NSImage> = {
+        let cache = NSCache<ThumbnailCacheKey, NSImage>()
+        cache.countLimit = 500
+        return cache
+    }()
+
+    /// Drops decoded thumbnails; they are rebuilt from `thumbnailData` on demand.
+    static func evictThumbnails(for ids: [PersistentIdentifier]) {
+        for id in ids {
+            thumbnailCache.removeObject(forKey: ThumbnailCacheKey(id))
+        }
+    }
+
+    /// Small preview for image-like items (images, text + image, image files);
+    /// nil for anything else. Never writes to the model.
     var thumbnail: NSImage? {
-        // First check if we have cached thumbnail
-        if let thumbnailData = thumbnailData,
-            let cachedThumbnail = NSImage(data: thumbnailData)
-        {
-            return cachedThumbnail
-        }
+        guard itemType == .image || itemType == .combined || isImageFile else { return nil }
 
-        // Generate thumbnail on-demand for images and combined items
-        if (itemType == .image || itemType == .combined),
-           let imageData = imageData,
-           let image = NSImage(data: imageData)
-        {
-            let thumbnail = generateThumbnailImage(from: image)
-            // Cache the generated thumbnail immediately
-            if let thumbnail = thumbnail,
-                let pngData = thumbnail.pngRepresentation
-            {
-                self.thumbnailData = pngData
-            }
-            return thumbnail ?? createPlaceholderThumbnail()
+        let key = ThumbnailCacheKey(persistentModelID)
+        if let cached = Self.thumbnailCache.object(forKey: key) {
+            return cached
         }
-        // Generate thumbnail for image files
-        else if isImageFile,
-                let fileData = fileData,
-                let image = NSImage(data: fileData)
-        {
-            let thumbnail = generateThumbnailImage(from: image)
-            // Cache the generated thumbnail immediately
-            if let thumbnail = thumbnail,
-                let pngData = thumbnail.pngRepresentation
-            {
-                self.thumbnailData = pngData
-            }
-            return thumbnail ?? createPlaceholderThumbnail()
+        let image = makeThumbnail() ?? createPlaceholderThumbnail()
+        if let image {
+            Self.thumbnailCache.setObject(image, forKey: key)
         }
+        return image
+    }
 
-        // Return placeholder for failed generation
-        return createPlaceholderThumbnail()
+    private func makeThumbnail() -> NSImage? {
+        if let thumbnailData, let stored = NSImage(data: thumbnailData) {
+            return stored
+        }
+        // No stored thumbnail (older items; memory cleanup before 1.8.0 also
+        // deleted them from the store): render one in memory from the source.
+        let source = isImageFile ? fileData : imageData
+        guard let source, let image = NSImage(data: source) else { return nil }
+        return generateThumbnailImage(from: image)
     }
 
     private func createPlaceholderThumbnail() -> NSImage? {
@@ -212,8 +217,10 @@ final class CBItem {
         return "\(Int(size.width))×\(Int(size.height))"
     }
 
+    /// Stored as PNG: an uncompressed TIFF of the same 80 pt image is several
+    /// times larger. (Thumbnails stored as TIFF by older versions still decode.)
     private func generateThumbnail(from image: NSImage) -> Data? {
-        return generateThumbnailImage(from: image)?.tiffRepresentation
+        return generateThumbnailImage(from: image)?.pngRepresentation
     }
 
     private func generateThumbnailImage(from image: NSImage) -> NSImage? {
@@ -333,5 +340,20 @@ extension NSImage {
             return nil
         }
         return bitmapRep.representation(using: .png, properties: [:])
+    }
+}
+
+/// NSCache needs an object key; hashes and compares the item's identifier.
+private final class ThumbnailCacheKey: NSObject {
+    let id: PersistentIdentifier
+
+    init(_ id: PersistentIdentifier) {
+        self.id = id
+    }
+
+    override var hash: Int { id.hashValue }
+
+    override func isEqual(_ object: Any?) -> Bool {
+        (object as? ThumbnailCacheKey)?.id == id
     }
 }

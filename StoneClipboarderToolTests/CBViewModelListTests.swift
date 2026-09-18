@@ -112,6 +112,39 @@ final class CBViewModelListTests: XCTestCase {
         XCTAssertTrue(viewModel.favoriteItems.isEmpty, "views must not keep a row whose backing data is going away")
     }
 
+    // MARK: - Memory cleanup
+
+    func testMemoryCleanupDropsScrolledRowsOnceInactive() async throws {
+        let defaults = IsolatedDefaults()
+        defer { defaults.remove() }
+        defaults.defaults.set(0, forKey: "maxInactiveTime")  // everything counts as inactive
+        viewModel.setSettingsManager(SettingsManager(defaults: defaults.defaults))
+        try insertTextItems(count: 80)
+        viewModel.fetchItems(reset: true)
+        viewModel.loadMoreItems()
+        await waitUntil { self.viewModel.items.count == 80 }
+
+        viewModel.releaseInactiveMemory()
+
+        XCTAssertEqual(viewModel.items.count, 30)
+        XCTAssertFalse(context.hasChanges, "memory cleanup must not touch the store")
+    }
+
+    func testMemoryCleanupKeepsRowsInUse() async throws {
+        let defaults = IsolatedDefaults()
+        defer { defaults.remove() }
+        defaults.defaults.set(30, forKey: "maxInactiveTime")
+        viewModel.setSettingsManager(SettingsManager(defaults: defaults.defaults))
+        try insertTextItems(count: 80)
+        viewModel.fetchItems(reset: true)
+        viewModel.loadMoreItems()
+        await waitUntil { self.viewModel.items.count == 80 }
+
+        viewModel.releaseInactiveMemory()
+
+        XCTAssertEqual(viewModel.items.count, 80, "rows loaded moments ago are active")
+    }
+
     // MARK: - Helpers
 
     private func insertTextItems(count: Int) throws {

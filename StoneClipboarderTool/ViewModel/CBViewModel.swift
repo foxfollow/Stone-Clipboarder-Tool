@@ -628,7 +628,7 @@ class CBViewModel: ObservableObject {
         performItemCountCleanupCore(maxItems: settingsManager.maxItemsToKeep)
 
         // Always run memory cleanup during manual cleanup, regardless of toggle
-        performMemoryCleanupCore()
+        releaseInactiveMemory()
 
         // Reset in-memory items to only the most recent batch
         fetchItems(limit: initialBatchSize, reset: true)
@@ -657,60 +657,49 @@ class CBViewModel: ObservableObject {
             settingsManager.enableMemoryCleanup
         else { return }
 
-        performMemoryCleanupCore()
+        releaseInactiveMemory()
     }
 
-    private func performMemoryCleanupCore() {
+    /// Frees what inactive items hold in memory: their decoded thumbnails,
+    /// and — once none of them is in use — the rows loaded by scrolling past
+    /// the first batch (they reload on the next scroll). Favorites keep their
+    /// thumbnails. Never modifies the store: this used to nil `thumbnailData`,
+    /// which the next save deleted from disk, only to re-render it from the
+    /// full image on the next display.
+    func releaseInactiveMemory() {
         guard let settingsManager = settingsManager else { return }
 
         let now = Date()
         let maxInactiveTime = TimeInterval(settingsManager.maxInactiveTime * 60)
-        var itemsToCleanup: [CBItem] = []
-
-        for item in items {
-            if item.isFavorite {
-                continue
-            }
-
-            if let lastAccess = lastAccessTimes[item.persistentModelID],
-               now.timeIntervalSince(lastAccess) > maxInactiveTime {
-                itemsToCleanup.append(item)
-            }
+        let isInactive: (CBItem) -> Bool = { item in
+            guard let lastAccess = self.lastAccessTimes[item.persistentModelID] else { return true }
+            return now.timeIntervalSince(lastAccess) > maxInactiveTime
         }
 
-        for item in itemsToCleanup {
-            cleanupItemMemory(item)
+        let inactive = items.filter { !$0.isFavorite && isInactive($0) }
+        CBItem.evictThumbnails(for: inactive.map(\.persistentModelID))
+
+        var trimmed = 0
+        if items.count > initialBatchSize,
+           items.dropFirst(initialBatchSize).allSatisfy({ isInactive($0) && $0.id != selectedItem?.id }) {
+            trimmed = items.count - initialBatchSize
+            items.removeLast(trimmed)
+            canLoadMore = true
         }
 
         let cutoffTime = now.addingTimeInterval(-maxInactiveTime)
         lastAccessTimes = lastAccessTimes.filter { $1 > cutoffTime }
 
-        ErrorLogger.shared.debug("Memory cleanup: released \(itemsToCleanup.count) inactive items (favorites preserved)", category: "Memory")
+        ErrorLogger.shared.debug(
+            "Memory cleanup: released \(inactive.count) thumbnails, \(trimmed) scrolled rows (favorites preserved)",
+            category: "Memory")
     }
 
-    private func cleanupItemMemory(_ item: CBItem) {
-        item.thumbnailData = nil
-        lastAccessTimes.removeValue(forKey: item.persistentModelID)
-    }
-
+    /// After a saved copy: enforce the item cap. The check is a fetchCount, so
+    /// run it every time rather than guessing from `items.count`. Memory
+    /// cleanup has its own timer.
     private func performCleanupIfNeeded() {
-        guard let settingsManager = settingsManager else { return }
-
-        // Perform item count cleanup if enabled (check every 10 new items)
-        if settingsManager.enableAutoCleanup && items.count % 10 == 0 {
-            performItemCountCleanup()
-        }
-
-        // Perform memory cleanup if enabled (check every 100 items)
-        if settingsManager.enableMemoryCleanup && items.count % 100 == 0 {
-            Task {
-                await Task.detached {
-                    await MainActor.run {
-                        self.performMemoryCleanup()
-                    }
-                }.value
-            }
-        }
+        performItemCountCleanup()
     }
 
     private func performItemCountCleanup() {
