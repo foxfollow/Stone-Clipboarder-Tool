@@ -140,8 +140,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         cbViewModel.setModelContext(clipboardContainer.mainContext)
         cbViewModel.setSettingsManager(settingsManager)
 
-        // Ensure recent items are loaded immediately
-        cbViewModel.fetchItems(reset: true)
+        // Load the first rows on the next turn: performSetup runs while
+        // SwiftUI evaluates App.body, where publishing `items` isn't allowed.
+        DispatchQueue.main.async {
+            cbViewModel.fetchItems(reset: true)
+        }
 
         cbViewModel.startClipboardMonitoring()
 

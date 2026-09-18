@@ -30,8 +30,12 @@ class CBViewModel: ObservableObject {
     private let clipboardManager = ClipboardManager()
     private var settingsManager: SettingsManager?
 
-    private let defaultFetchLimit = 100
-    private var currentFetchOffset = 0
+    /// Rows shown before the first scroll, and the fewest a refresh reloads.
+    private let initialBatchSize = 30
+    /// Rows appended per `loadMoreItems()`.
+    private let pageSize = 100
+    /// False once a page came back short: `items` holds the whole history.
+    private var canLoadMore = true
 
     // Memory management
     nonisolated(unsafe) private var memoryCleanupTimer: Timer?
@@ -45,7 +49,6 @@ class CBViewModel: ObservableObject {
     func setModelContext(_ context: ModelContext) {
         self._modelContext = context
         clipboardManager.setModelContext(context)
-        fetchItems()
     }
 
     func setSettingsManager(_ manager: SettingsManager) {
@@ -63,98 +66,79 @@ class CBViewModel: ObservableObject {
         return clipboardManager
     }
 
+    /// Loads history rows, newest first.
+    /// - reset: replace `items` with a fresh fetch of `limit` rows. The default
+    ///   keeps at least as many rows as are loaded now, so a refresh after a
+    ///   copy doesn't collapse a list the user has scrolled down.
+    /// - otherwise: append the next page (`limit` defaults to `pageSize`).
     func fetchItems(limit: Int? = nil, reset: Bool = false) {
+        if reset {
+            reloadItems(limit: limit ?? max(initialBatchSize, items.count))
+        } else {
+            loadNextPage(size: limit ?? pageSize)
+        }
+    }
+
+    private func reloadItems(limit: Int) {
         guard let modelContext = _modelContext else { return }
 
-        if reset {
-            currentFetchOffset = 0
-        } else {
-            isLoadingMore = true
-        }
-
-        let fetchLimit = limit ?? defaultFetchLimit
         var descriptor = FetchDescriptor<CBItem>(
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
-        descriptor.fetchLimit = fetchLimit
-        descriptor.fetchOffset = currentFetchOffset
+        descriptor.fetchLimit = limit
 
-        // Always preload last 10 items immediately for instant display
-        if reset {
-            // First, get the most recent 30 items synchronously for instant display
-            var recentDescriptor = FetchDescriptor<CBItem>(
+        do {
+            let fetched = try modelContext.fetch(descriptor)
+            items = fetched
+            canLoadMore = fetched.count == limit
+            trackFirstAccess(of: fetched)
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch recent items", category: "SwiftData", error: error)
+            items = []
+        }
+        refreshItemCounts()
+    }
+
+    private func loadNextPage(size: Int) {
+        guard let modelContext = _modelContext, !isLoadingMore, canLoadMore else { return }
+        isLoadingMore = true
+
+        // One turn later, so a scroll-triggered call doesn't mutate the list
+        // from inside the appearing row's callback.
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.isLoadingMore = false }
+
+            var descriptor = FetchDescriptor<CBItem>(
                 sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
             )
-            recentDescriptor.fetchLimit = 30
+            // Deletes remove rows from `items` and every other change reloads
+            // it, so `items` is always the newest N rows and its count is the
+            // right offset; a separate counter drifted after each delete.
+            descriptor.fetchOffset = self.items.count
+            descriptor.fetchLimit = size
 
             do {
-                let recentItems = try modelContext.fetch(recentDescriptor)
-                
-                // Deduplicate items based on persistentModelID
-                var uniqueItems: [CBItem] = []
-                var seenIds = Set<PersistentIdentifier>()
-                
-                for item in recentItems {
-                    if !seenIds.contains(item.persistentModelID) {
-                        uniqueItems.append(item)
-                        seenIds.insert(item.persistentModelID)
-                    }
-                }
-                
-                // Defer @Published mutation to avoid publishing during view updates
-                DispatchQueue.main.async {
-                    self.items = uniqueItems
-                    self.currentFetchOffset = uniqueItems.count
-                    self.refreshItemCounts()
-                }
-
-                // Track access times for memory management
-                for item in uniqueItems {
-                    self.lastAccessTimes[item.persistentModelID] = Date()
-                }
-
-                // Don't automatically load more - only load when user actually scrolls
-                // The 30 items are enough for immediate use
+                let page = try modelContext.fetch(descriptor)
+                // A copy saved while this page was pending shifts rows down
+                // by one; skip anything already loaded.
+                let loaded = Set(self.items.map(\.persistentModelID))
+                let fresh = page.filter { !loaded.contains($0.persistentModelID) }
+                self.items.append(contentsOf: fresh)
+                self.canLoadMore = page.count == size
+                self.trackFirstAccess(of: fresh)
             } catch {
-                ErrorLogger.shared.log("Failed to fetch recent items", category: "SwiftData", error: error)
-                DispatchQueue.main.async {
-                    self.items = []
-                }
+                ErrorLogger.shared.log("Failed to fetch items (pagination)", category: "SwiftData", error: error)
             }
-        } else {
-            // For pagination, use async to avoid blocking UI
-            Task {
-                do {
-                    let newItems = try modelContext.fetch(descriptor)
-                    await MainActor.run {
-                        // Deduplicate new items and check against existing items
-                        var existingIds = Set(self.items.map { $0.persistentModelID })
-                        var uniqueNewItems: [CBItem] = []
-                        
-                        for item in newItems {
-                            if !existingIds.contains(item.persistentModelID) {
-                                uniqueNewItems.append(item)
-                                existingIds.insert(item.persistentModelID)
-                            }
-                        }
-                        
-                        self.items.append(contentsOf: uniqueNewItems)
-                        self.isLoadingMore = false
-                        self.currentFetchOffset += newItems.count
-                        self.refreshItemCounts()
+        }
+    }
 
-                        // Track access times for memory management
-                        for item in uniqueNewItems {
-                            self.lastAccessTimes[item.persistentModelID] = Date()
-                        }
-                    }
-                } catch {
-                    await MainActor.run {
-                        ErrorLogger.shared.log("Failed to fetch items (pagination)", category: "SwiftData", error: error)
-                        self.isLoadingMore = false
-                    }
-                }
-            }
+    /// Starts the inactivity clock for rows seen for the first time. Rows
+    /// already tracked keep their time: reloading the list is not access.
+    private func trackFirstAccess(of fetched: [CBItem]) {
+        let now = Date()
+        for item in fetched where lastAccessTimes[item.persistentModelID] == nil {
+            lastAccessTimes[item.persistentModelID] = now
         }
     }
 
@@ -645,7 +629,7 @@ class CBViewModel: ObservableObject {
         performMemoryCleanupCore()
 
         // Reset in-memory items to only the most recent batch
-        fetchItems(reset: true)
+        fetchItems(limit: initialBatchSize, reset: true)
     }
 
     // MARK: - Memory Management
