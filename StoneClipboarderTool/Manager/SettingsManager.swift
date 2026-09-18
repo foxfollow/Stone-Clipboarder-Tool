@@ -370,14 +370,3 @@ final class SettingsManager: ObservableObject {
         }
     }
 }
-
-extension Notification.Name {
-    /// Posted when a pin behavior setting that needs to propagate to live
-    /// NSPanels changes (collection behavior, shadow, corner radius).
-    static let pinBehaviorSettingsChanged = Notification.Name("StoneClipboarder.pinBehaviorSettingsChanged")
-
-    /// Posted with `object` = `PersistentIdentifier` of a CBItem that just got
-    /// deleted from the clipboard history. PinManager listens and closes any
-    /// pin referencing it. (Posting `nil` means "all items wiped".)
-    static let clipboardItemDeleted = Notification.Name("StoneClipboarder.clipboardItemDeleted")
-}

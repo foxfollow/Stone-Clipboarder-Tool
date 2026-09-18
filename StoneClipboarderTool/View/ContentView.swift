@@ -40,44 +40,27 @@ struct ContentView: View {
     @State private var selectedItem: CBItem? = nil
     @State private var selectedTab: ClipboardTab = .recent
     @State private var searchText: String = ""
+    /// Matches from the whole history for the Recent tab; the loaded rows
+    /// alone would miss everything not scrolled into view yet.
+    @State private var searchResults: [CBItem] = []
+    /// True while a debounced search is pending, so "No Results" doesn't
+    /// flash before the first results arrive.
+    @State private var isSearching = false
 
+    private var trimmedSearch: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
-
-    // Filtered items based on search text
     private var filteredRecentItems: [CBItem] {
-        if searchText.isEmpty {
-            return cbViewModel.items
-        }
-        return cbViewModel.items.filter { item in
-            matchesSearch(item: item)
-        }
+        trimmedSearch.isEmpty ? cbViewModel.items : searchResults
     }
 
     private var filteredFavoriteItems: [CBItem] {
-        if searchText.isEmpty {
+        let query = trimmedSearch
+        if query.isEmpty {
             return cbViewModel.favoriteItems
         }
-        return cbViewModel.favoriteItems.filter { item in
-            matchesSearch(item: item)
-        }
-    }
-
-    private func matchesSearch(item: CBItem) -> Bool {
-        let lowercasedSearch = searchText.lowercased()
-
-        // Search in text content
-        if let content = item.content,
-           content.lowercased().contains(lowercasedSearch) {
-            return true
-        }
-
-        // Search in file name
-        if let fileName = item.fileName,
-           fileName.lowercased().contains(lowercasedSearch) {
-            return true
-        }
-
-        return false
+        return cbViewModel.favoriteItems.filter { $0.matchesSearch(query) }
     }
 
     var body: some View {
@@ -140,16 +123,39 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .init("SelectClipboardItem"))) {
-            notification in
-            if let itemUUID = notification.object as? String,
-                let item = cbViewModel.items.first(where: { "\($0.id)" == itemUUID })
+        .onReceive(NotificationCenter.default.publisher(for: .selectClipboardItem)) { notification in
+            if let id = notification.object as? PersistentIdentifier,
+               let item = cbViewModel.items.first(where: { $0.persistentModelID == id })
             {
                 selectedItem = item
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .init("ClearClipboardSelection"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .clearClipboardSelection)) { _ in
             selectedItem = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .clipboardItemDeleted)) { notification in
+            // Posted before the item's backing data goes away: drop it from the
+            // search results in the same update, like the view model does for
+            // its own arrays.
+            if let id = notification.object as? PersistentIdentifier {
+                searchResults.removeAll { $0.persistentModelID == id }
+            } else {
+                searchResults = []
+            }
+        }
+        .task(id: searchText) {
+            // Debounced; a new keystroke cancels this task.
+            let query = trimmedSearch
+            guard !query.isEmpty else {
+                searchResults = []
+                isSearching = false
+                return
+            }
+            isSearching = true
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            searchResults = cbViewModel.searchItems(matching: query)
+            isSearching = false
         }
         .onAppear {
             setupWindowBehavior()
@@ -166,7 +172,7 @@ struct ContentView: View {
                 .foregroundStyle(.red)
             }
 
-            if filteredRecentItems.isEmpty && !searchText.isEmpty {
+            if filteredRecentItems.isEmpty && !trimmedSearch.isEmpty && !isSearching {
                 ContentUnavailableView {
                     Label("No Results", systemImage: "magnifyingglass")
                 } description: {
@@ -222,7 +228,7 @@ struct ContentView: View {
                     Text("Tap the heart icon on items to add them to favorites")
                 }
                 .listRowBackground(Color.clear)
-            } else if filteredFavoriteItems.isEmpty && !searchText.isEmpty {
+            } else if filteredFavoriteItems.isEmpty && !trimmedSearch.isEmpty {
                 ContentUnavailableView {
                     Label("No Results", systemImage: "magnifyingglass")
                 } description: {
@@ -264,11 +270,14 @@ struct ContentView: View {
 
     private func deleteItems(offsets: IndexSet) {
         withAnimation(.easeInOut(duration: 0.3)) {
-            let itemsToDelete = offsets.map { filteredRecentItems[$0] }
+            // Offsets refer to the list as shown (search results while
+            // searching), not to cbViewModel.items.
+            let shown = filteredRecentItems
+            let itemsToDelete = offsets.map { shown[$0] }
             if let selected = selectedItem, itemsToDelete.contains(where: { $0.id == selected.id }) {
                 selectedItem = nil
             }
-            cbViewModel.deleteItems(at: offsets, from: cbViewModel.items)
+            cbViewModel.deleteItems(at: offsets, from: shown)
         }
     }
 

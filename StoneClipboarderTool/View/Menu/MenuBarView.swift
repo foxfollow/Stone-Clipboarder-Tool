@@ -5,6 +5,7 @@
 //  Created by Heorhii Savoiskyi on 08.08.2025.
 //
 
+import SwiftData
 import SwiftUI
 
 struct MenuBarView: View {
@@ -249,8 +250,8 @@ struct MenuBarView: View {
             // Select the item after window is properly shown
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 NotificationCenter.default.post(
-                    name: NSNotification.Name("SelectClipboardItem"),
-                    object: "\(item.id)"
+                    name: .selectClipboardItem,
+                    object: item.persistentModelID
                 )
             }
         }

@@ -181,7 +181,7 @@ class CBViewModel: ObservableObject {
         // Clear selection if this item is selected
         if selectedItem?.id == item.id {
             selectedItem = nil
-            NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+            NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
         }
 
         // Tell PinManager so any open pin for this item closes.
@@ -224,7 +224,7 @@ class CBViewModel: ObservableObject {
         // Clear selection if deleted item is selected
         if let sel = selectedItem, idsToDelete.contains(sel.id) {
             selectedItem = nil
-            NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+            NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
         }
 
         // Remove from published arrays so SwiftUI drops views
@@ -560,7 +560,7 @@ class CBViewModel: ObservableObject {
         selectedItem = nil
         items = []
         favoriteItems = []
-        NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+        NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
         // Tell PinManager — `object: nil` means "all items wiped".
         NotificationCenter.default.post(name: .clipboardItemDeleted, object: nil)
 
@@ -835,7 +835,7 @@ class CBViewModel: ObservableObject {
 
             if let sel = selectedItem, idsToDelete.contains(sel.id) {
                 selectedItem = nil
-                NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+                NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
             }
 
             for item in nonFavoriteOldItems {
