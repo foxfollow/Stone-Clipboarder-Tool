@@ -156,11 +156,11 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
             }
         case .file:
             if let data = state.fileData, let name = state.fileName {
-                let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(name)
                 do {
-                    try data.write(to: tmp)
-                    pb.writeObjects([tmp as NSURL])
+                    let fileURL = try PasteboardFileStore.write(data, fileName: name)
+                    pb.writeObjects([fileURL as NSURL])
                 } catch {
+                    ErrorLogger.shared.log("Failed to write pinned file for the pasteboard", category: "Pins", error: error)
                     if let s = state.content { pb.setString(s, forType: .string) }
                 }
             }

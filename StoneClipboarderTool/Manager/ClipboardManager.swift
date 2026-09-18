@@ -210,30 +210,22 @@ final class ClipboardManager: ObservableObject {
         return savePanel
     }
     
+    /// Puts a file on the pasteboard. The file stays on disk until the next
+    /// file copy — see PasteboardFileStore.
     @discardableResult
-    func copyFileToClipboard(data: Data, fileName: String, uti: String) -> Bool {
-        // Create a temporary file to copy to clipboard
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempFile = tempDir.appendingPathComponent(fileName)
-        
+    func copyFileToClipboard(data: Data, fileName: String) -> Bool {
         do {
-            try data.write(to: tempFile)
-            
+            let fileURL = try PasteboardFileStore.write(data, fileName: fileName)
             pasteboard.clearContents()
-            pasteboard.writeObjects([tempFile as NSURL])
+            pasteboard.writeObjects([fileURL as NSURL])
             lastChangeCount = pasteboard.changeCount
-            
-            // Clean up temp file after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                try? FileManager.default.removeItem(at: tempFile)
-            }
             return true
         } catch {
             ErrorLogger.shared.log("Failed to create temp file for clipboard", category: "Clipboard", error: error)
             return false
         }
     }
-    
+
     func saveItemToFile(_ item: CBItem) {
         // Try to create save panel - if it crashes, it's likely a sandbox issue
         guard let savePanel = createSavePanel() else {
@@ -356,11 +348,8 @@ final class ClipboardManager: ObservableObject {
             copyToClipboard(image)
             return true
         case .file:
-            guard let fileData = item.fileData,
-                  let fileName = item.fileName,
-                  let uti = item.fileUTI
-            else { return false }
-            return copyFileToClipboard(data: fileData, fileName: fileName, uti: uti)
+            guard let fileData = item.fileData, let fileName = item.fileName else { return false }
+            return copyFileToClipboard(data: fileData, fileName: fileName)
         case .combined:
             // Copy both text and image to clipboard
             var objects: [NSPasteboardWriting] = []
