@@ -23,6 +23,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsContainer: ModelContainer?
 
     private var isInitialized = false
+    /// Watches the running-application record so a late reset of the activation
+    /// policy can be undone — see `startGuardingActivationPolicy()`.
+    private var activationPolicyObservation: NSKeyValueObservation?
+    /// Held strongly on purpose: NSKeyValueObservation doesn't retain what it
+    /// observes, and AppKit keeps delivering LaunchServices change callbacks to
+    /// an observed NSRunningApplication. Letting it deallocate crashes the app
+    /// (objc_msgSend in runningApplicationNotificationCallback) on the first
+    /// policy change.
+    private var observedRunningApplication: NSRunningApplication?
     private var quitKeyDownMonitor: Any?
     private var quitKeyUpMonitor: Any?
     private var quitTimer: Timer?
@@ -48,10 +57,62 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // guarded by isInitialized, it won't re-apply the policy here on its own, so the
         // app would stay in the Dock & Cmd+Tab after a cold launch (e.g. login-item
         // relaunch after a reboot) despite "Show Main Window" being off — until the user
-        // toggled the setting off and on again. Re-applying here makes the setting stick.
+        // toggled the setting off and on again. Re-applying here covers a normal launch;
+        // startGuardingActivationPolicy() covers a slow login-item check-in that lands later.
         if let settingsManager {
             updateWindowVisibility(settingsManager: settingsManager)
         }
+        startGuardingActivationPolicy()
+    }
+
+    /// Keeps Dock / Cmd+Tab presence matching `showMainWindow` after launch.
+    ///
+    /// Re-applying the policy in applicationDidFinishLaunching is not enough on
+    /// its own. LaunchServices check-in stamps the Info.plist default type
+    /// (Foreground) onto the app, and check-in is asynchronous: on a normal launch
+    /// it completes within milliseconds, before our re-apply, but for a login-item
+    /// launch it was measured at 3.3 s — landing after the re-apply and putting
+    /// the app back in the Dock. Nothing signals check-in completion, so correct
+    /// drift whenever the running-application record changes, and re-check on a
+    /// short schedule in case that change is never observed.
+    private func startGuardingActivationPolicy() {
+        let runningApplication = NSRunningApplication.current
+        observedRunningApplication = runningApplication
+        activationPolicyObservation = runningApplication.observe(\.activationPolicy) {
+            [weak self] _, _ in
+            Task { @MainActor in self?.correctActivationPolicyDrift() }
+        }
+        for delay in [1.0, 3.0, 6.0, 10.0, 20.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.correctActivationPolicyDrift()
+            }
+        }
+    }
+
+    /// Re-applies the policy the settings call for, if the system disagrees.
+    /// A no-op when nothing drifted, so it's safe to call on every change —
+    /// legitimate toggles update `showMainWindow` before the policy, never after.
+    private func correctActivationPolicyDrift() {
+        guard let settingsManager else { return }
+        let wanted: NSApplication.ActivationPolicy = settingsManager.showMainWindow ? .regular : .accessory
+        // NSRunningApplication reflects what LaunchServices — and so the Dock —
+        // believes. NSApp.activationPolicy() can be a stale cache of our own
+        // last call, which is exactly the value that got overwritten.
+        let actual = NSRunningApplication.current.activationPolicy
+        guard actual != wanted else { return }
+
+        ErrorLogger.shared.log(
+            "Activation policy drifted to \(actual.rawValue), expected \(wanted.rawValue); re-applying",
+            category: "WindowVisibility")
+
+        // If AppKit's cache already holds the target value, setting it again may
+        // be skipped as a no-op and never reach LaunchServices. Sync the cache to
+        // the real state first — the Dock already shows that state, so this step
+        // is invisible.
+        if NSApp.activationPolicy() == wanted, actual != .prohibited {
+            NSApp.setActivationPolicy(actual)
+        }
+        updateWindowVisibility(settingsManager: settingsManager)
     }
 
     func performSetup() {
