@@ -61,14 +61,16 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 - **Combined Clipboard Items**: Save text and image as a single item (BETA - Added in v1.2.0)
 - **Global Hotkeys**: System-wide keyboard shortcuts for instant clipboard access (⌃⌥1-0, ⌃⇧1-0)
 - **Quick Picker Window**: Spotlight-like floating panel (⌃⌥Space) for fast item selection
-- **Favorites System**: Pin frequently-used items that are protected from auto-deletion
-- **Menu Bar Integration**: Quick access to recent 10 clipboard items from the menu bar
+- **Favorites System**: Keep frequently-used items; favorites are never auto-deleted
+- **Pinned Windows**: Pin any item to the screen as a floating, always-on-top window (⌃⌥P pins the latest item)
+- **Type-Out Paste**: ⌘⇧Return in the Quick Picker types text key by key, for fields and remote desktops that block pasting
+- **Menu Bar Integration**: Quick access to your most recent items (5–50, configurable) from the menu bar
 - **Native Settings**: Access settings through macOS app menu (⌘,) or menu bar
 - **Persistent Storage**: Uses SwiftData to store clipboard history locally
 - **Easy Access**: Browse and search your clipboard history in a clean interface
 - **Quick Copy**: Click any item to copy it back to your clipboard
 - **Smart Timestamp Update**: Reused items move to the top with updated timestamp
-- **Smart Deduplication**: Avoids saving duplicate consecutive items
+- **Smart Deduplication**: Copying something that's already in your history moves it to the top instead of saving it twice
 - **Bulk Operations**: Delete all clipboard history with confirmation dialog
 - **Flexible UI Options**: Show/hide main window and menu bar independently
 
@@ -90,12 +92,6 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
       <img src="docs/resources/index/sct-dark-basicwindow.png" width="250" alt="Main Window"><br>
       <sub><b>Main Window</b><br>Clipboard history with preview</sub>
     </td>
-    <td align="center">
-      <img src="docs/resources/index/sct-dark-settings.png" width="250" alt="Settings"><br>
-      <sub><b>Settings</b><br>Customization options</sub>
-    </td>
-  </tr>
-  <tr>
     <td align="center">
       <img src="docs/resources/index/sct-dark-quickpicker.png" width="250" alt="Quick Picker"><br>
       <sub><b>Quick Picker</b><br>Spotlight-like access (⌃⌥Space)</sub>
@@ -133,15 +129,23 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 ## Requirements
 
 - macOS 15.0+
-- Xcode 16.0+ (for building from source)
+- Xcode 26+ (for building from source: the project uses an Icon Composer app icon and macOS 26 APIs behind availability checks)
 
 ## Building
 
 1. Open `StoneClipboarderTool.xcodeproj` in Xcode
 2. Build and run the project
-3. Grant any required permissions for clipboard access
+3. Grant Accessibility permission when asked (needed to paste into other apps)
 
 The app uses SwiftUI and SwiftData for a modern, native macOS experience.
+
+Unit tests run inside the app but against in-memory stores and throwaway settings, so they never touch your real history:
+
+```bash
+xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarderTool -destination "platform=macOS"
+```
+
+Manual checks per feature are in [TESTING_GUIDE.md](TESTING_GUIDE.md); contributor and agent notes are in [AGENTS.md](AGENTS.md) and [docs/CODEMAP.md](docs/CODEMAP.md).
 
 ## Version History
 

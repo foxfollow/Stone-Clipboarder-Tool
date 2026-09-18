@@ -7,7 +7,7 @@ Sparkle `<item>` and the GitHub release notes from them. You only write the
 `<li>` lines — everything else (version, signature, size, pubDate, URL) is
 filled in by the workflow.
 
-See `docs/git-release-hint-note.md` for the full procedure.
+See "Releasing" in `AGENTS.md` for the procedure.
 
 ## list of changes
 
