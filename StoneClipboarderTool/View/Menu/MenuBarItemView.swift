@@ -57,15 +57,5 @@ struct MenuBarItemView: View {
                 NSCursor.arrow.set()
             }
         }
-        .background(
-            Rectangle()
-                .fill(Color.blue.opacity(0.1))
-                .opacity(0)
-        )
-        .onHover { isHovering in
-            withAnimation(.easeInOut(duration: 0.1)) {
-                // Visual feedback handled by system
-            }
-        }
     }
 }

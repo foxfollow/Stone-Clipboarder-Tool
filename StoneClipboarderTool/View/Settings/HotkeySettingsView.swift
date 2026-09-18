@@ -12,8 +12,6 @@ struct HotkeySettingsView: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var hotkeyManager: HotkeyManager
     @Environment(\.modelContext) private var modelContext
-    @State private var showingConflictAlert = false
-    @State private var conflictMessage = ""
     @State private var currentlyRecordingID: UUID? = nil
 
     var body: some View {
@@ -84,11 +82,6 @@ struct HotkeySettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Hotkey Settings")
-        .alert("Hotkey Conflict", isPresented: $showingConflictAlert) {
-            Button("OK") { /* No action needed for acknowledgement */ }
-        } message: {
-            Text(conflictMessage)
-        }
         .onChange(of: settingsManager.maxLastItems) { _, _ in
             hotkeyManager.refreshHotkeyRegistrations()
         }

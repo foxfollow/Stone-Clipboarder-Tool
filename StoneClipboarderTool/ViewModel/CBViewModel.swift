@@ -259,15 +259,6 @@ class CBViewModel: ObservableObject {
         clipboardManager.startMonitoring()
     }
 
-    func stopClipboardMonitoring() {
-        clipboardManager.stopMonitoring()
-    }
-
-    func selectItem(_ item: CBItem) {
-        selectedItem = item
-        lastAccessTimes[item.persistentModelID] = Date()
-    }
-
     private func handleClipboardChange(_ clipboardContent: ClipboardContent) {
         switch clipboardContent {
         case .text(let content):
@@ -372,10 +363,6 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    func copyItem(_ item: CBItem) {
-        copyAndUpdateItem(item)
-    }
-
     /// Puts the item on the pasteboard and moves it to the top of the history.
     /// Returns false when the item had nothing to copy.
     @discardableResult
@@ -452,22 +439,6 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    func updateFavoriteOrder(_ favorites: [CBItem]) {
-        guard let modelContext = _modelContext else { return }
-
-        for (index, item) in favorites.enumerated() {
-            item.orderIndex = index
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to update favorite order", category: "SwiftData", error: error)
-        }
-    }
-
     /// Newest first. `items` is kept in that order by every fetch and change.
     var recentItems: [CBItem] {
         items
@@ -501,23 +472,6 @@ class CBViewModel: ObservableObject {
                 ErrorLogger.shared.log("Failed to delete all items", category: "SwiftData", error: error)
                 self?.fetchItems(reset: true)
             }
-        }
-    }
-
-    func deleteAllFavorites() {
-        guard let modelContext = _modelContext else { return }
-
-        for item in items where item.isFavorite {
-            item.isFavorite = false
-            item.orderIndex = 0
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to clear all favorites", category: "SwiftData", error: error)
         }
     }
 

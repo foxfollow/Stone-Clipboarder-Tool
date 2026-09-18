@@ -40,11 +40,6 @@ class KeyCapturingPanel: NSPanel {
         return canBecomeKey
     }
 
-    override func becomeFirstResponder() -> Bool {
-        let result = super.becomeFirstResponder()
-        return result
-    }
-
     override func sendEvent(_ event: NSEvent) {
         super.sendEvent(event)
 
@@ -81,8 +76,6 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     nonisolated(unsafe) private var keyMonitor: Any?
     nonisolated(unsafe) private var localKeyMonitor: Any?
     private var previousApp: NSRunningApplication?
-    private var isDragging = false
-    private var dragOffset: NSPoint = NSPoint.zero
     private var menuBarRefreshCallback: (() -> Void)?
     /// Where the user last left the picker. Kept for this session only: the
     /// picker opens centered after every launch.
@@ -423,14 +416,6 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     func hidePreviewPanel() {
         quickLookCoordinator.hidePreview()
         customPreviewManager.hidePreview()
-    }
-
-    func handleKeyEvent(_ event: NSEvent) {
-        // This method is no longer used - key handling moved to local monitor
-    }
-
-    func isQuickPickerVisible() -> Bool {
-        return window?.isVisible == true
     }
 
     private func setupEventMonitoring() {

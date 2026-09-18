@@ -177,14 +177,6 @@ struct SwipeableRow<Content: View>: View {
         }
     }
 
-    init(@ViewBuilder content: () -> Content, onDelete: @escaping () -> Void) {
-        self.content = content()
-        self.onDelete = onDelete
-        self.item = nil
-        self.onPreview = nil
-        self.onOpenMain = nil
-    }
-
     init(
         item: CBItem,
         onDelete: @escaping () -> Void,
@@ -347,29 +339,5 @@ struct SwipeableRow<Content: View>: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             onDelete()
         }
-    }
-}
-
-// Alternative simple version that responds to keyboard delete key
-struct KeyboardDeleteableRow<Content: View>: View {
-    let content: Content
-    let onDelete: () -> Void
-    @FocusState private var isFocused: Bool
-
-    init(@ViewBuilder content: () -> Content, onDelete: @escaping () -> Void) {
-        self.content = content()
-        self.onDelete = onDelete
-    }
-
-    var body: some View {
-        content
-            .focusable()
-            .focused($isFocused)
-            .onDeleteCommand {
-                onDelete()
-            }
-            .onTapGesture {
-                isFocused = true
-            }
     }
 }

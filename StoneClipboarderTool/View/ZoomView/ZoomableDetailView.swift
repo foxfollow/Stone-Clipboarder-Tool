@@ -373,7 +373,7 @@ struct ZoomableDetailView: View {
     }
     
     private func copyFileToClipboard() {
-        cbViewModel.copyItem(item)
+        cbViewModel.copyAndUpdateItem(item)
     }
 }
 

@@ -351,8 +351,6 @@ final class SettingsManager: ObservableObject {
             self.clipboardCaptureMode = .textOnly
         }
 
-        //        self.autoSelectOnPaste = defaults.object(forKey: "autoSelectOnPaste") as? Bool ?? true
-
         // Default to showing menubar if first launch
         if defaults.object(forKey: "showInMenubar") == nil {
             self.showInMenubar = true

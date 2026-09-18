@@ -213,8 +213,7 @@ final class CBItem {
         }
 
         guard let image = self.image else { return "Unknown size" }
-        let size = image.size
-        return "\(Int(size.width))×\(Int(size.height))"
+        return Self.sizeDescription(image.size)
     }
 
     /// Stored as PNG: an uncompressed TIFF of the same 80 pt image is several
@@ -341,11 +340,6 @@ final class CBItem {
             fileData: other.fileData, fileName: other.fileName))
     }
 
-    static func findExistingItem(in items: [CBItem], matching newItem: CBItem) -> CBItem? {
-        return items.first { existingItem in
-            newItem.isDuplicate(of: existingItem)
-        }
-    }
 }
 
 extension NSImage {

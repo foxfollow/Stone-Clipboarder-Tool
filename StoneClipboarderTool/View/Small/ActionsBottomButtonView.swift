@@ -66,7 +66,6 @@ struct ActionsBottomButtonView: View {
                     // Save changes first, then copy
                     saveTextChanges()
                 }
-//                cbViewModel.copyItem(item)
                 cbViewModel.copyAndUpdateItem(item)
             }
             .buttonStyle(.bordered)

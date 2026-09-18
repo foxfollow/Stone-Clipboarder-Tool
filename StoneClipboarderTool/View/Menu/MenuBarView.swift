@@ -114,12 +114,6 @@ struct MenuBarView: View {
         .background(Color(NSColor.controlBackgroundColor))
     }
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            cbViewModel.deleteItems(at: offsets, from: cbViewModel.items)
-        }
-    }
-
     private func openInPreview(item: CBItem) {
         cbViewModel.openInPreview(item)
     }

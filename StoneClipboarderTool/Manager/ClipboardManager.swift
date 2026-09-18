@@ -201,15 +201,6 @@ final class ClipboardManager: ObservableObject {
         lastChangeCount = pasteboard.changeCount
     }
     
-    private func createSavePanel() -> NSSavePanel? {
-        // Try to create save panel safely
-        let savePanel = NSSavePanel()
-
-        // Test if we can access basic properties (will fail in strict sandbox)
-        _ = savePanel.canCreateDirectories
-        return savePanel
-    }
-    
     /// Puts a file on the pasteboard. The file stays on disk until the next
     /// file copy — see PasteboardFileStore.
     @discardableResult
@@ -227,11 +218,7 @@ final class ClipboardManager: ObservableObject {
     }
 
     func saveItemToFile(_ item: CBItem) {
-        // Try to create save panel - if it crashes, it's likely a sandbox issue
-        guard let savePanel = createSavePanel() else {
-            ErrorLogger.shared.log("Cannot create save panel - check app sandbox entitlements", category: "SaveToFile")
-            return
-        }
+        let savePanel = NSSavePanel()
 
         // Configure save panel based on item type
         switch item.itemType {
@@ -317,21 +304,12 @@ final class ClipboardManager: ObservableObject {
                         }
                     }
 
-                    await self.logSuccessOnMain()
-
+                    ErrorLogger.shared.debug("Item saved to file", category: "SaveToFile")
                 } catch {
-                    await self.logErrorOnMain(error)
+                    ErrorLogger.shared.log("Failed to save item to file", category: "SaveToFile", error: error)
                 }
             }
         }
-    }
-    
-    private func logSuccessOnMain() {
-        ErrorLogger.shared.debug("Item saved to file", category: "SaveToFile")
-    }
-    
-    private func logErrorOnMain(_ error: Error) {
-        ErrorLogger.shared.log("Failed to save item to file", category: "SaveToFile", error: error)
     }
     
     /// Puts the item on the pasteboard. Returns false when it has nothing to
