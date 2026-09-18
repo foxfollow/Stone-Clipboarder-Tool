@@ -338,10 +338,7 @@ class HotkeyManager: ObservableObject {
             return
         }
 
-        let item = items[index]
-        Task { @MainActor in
-            pasteItemToActiveApplication(item)
-        }
+        pasteItemToActiveApplication(items[index])
     }
 
     private func executeFavoriteAction(index: Int) {
@@ -360,116 +357,16 @@ class HotkeyManager: ObservableObject {
             return
         }
 
-        let item = favoriteItems[index]
-        Task { @MainActor in
-            pasteItemToActiveApplication(item)
-        }
+        pasteItemToActiveApplication(favoriteItems[index])
     }
 
-    @MainActor
     private func pasteItemToActiveApplication(_ item: CBItem) {
-        guard cbViewModel != nil else {
-            return
-        }
-
-        guard !item.displayContent.isEmpty else {
-            return
-        }
-
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-
-        var copySuccessful = false
-
-        switch item.itemType {
-        case .text:
-            if let content = item.content,
-                !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            {
-                pasteboard.setString(content, forType: .string)
-                copySuccessful = true
-            }
-        case .image:
-            if let imageData = item.imageData,
-                !imageData.isEmpty,
-                let image = NSImage(data: imageData)
-            {
-                pasteboard.writeObjects([image])
-                copySuccessful = true
-            }
-        case .file:
-            if let fileData = item.fileData,
-                !fileData.isEmpty,
-                let fileName = item.fileName,
-                !fileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            {
-                let tempDir = FileManager.default.temporaryDirectory
-                let tempFile = tempDir.appendingPathComponent(fileName)
-                do {
-                    try fileData.write(to: tempFile)
-                    pasteboard.writeObjects([tempFile as NSURL])
-                    copySuccessful = true
-                } catch {
-                    ErrorLogger.shared.log("Failed to write temp file for hotkey paste", category: "Hotkeys", error: error)
-                }
-            }
-        case .combined:
-            // Copy both text and image to clipboard
-            var objects: [NSPasteboardWriting] = []
-
-            if let content = item.content,
-               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            {
-                objects.append(content as NSPasteboardWriting)
-            }
-
-            if let imageData = item.imageData,
-               !imageData.isEmpty,
-               let image = NSImage(data: imageData)
-            {
-                objects.append(image)
-            }
-
-            if !objects.isEmpty {
-                pasteboard.writeObjects(objects)
-                copySuccessful = true
-            }
-        }
-
-        if copySuccessful {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.simulatePasteKeyPress()
-            }
-
-            Task { @MainActor in
-                guard let viewModel = self.cbViewModel else { return }
-                viewModel.copyAndUpdateItem(item)
-
-            }
-        }
-    }
-
-    private func simulatePasteKeyPress() {
-        guard let source = CGEventSource(stateID: .hidSystemState) else {
-            return
-        }
-
-        guard
-            let keyDownEvent = CGEvent(
-                keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
-            let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-        else {
-            return
-        }
-
-        keyDownEvent.flags = .maskCommand
-        keyUpEvent.flags = .maskCommand
-
-        keyDownEvent.post(tap: .cghidEventTap)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            keyUpEvent.post(tap: .cghidEventTap)
-        }
+        // Through the view model → ClipboardManager, which records the new
+        // pasteboard change count so the monitor doesn't capture our own write
+        // (an image written here used to come back as a duplicate item). It
+        // also moves the item to the top of the history.
+        guard let cbViewModel, cbViewModel.copyAndUpdateItem(item) else { return }
+        PasteSimulator.paste()
     }
 
     // MARK: - Helper Methods

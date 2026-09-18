@@ -701,15 +701,10 @@ struct QuickPickerView: View {
         guard selectedIndex < filteredItems.count else { return }
 
         let item = filteredItems[selectedIndex]
-
-        viewModel.markItemAccessed(item)
-        copyToPasteboard(item)
+        guard viewModel.copyAndUpdateItem(item) else { return }
 
         onClose()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            simulatePaste()
-        }
+        PasteSimulator.paste()
     }
 
     // Resolved Shift+Arrow selection range, clamped to current items.
@@ -760,20 +755,20 @@ struct QuickPickerView: View {
             let joined = items.compactMap { $0.content }.joined(separator: "\n")
             items.forEach { viewModel.markItemAccessed($0) }
 
-            let pb = NSPasteboard.general
-            pb.clearContents()
-            pb.setString(joined, forType: .string)
+            // Through ClipboardManager, so the monitor doesn't save the joined
+            // text as yet another history item.
+            viewModel.getClipboardManager().copyToClipboard(joined)
 
             onClose()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                simulatePaste()
-            }
+            PasteSimulator.paste()
         } else {
             items.forEach { viewModel.markItemAccessed($0) }
             onClose()
+            // One Accessibility alert up front rather than one per item.
+            guard PasteSimulator.ensureAccessibility() else { return }
             // Let focus return to the previously-active window first, then
             // start the sequential paste chain.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + PasteSimulator.defaultDelay) {
                 pasteSequentially(items, at: 0)
             }
         }
@@ -786,14 +781,12 @@ struct QuickPickerView: View {
         guard index < items.count else { return }
         let item = items[index]
         viewModel.copyAndUpdateItem(item)
+        PasteSimulator.paste(after: 0.05)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            simulatePaste()
-            let next = index + 1
-            guard next < items.count else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                pasteSequentially(items, at: next)
-            }
+        let next = index + 1
+        guard next < items.count else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            pasteSequentially(items, at: next)
         }
     }
 
@@ -821,10 +814,6 @@ struct QuickPickerView: View {
     private func togglePreview() {
         guard selectedIndex < filteredItems.count else { return }
         onPreviewToggle(filteredItems[selectedIndex])
-    }
-
-    private func copyToPasteboard(_ item: CBItem) {
-        viewModel.copyAndUpdateItem(item)
     }
 
     private func performOCRAction() {
@@ -872,13 +861,13 @@ struct QuickPickerView: View {
                   !recognizedText.isEmpty else { return }
 
             DispatchQueue.main.async {
+                // Straight to the pasteboard on purpose: the clipboard monitor
+                // then saves the recognized text as a history item, honoring
+                // pause and excluded apps.
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(recognizedText, forType: .string)
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    self.simulatePaste()
-                }
+                PasteSimulator.paste()
             }
         }
     }
@@ -954,13 +943,12 @@ struct QuickPickerView: View {
             guard !combined.isEmpty else { return }
 
             DispatchQueue.main.async {
+                // Straight to the pasteboard on purpose, like single OCR: the
+                // monitor saves the recognized text as a history item.
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.setString(combined, forType: .string)
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    simulatePaste()
-                }
+                PasteSimulator.paste()
             }
         }
     }
@@ -988,29 +976,6 @@ struct QuickPickerView: View {
             return nil
         }
         return box.text.isEmpty ? nil : box.text
-    }
-
-    private func simulatePaste() {
-        if !AccessibilityAlertHelper.isAccessibilityGranted {
-            AccessibilityAlertHelper.showAccessibilityAlert()
-            return
-        }
-
-        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
-
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-
-        keyDown?.flags = .maskCommand
-        keyUp?.flags = .maskCommand
-
-        let location = CGEventTapLocation.cghidEventTap
-
-        keyDown?.post(tap: location)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            keyUp?.post(tap: location)
-        }
     }
 
     // Whether the current selection is something performTypePaste can act on:
@@ -1052,10 +1017,7 @@ struct QuickPickerView: View {
 
         guard let text = targetText, !text.isEmpty else { return }
 
-        if !AccessibilityAlertHelper.isAccessibilityGranted {
-            AccessibilityAlertHelper.showAccessibilityAlert()
-            return
-        }
+        guard PasteSimulator.ensureAccessibility() else { return }
 
         onClose()
         // Let focus return to the previously-active window before typing.

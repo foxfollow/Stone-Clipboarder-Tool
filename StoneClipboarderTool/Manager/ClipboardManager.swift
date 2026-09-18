@@ -240,7 +240,8 @@ final class ClipboardManager: ObservableObject {
         return savePanel
     }
     
-    func copyFileToClipboard(data: Data, fileName: String, uti: String) {
+    @discardableResult
+    func copyFileToClipboard(data: Data, fileName: String, uti: String) -> Bool {
         // Create a temporary file to copy to clipboard
         let tempDir = FileManager.default.temporaryDirectory
         let tempFile = tempDir.appendingPathComponent(fileName)
@@ -256,8 +257,10 @@ final class ClipboardManager: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                 try? FileManager.default.removeItem(at: tempFile)
             }
+            return true
         } catch {
             ErrorLogger.shared.log("Failed to create temp file for clipboard", category: "Clipboard", error: error)
+            return false
         }
     }
     
@@ -369,38 +372,39 @@ final class ClipboardManager: ObservableObject {
         ErrorLogger.shared.log("Failed to save item to file", category: "SaveToFile", error: error)
     }
     
-    func copyItemToClipboard(_ item: CBItem) {
+    /// Puts the item on the pasteboard. Returns false when it has nothing to
+    /// copy (missing content or undecodable image data).
+    @discardableResult
+    func copyItemToClipboard(_ item: CBItem) -> Bool {
         switch item.itemType {
         case .text:
-            if let content = item.content {
-                copyToClipboard(content)
-            }
+            guard let content = item.content, !content.isEmpty else { return false }
+            copyToClipboard(content)
+            return true
         case .image:
-            if let image = item.image {
-                copyToClipboard(image)
-            }
+            guard let image = item.image else { return false }
+            copyToClipboard(image)
+            return true
         case .file:
-            if let fileData = item.fileData,
-               let fileName = item.fileName,
-               let uti = item.fileUTI {
-                copyFileToClipboard(data: fileData, fileName: fileName, uti: uti)
-            }
+            guard let fileData = item.fileData,
+                  let fileName = item.fileName,
+                  let uti = item.fileUTI
+            else { return false }
+            return copyFileToClipboard(data: fileData, fileName: fileName, uti: uti)
         case .combined:
             // Copy both text and image to clipboard
-            pasteboard.clearContents()
             var objects: [NSPasteboardWriting] = []
-
-            if let content = item.content {
+            if let content = item.content, !content.isEmpty {
                 objects.append(content as NSPasteboardWriting)
             }
             if let image = item.image {
                 objects.append(image)
             }
-
-            if !objects.isEmpty {
-                pasteboard.writeObjects(objects)
-                lastChangeCount = pasteboard.changeCount
-            }
+            guard !objects.isEmpty else { return false }
+            pasteboard.clearContents()
+            pasteboard.writeObjects(objects)
+            lastChangeCount = pasteboard.changeCount
+            return true
         }
     }
 

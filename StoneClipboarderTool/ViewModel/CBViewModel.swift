@@ -386,13 +386,15 @@ class CBViewModel: ObservableObject {
         copyAndUpdateItem(item)
     }
 
-    func copyAndUpdateItem(_ item: CBItem) {
-        clipboardManager.copyItemToClipboard(item)
-
-        guard let modelContext = _modelContext else { return }
-        item.timestamp = Date()
+    /// Puts the item on the pasteboard and moves it to the top of the history.
+    /// Returns false when the item had nothing to copy.
+    @discardableResult
+    func copyAndUpdateItem(_ item: CBItem) -> Bool {
+        guard clipboardManager.copyItemToClipboard(item) else { return false }
 
         markItemAccessed(item)
+        guard let modelContext = _modelContext else { return true }
+        item.timestamp = Date()
 
         do {
             try modelContext.save()
@@ -401,6 +403,7 @@ class CBViewModel: ObservableObject {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to update item timestamp", category: "SwiftData", error: error)
         }
+        return true
     }
 
     func saveItemToFile(_ item: CBItem) {
