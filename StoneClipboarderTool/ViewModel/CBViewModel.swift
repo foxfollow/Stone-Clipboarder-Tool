@@ -19,6 +19,9 @@ class CBViewModel: ObservableObject {
     // counted against this number, so they can't be auto-cleaned.
     @Published var totalItemCount: Int = 0
     @Published var favoriteItemCount: Int = 0
+    /// Favorites in their user-defined order. Cached because views read it on
+    /// every render and hotkeys on every press; reloaded with `items`.
+    @Published private(set) var favoriteItems: [CBItem] = []
 
     var inMemoryItemCount: Int { items.count }
 
@@ -96,7 +99,22 @@ class CBViewModel: ObservableObject {
             ErrorLogger.shared.log("Failed to fetch recent items", category: "SwiftData", error: error)
             items = []
         }
+        reloadFavorites()
         refreshItemCounts()
+    }
+
+    private func reloadFavorites() {
+        guard let modelContext = _modelContext else { return }
+        let descriptor = FetchDescriptor<CBItem>(
+            predicate: #Predicate { $0.isFavorite },
+            sortBy: [SortDescriptor(\.orderIndex, order: .forward)]
+        )
+        do {
+            favoriteItems = try modelContext.fetch(descriptor)
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch favorite items", category: "SwiftData", error: error)
+            favoriteItems = []
+        }
     }
 
     private func loadNextPage(size: Int) {
@@ -171,8 +189,9 @@ class CBViewModel: ObservableObject {
             name: .clipboardItemDeleted, object: item.persistentModelID
         )
 
-        // Remove from published array so SwiftUI drops the view
+        // Remove from published arrays so SwiftUI drops the view
         items.removeAll { $0.id == item.id }
+        favoriteItems.removeAll { $0.id == item.id }
 
         // Defer context deletion to next run loop so SwiftUI finishes layout first
         DispatchQueue.main.async { [weak self] in
@@ -208,8 +227,9 @@ class CBViewModel: ObservableObject {
             NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
         }
 
-        // Remove from published array so SwiftUI drops views
+        // Remove from published arrays so SwiftUI drops views
         items.removeAll { idsToDelete.contains($0.id) }
+        favoriteItems.removeAll { idsToDelete.contains($0.id) }
 
         // Defer context deletion to next run loop
         DispatchQueue.main.async { [weak self] in
@@ -528,24 +548,9 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    var favoriteItems: [CBItem] {
-        guard let modelContext = _modelContext else { return [] }
-
-        let descriptor = FetchDescriptor<CBItem>(
-            predicate: #Predicate { $0.isFavorite },
-            sortBy: [SortDescriptor(\.orderIndex, order: .forward)]
-        )
-
-        do {
-            return try modelContext.fetch(descriptor)
-        } catch {
-            ErrorLogger.shared.log("Failed to fetch favorite items", category: "SwiftData", error: error)
-            return []
-        }
-    }
-
+    /// Newest first. `items` is kept in that order by every fetch and change.
     var recentItems: [CBItem] {
-        return items.sorted { $0.timestamp > $1.timestamp }
+        items
     }
 
     func deleteAllItems() {
@@ -554,6 +559,7 @@ class CBViewModel: ObservableObject {
         // 1. Clear all UI state synchronously so SwiftUI stops referencing items
         selectedItem = nil
         items = []
+        favoriteItems = []
         NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
         // Tell PinManager — `object: nil` means "all items wiped".
         NotificationCenter.default.post(name: .clipboardItemDeleted, object: nil)

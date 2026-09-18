@@ -83,6 +83,35 @@ final class CBViewModelListTests: XCTestCase {
         XCTAssertFalse(viewModel.isLoadingMore, "only performSetup loads the first rows")
     }
 
+    // MARK: - Favorites cache
+
+    func testFavoritesFollowTogglesInTheirOrder() throws {
+        try insertTextItems(count: 3)
+        viewModel.fetchItems(reset: true)
+        XCTAssertTrue(viewModel.favoriteItems.isEmpty)
+        let first = try XCTUnwrap(viewModel.items.first { $0.content == "item 0" })
+        let second = try XCTUnwrap(viewModel.items.first { $0.content == "item 2" })
+
+        viewModel.toggleFavorite(first)
+        viewModel.toggleFavorite(second)
+        XCTAssertEqual(viewModel.favoriteItems.map(\.content), ["item 0", "item 2"])
+
+        viewModel.toggleFavorite(first)
+        XCTAssertEqual(viewModel.favoriteItems.map(\.content), ["item 2"])
+    }
+
+    func testDeletingAFavoriteDropsItFromTheCacheRightAway() throws {
+        try insertTextItems(count: 2)
+        viewModel.fetchItems(reset: true)
+        let item = try XCTUnwrap(viewModel.items.first)
+        viewModel.toggleFavorite(item)
+        XCTAssertEqual(viewModel.favoriteItems.count, 1)
+
+        viewModel.deleteItem(item)
+
+        XCTAssertTrue(viewModel.favoriteItems.isEmpty, "views must not keep a row whose backing data is going away")
+    }
+
     // MARK: - Helpers
 
     private func insertTextItems(count: Int) throws {
