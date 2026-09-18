@@ -295,18 +295,10 @@ final class PinDraggableImageView: NSImageView {
 
 // MARK: - Debug logging
 //
-// Temporary diagnostics for pin-image zoom. Prints to stdout (visible in the
-// Xcode console) with a "[PinZoom]" prefix so it's easy to filter and copy.
+// Diagnostics for pin-image zoom, at debug level in the unified log
+// (category "PinZoom"); free when debug logging is off.
 enum PinZoomLog {
-    static func log(_ message: String) {
-        // DEBUG if needed: uncomment to trace pin-image zoom in the console.
-        // let ts = Self.formatter.string(from: Date())
-        // print("[PinZoom \(ts)] \(message)")
+    static func log(_ message: @autoclosure () -> String) {
+        ErrorLogger.shared.debug(message(), category: "PinZoom")
     }
-
-    private static let formatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss.SSS"
-        return f
-    }()
 }

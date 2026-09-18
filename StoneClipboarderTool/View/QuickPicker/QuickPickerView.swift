@@ -1082,7 +1082,7 @@ struct QuickPickerView: View {
             // Don't automatically load more - only when user scrolls
             // The 30 items are enough for immediate use
         } catch {
-            print("Failed to load recent QuickPicker items: \(error)")
+            ErrorLogger.shared.log("Failed to load recent QuickPicker items", category: "QuickPicker", error: error)
             self.quickPickerItems = []
             self.hasMoreItems = false
             self.isLoadingItems = false
@@ -1119,7 +1119,7 @@ struct QuickPickerView: View {
                 }
             } catch {
                 await MainActor.run {
-                    print("Failed to load more QuickPicker items: \(error)")
+                    ErrorLogger.shared.log("Failed to load more QuickPicker items", category: "QuickPicker", error: error)
                     self.hasMoreItems = false
                     self.isLoadingItems = false
                 }
@@ -1164,7 +1164,7 @@ struct QuickPickerView: View {
                 }
             } catch {
                 await MainActor.run {
-                    print("Failed to search QuickPicker items: \(error)")
+                    ErrorLogger.shared.log("Failed to search QuickPicker items", category: "QuickPicker", error: error)
                     self.quickPickerItems = []
                     self.hasMoreItems = false
                     self.isLoadingItems = false
@@ -1260,7 +1260,5 @@ final class TabKeyInterceptor: ObservableObject {
 
 
 #Preview {
-    QuickPickerView(viewModel: CBViewModel(), pinManager: PinManager()) {
-        print("Closed")
-    }
+    QuickPickerView(viewModel: CBViewModel(), pinManager: PinManager()) { /* preview: no-op close */ }
 }

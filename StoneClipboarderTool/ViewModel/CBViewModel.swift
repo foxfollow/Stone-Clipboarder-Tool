@@ -412,7 +412,7 @@ class CBViewModel: ObservableObject {
             do {
                 try await openInPreviewAsync(item: item)
             } catch {
-                print("Failed to open in preview: \(error)")
+                ErrorLogger.shared.log("Failed to open item in Preview", category: "ExternalOpen", error: error)
             }
         }
     }
@@ -706,7 +706,7 @@ class CBViewModel: ObservableObject {
         let cutoffTime = now.addingTimeInterval(-maxInactiveTime)
         lastAccessTimes = lastAccessTimes.filter { $1 > cutoffTime }
 
-        print("Memory cleanup: Released \(itemsToCleanup.count) inactive items (favorites preserved)")
+        ErrorLogger.shared.debug("Memory cleanup: released \(itemsToCleanup.count) inactive items (favorites preserved)", category: "Memory")
     }
 
     private func cleanupItemMemory(_ item: CBItem) {
@@ -795,9 +795,9 @@ class CBViewModel: ObservableObject {
                 do {
                     try modelContext.save()
                     self?.fetchItems(reset: true)
-                    print(
-                        "Cleanup: Removed \(deletedCount) old items, keeping under \(maxItems) limit"
-                    )
+                    ErrorLogger.shared.debug(
+                        "Cleanup: removed \(deletedCount) old items, keeping under \(maxItems) limit",
+                        category: "Cleanup")
                 } catch {
                     modelContext.rollback()
                     ErrorLogger.shared.log("Failed to save item count cleanup", category: "SwiftData", error: error)
@@ -897,7 +897,7 @@ class CBViewModel: ObservableObject {
                 try? FileManager.default.removeItem(at: fileURL)
             }
         } catch {
-            print("Failed to open content in TextEdit: \(error)")
+            ErrorLogger.shared.log("Failed to open text in TextEdit", category: "ExternalOpen", error: error)
         }
     }
 

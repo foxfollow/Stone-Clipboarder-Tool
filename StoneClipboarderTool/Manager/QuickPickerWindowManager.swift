@@ -120,7 +120,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         }
 
         guard let cbViewModel = cbViewModel else {
-            print("CBViewModel is nil")
+            ErrorLogger.shared.log("CBViewModel is nil — QuickPicker cannot start", category: "QuickPicker")
             return
         }
 
@@ -186,7 +186,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
         // Create content view
         guard let pinManager = pinManager else {
-            print("PinManager is nil — QuickPicker cannot start")
+            ErrorLogger.shared.log("PinManager is nil — QuickPicker cannot start", category: "QuickPicker")
             return
         }
         let contentView = QuickPickerView(

@@ -265,7 +265,7 @@ class SettingsManager: ObservableObject {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            print("Failed to update login item: \(error.localizedDescription)")
+            ErrorLogger.shared.log("Failed to update login item", category: "LoginItem", error: error)
         }
     }
 

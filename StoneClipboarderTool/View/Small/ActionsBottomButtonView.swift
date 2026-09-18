@@ -163,7 +163,7 @@ struct ActionsBottomButtonView: View {
             guard let tiffData = image.tiffRepresentation,
                   let bitmapRep = NSBitmapImageRep(data: tiffData),
                   let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-                print("Failed to convert image to PNG")
+                ErrorLogger.shared.log("Failed to convert image to PNG", category: "ExternalOpen")
                 return
             }
             
@@ -179,7 +179,7 @@ struct ActionsBottomButtonView: View {
             }
             
         } catch {
-            print("Error creating temp file for Preview: \(error.localizedDescription)")
+            ErrorLogger.shared.log("Failed to create temp file for Preview", category: "ExternalOpen", error: error)
         }
     }
     
@@ -205,7 +205,7 @@ struct ActionsBottomButtonView: View {
             }
             
         } catch {
-            print("Error creating temp file for Preview: \(error.localizedDescription)")
+            ErrorLogger.shared.log("Failed to create temp file for Preview", category: "ExternalOpen", error: error)
         }
     }
 
@@ -223,19 +223,19 @@ struct ActionsBottomButtonView: View {
 
         guard let image = imageToProcess,
               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            print("Failed to get image for OCR")
+            ErrorLogger.shared.log("Failed to get image for OCR", category: "OCR")
             return
         }
 
         // Create Vision request
         let request = VNRecognizeTextRequest { request, error in
             if let error = error {
-                print("OCR error: \(error.localizedDescription)")
+                ErrorLogger.shared.log("OCR request failed", category: "OCR", error: error)
                 return
             }
 
             guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                print("No text recognized")
+                ErrorLogger.shared.debug("No text recognized", category: "OCR")
                 return
             }
 
@@ -245,14 +245,14 @@ struct ActionsBottomButtonView: View {
             }.joined(separator: "\n")
 
             if recognizedText.isEmpty {
-                print("No text found in image")
+                ErrorLogger.shared.debug("No text found in image", category: "OCR")
                 return
             }
 
             // Create a new text item with extracted text on main thread
             DispatchQueue.main.async {
                 cbViewModel.addTextItem(content: recognizedText)
-                print("Extracted \(recognizedText.count) characters from image")
+                ErrorLogger.shared.debug("Extracted \(recognizedText.count) characters from image", category: "OCR")
             }
         }
 
@@ -266,7 +266,7 @@ struct ActionsBottomButtonView: View {
             do {
                 try requestHandler.perform([request])
             } catch {
-                print("Failed to perform OCR: \(error.localizedDescription)")
+                ErrorLogger.shared.log("Failed to perform OCR", category: "OCR", error: error)
             }
         }
     }

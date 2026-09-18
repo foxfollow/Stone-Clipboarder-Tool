@@ -207,13 +207,13 @@ class ClipboardManager: ObservableObject {
             // Safety check for file size (limit to 100MB)
             let maxFileSize = 100 * 1024 * 1024 // 100MB
             guard fileData.count <= maxFileSize else {
-                print("File too large: \(fileData.count) bytes")
+                ErrorLogger.shared.debug("Skipped copied file over the size limit (\(fileData.count) bytes)", category: "Clipboard")
                 return
             }
             
             onClipboardChange?(.file(fileURL, uti, fileData))
         } catch {
-            print("Error reading file: \(error.localizedDescription)")
+            ErrorLogger.shared.log("Failed to read copied file", category: "Clipboard", error: error)
         }
     }
     
@@ -256,7 +256,7 @@ class ClipboardManager: ObservableObject {
                 try? FileManager.default.removeItem(at: tempFile)
             }
         } catch {
-            print("Error creating temp file for clipboard: \(error.localizedDescription)")
+            ErrorLogger.shared.log("Failed to create temp file for clipboard", category: "Clipboard", error: error)
         }
     }
     
@@ -264,7 +264,7 @@ class ClipboardManager: ObservableObject {
     func saveItemToFile(_ item: CBItem) {
         // Try to create save panel - if it crashes, it's likely a sandbox issue
         guard let savePanel = createSavePanel() else {
-            print("Cannot create save panel - check app sandbox entitlements")
+            ErrorLogger.shared.log("Cannot create save panel - check app sandbox entitlements", category: "SaveToFile")
             return
         }
 
@@ -363,12 +363,12 @@ class ClipboardManager: ObservableObject {
     
     @MainActor
     private func logSuccessOnMain() {
-        print("File saved successfully")
+        ErrorLogger.shared.debug("Item saved to file", category: "SaveToFile")
     }
     
     @MainActor
     private func logErrorOnMain(_ error: Error) {
-        print("Error saving file: \(error.localizedDescription)")
+        ErrorLogger.shared.log("Failed to save item to file", category: "SaveToFile", error: error)
     }
     
     func copyItemToClipboard(_ item: CBItem) {

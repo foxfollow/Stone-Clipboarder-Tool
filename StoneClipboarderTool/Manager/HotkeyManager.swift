@@ -95,7 +95,7 @@ class HotkeyManager: ObservableObject {
             GetApplicationEventTarget(), callback, 1, &eventType, selfPtr, &eventHandler)
 
         if status != noErr {
-            print("Failed to install event handler: \(status)")
+            ErrorLogger.shared.log("Failed to install hotkey event handler (OSStatus \(status))", category: "Hotkeys")
         }
     }
 
@@ -230,7 +230,7 @@ class HotkeyManager: ObservableObject {
         config: HotkeyConfig, action: HotkeyAction, shortcut: String
     ) {
         guard let (keyCode, modifiers) = parseShortcut(shortcut) else {
-            print("Failed to parse shortcut: \(shortcut), setting to None")
+            ErrorLogger.shared.log("Failed to parse shortcut \(shortcut), setting to None", category: "Hotkeys")
             // Set invalid shortcuts to None
             config.shortcutKeys = "None"
             return
@@ -292,7 +292,7 @@ class HotkeyManager: ObservableObject {
             registeredHotkeys[hotkeyID] = hotKeyRef
             hotkeyActions[hotkeyID] = action
         } else {
-            print("Failed to register hotkey: keyCode=\(keyCode), status=\(status)")
+            ErrorLogger.shared.log("Failed to register hotkey keyCode=\(keyCode) (OSStatus \(status))", category: "Hotkeys")
         }
     }
 
@@ -451,7 +451,7 @@ class HotkeyManager: ObservableObject {
                     pasteboard.writeObjects([tempFile as NSURL])
                     copySuccessful = true
                 } catch {
-                    print("Failed to write temp file: \(error)")
+                    ErrorLogger.shared.log("Failed to write temp file for hotkey paste", category: "Hotkeys", error: error)
                 }
             }
         case .combined:

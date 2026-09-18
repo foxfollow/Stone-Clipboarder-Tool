@@ -6,18 +6,33 @@
 //
 
 import Foundation
+import os
 
-/// Centralized error logger that optionally writes errors to a .log file.
-/// Logging to file is controlled by a UserDefaults toggle (disabled by default).
-class ErrorLogger {
+/// Central logger — the app's only singleton.
+///
+/// Everything goes to the unified log (Console.app, subsystem = bundle id,
+/// category = the `category` argument). `log` records errors and, when the
+/// user enables "Save errors to log file", also appends them to a plaintext
+/// file in Application Support. `debug` is for routine diagnostics and never
+/// reaches the file.
+///
+/// Log metadata only (item type, counts, error descriptions) — never
+/// clipboard content: the file is plaintext.
+final class ErrorLogger {
     static let shared = ErrorLogger()
+
+    /// UserDefaults key for the logging toggle
+    static let enableFileLoggingKey = "enableErrorFileLogging"
+
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "StoneClipboarderTool"
 
     private let fileManager = FileManager.default
     private let logFileName = "StoneClipboarder_errors.log"
     private let maxLogFileSize: UInt64 = 5 * 1024 * 1024 // 5 MB
-
-    /// UserDefaults key for the logging toggle
-    static let enableFileLoggingKey = "enableErrorFileLogging"
+    /// Serializes file access; `log` may be called from any thread.
+    private let fileQueue = DispatchQueue(label: "StoneClipboarder.ErrorLogger", qos: .utility)
+    /// Only used on `fileQueue`.
+    private let timestampFormatter = ISO8601DateFormatter()
 
     var isFileLoggingEnabled: Bool {
         UserDefaults.standard.bool(forKey: Self.enableFileLoggingKey)
@@ -33,21 +48,30 @@ class ErrorLogger {
 
     private init() { /* Private initialization to ensure singleton usage */ }
 
-    /// Log an error. Always prints to console. Writes to file if file logging is enabled.
+    /// Log an error: unified log at `.error`, plus the log file when enabled.
     func log(_ message: String, category: String = "General", error: Error? = nil) {
-        let timestamp = ISO8601DateFormatter().string(from: Date())
-        var logLine = "[\(timestamp)] [\(category)] \(message)"
+        var line = "[\(category)] \(message)"
         if let error = error {
-            logLine += " | Error: \(error.localizedDescription)"
+            line += " | Error: \(error.localizedDescription)"
         }
 
-        // Always print to console
-        print(logLine)
+        Logger(subsystem: Self.subsystem, category: category).error("\(line, privacy: .public)")
 
-        // Write to file if enabled
         guard isFileLoggingEnabled else { return }
+        let now = Date()
+        fileQueue.async {
+            self.writeToFile("[\(self.timestampFormatter.string(from: now))] \(line)")
+        }
+    }
 
-        writeToFile(logLine)
+    /// Routine diagnostics (not errors): unified log at `.debug` only, never the
+    /// file. The message is only built when debug logging is enabled — see it
+    /// with `log stream --level debug --predicate 'subsystem == "<bundle id>"'`.
+    func debug(_ message: @autoclosure () -> String, category: String = "General") {
+        let osLog = OSLog(subsystem: Self.subsystem, category: category)
+        guard osLog.isEnabled(type: .debug) else { return }
+        let text = message()
+        Logger(osLog).debug("\(text, privacy: .public)")
     }
 
     private func writeToFile(_ line: String) {
@@ -62,21 +86,22 @@ class ErrorLogger {
                 if fileSize > maxLogFileSize {
                     rotateLogFile(at: url)
                 }
+            }
 
+            if fileManager.fileExists(atPath: url.path) {
                 // Append to existing file
                 let fileHandle = try FileHandle(forWritingTo: url)
-                fileHandle.seekToEndOfFile()
-                if let data = lineWithNewline.data(using: .utf8) {
-                    fileHandle.write(data)
-                }
-                fileHandle.closeFile()
+                defer { try? fileHandle.close() }
+                try fileHandle.seekToEnd()
+                try fileHandle.write(contentsOf: Data(lineWithNewline.utf8))
             } else {
-                // Create new file
+                // Create new file (also right after a rotation)
                 try lineWithNewline.write(to: url, atomically: true, encoding: .utf8)
             }
         } catch {
-            // Silently fail — we can't log a logging failure
-            print("ErrorLogger: Failed to write to log file: \(error)")
+            // Can't log a logging failure to the file; the unified log still works.
+            Logger(subsystem: Self.subsystem, category: "ErrorLogger")
+                .error("Failed to write to log file: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -93,7 +118,9 @@ class ErrorLogger {
 
     /// Clears the log file
     func clearLog() {
-        try? fileManager.removeItem(at: logFileURL)
+        fileQueue.sync {
+            try? fileManager.removeItem(at: logFileURL)
+        }
     }
 
     /// Returns the log file size as a formatted string
