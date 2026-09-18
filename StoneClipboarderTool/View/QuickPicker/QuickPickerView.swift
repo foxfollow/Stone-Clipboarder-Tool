@@ -9,7 +9,6 @@ import AppKit
 import ApplicationServices
 import SwiftData
 import SwiftUI
-import Vision
 
 enum QPTab: Hashable, CaseIterable, Identifiable {
     case all
@@ -796,7 +795,7 @@ struct QuickPickerView: View {
         }
 
         guard let image = imageToProcess,
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+              let cgImage = TextRecognizer.cgImage(from: image) else {
             // Couldn't get CGImage — fall through to normal paste
             performAction()
             return
@@ -808,7 +807,7 @@ struct QuickPickerView: View {
 
         // Run OCR on background thread
         DispatchQueue.global(qos: .userInitiated).async {
-            guard let recognizedText = Self.recognizeText(in: cgImage),
+            guard let recognizedText = TextRecognizer.recognizeText(in: cgImage),
                   !recognizedText.isEmpty else { return }
 
             DispatchQueue.main.async {
@@ -843,20 +842,20 @@ struct QuickPickerView: View {
                 if let c = item.content, !c.isEmpty { return .text(c) }
                 if item.itemType == .combined,
                    let img = item.image,
-                   let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                   let cg = TextRecognizer.cgImage(from: img) {
                     return .image(cg)
                 }
                 return nil
             case .image:
                 guard let img = item.image,
-                      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                      let cg = TextRecognizer.cgImage(from: img) else {
                     return nil
                 }
                 return .image(cg)
             case .file:
                 guard item.isImageFile,
                       let img = item.filePreviewImage,
-                      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                      let cg = TextRecognizer.cgImage(from: img) else {
                     return nil
                 }
                 return .image(cg)
@@ -884,7 +883,7 @@ struct QuickPickerView: View {
                 case .text(let s):
                     parts.append(s)
                 case .image(let cg):
-                    if let recognized = Self.recognizeText(in: cg) {
+                    if let recognized = TextRecognizer.recognizeText(in: cg) {
                         parts.append(recognized)
                     }
                 }
@@ -902,31 +901,6 @@ struct QuickPickerView: View {
                 PasteSimulator.paste()
             }
         }
-    }
-
-    // Synchronous Vision OCR. Safe to call concurrently — each invocation
-    // creates its own request and handler with no captured mutable state.
-    private static func recognizeText(in cgImage: CGImage) -> String? {
-        final class Box { var text: String = "" }
-        let box = Box()
-
-        let request = VNRecognizeTextRequest { req, _ in
-            guard let observations = req.results as? [VNRecognizedTextObservation] else {
-                return
-            }
-            box.text = observations.compactMap { $0.topCandidates(1).first?.string }
-                .joined(separator: "\n")
-        }
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        do {
-            try handler.perform([request])
-        } catch {
-            return nil
-        }
-        return box.text.isEmpty ? nil : box.text
     }
 
     // Whether the current selection is something performTypePaste can act on:

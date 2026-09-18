@@ -6,7 +6,6 @@
 
 import SwiftUI
 import AppKit
-import Vision
 
 struct ActionsBottomButtonView: View {
     @EnvironmentObject var cbViewModel: CBViewModel
@@ -141,8 +140,8 @@ struct ActionsBottomButtonView: View {
         cbViewModel.openInPreview(item)
     }
 
+    /// OCR the image into a new text item (on-device, see TextRecognizer).
     private func extractTextFromImage() {
-        // Get the image based on item type
         let imageToProcess: NSImage?
         switch item.itemType {
         case .image:
@@ -153,54 +152,21 @@ struct ActionsBottomButtonView: View {
             imageToProcess = nil
         }
 
-        guard let image = imageToProcess,
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+        guard let image = imageToProcess, let cgImage = TextRecognizer.cgImage(from: image) else {
             ErrorLogger.shared.log("Failed to get image for OCR", category: "OCR")
             return
         }
 
-        // Create Vision request
-        let request = VNRecognizeTextRequest { request, error in
-            if let error = error {
-                ErrorLogger.shared.log("OCR request failed", category: "OCR", error: error)
-                return
-            }
-
-            guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                ErrorLogger.shared.debug("No text recognized", category: "OCR")
-                return
-            }
-
-            // Extract all recognized text
-            let recognizedText = observations.compactMap { observation in
-                observation.topCandidates(1).first?.string
-            }.joined(separator: "\n")
-
-            if recognizedText.isEmpty {
-                ErrorLogger.shared.debug("No text found in image", category: "OCR")
-                return
-            }
-
-            // Create a new text item with extracted text on main thread
+        DispatchQueue.global(qos: .userInitiated).async {
+            let recognizedText = TextRecognizer.recognizeText(in: cgImage)
             DispatchQueue.main.async {
+                guard let recognizedText else {
+                    ErrorLogger.shared.debug("No text found in image", category: "OCR")
+                    return
+                }
                 cbViewModel.addTextItem(content: recognizedText)
                 ErrorLogger.shared.debug("Extracted \(recognizedText.count) characters from image", category: "OCR")
             }
         }
-
-        // Configure request for best accuracy
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-
-        // Perform OCR
-        let requestHandler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try requestHandler.perform([request])
-            } catch {
-                ErrorLogger.shared.log("Failed to perform OCR", category: "OCR", error: error)
-            }
-        }
     }
-
 }
