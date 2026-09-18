@@ -122,7 +122,7 @@ struct MenuBarView: View {
     }
 
     private func openInPreview(item: CBItem) {
-        cbViewModel.openInPreview(item: item)
+        cbViewModel.openInPreview(item)
     }
 
     private func showMainWindow() {

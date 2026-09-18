@@ -400,86 +400,6 @@ class CBViewModel: ObservableObject {
         clipboardManager.saveItemToFile(item)
     }
 
-    func openInPreview(item: CBItem) {
-        Task {
-            do {
-                try await openInPreviewAsync(item: item)
-            } catch {
-                ErrorLogger.shared.log("Failed to open item in Preview", category: "ExternalOpen", error: error)
-            }
-        }
-    }
-
-    private func openInPreviewAsync(item: CBItem) async throws {
-        switch item.itemType {
-        case .image, .combined:
-            try await openImageInPreview(item)
-        case .file:
-            if item.isImageFile {
-                try await openImageFileInPreview(item)
-            } else {
-                throw NSError(
-                    domain: "CBViewModel", code: -1,
-                    userInfo: [
-                        NSLocalizedDescriptionKey: "Only image files can be opened in Preview"
-                    ])
-            }
-        case .text:
-            throw NSError(
-                domain: "CBViewModel", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Text items cannot be opened in Preview"])
-        }
-    }
-
-    private func openImageInPreview(_ item: CBItem) async throws {
-        guard let image = item.image else {
-            throw NSError(
-                domain: "CBViewModel", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "No image data available"])
-        }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = "clipboard_image_\(UUID().uuidString).png"
-        let tempFile = tempDir.appendingPathComponent(fileName)
-
-        guard let tiffData = image.tiffRepresentation,
-            let bitmapRep = NSBitmapImageRep(data: tiffData),
-            let pngData = bitmapRep.representation(using: .png, properties: [:])
-        else {
-            throw NSError(
-                domain: "CBViewModel", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to PNG"])
-        }
-
-        try pngData.write(to: tempFile)
-        NSWorkspace.shared.open(tempFile)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-            try? FileManager.default.removeItem(at: tempFile)
-        }
-    }
-
-    private func openImageFileInPreview(_ item: CBItem) async throws {
-        guard let fileData = item.fileData,
-            let fileName = item.fileName
-        else {
-            throw NSError(
-                domain: "CBViewModel", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "No file data available"])
-        }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
-        let tempFile = tempDir.appendingPathComponent(tempFileName)
-
-        try fileData.write(to: tempFile)
-        NSWorkspace.shared.open(tempFile)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-            try? FileManager.default.removeItem(at: tempFile)
-        }
-    }
-
     func updateItemContent(_ item: CBItem, newContent: String) {
         guard let modelContext = _modelContext else { return }
 
@@ -875,92 +795,25 @@ class CBViewModel: ObservableObject {
         lastAccessTimes[item.persistentModelID] = Date()
     }
 
-    func openFileInExternalApp(_ item: CBItem) throws {
-        guard item.itemType == .file else {
-            throw NSError(
-                domain: "CBViewModel",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Item is not a file"])
-        }
-
-        guard let fileData = item.fileData else {
-            throw NSError(
-                domain: "CBViewModel",
-                code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "No file data available"])
-        }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = item.fileName ?? "unknown_file"
-        // Use a unique name to avoid conflicts
-        let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
-        let tempFile = tempDir.appendingPathComponent(tempFileName)
-
-        try fileData.write(to: tempFile)
-        NSWorkspace.shared.open(tempFile)
-
-        // Clean up after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-            try? FileManager.default.removeItem(at: tempFile)
-        }
-    }
-
+    /// Opens the item in the app that fits it: an image (or the image of a
+    /// text + image item) in Preview, a file — whatever its type — in its
+    /// default app. Text items use `openInTextEdit`.
     func openInPreview(_ item: CBItem) {
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileURL: URL
-
-        if let image = item.image ?? item.filePreviewImage {
-            // It's an image (or file with image preview)
-            let fileName = "clipboard_image_\(UUID().uuidString).png"
-            fileURL = tempDir.appendingPathComponent(fileName)
-
-            guard let tiffData = image.tiffRepresentation,
-                  let bitmapRep = NSBitmapImageRep(data: tiffData),
-                  let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-                return
-            }
-
-            try? pngData.write(to: fileURL)
-        } else if item.itemType == .file, let data = item.fileData, let name = item.fileName {
-            // It's a file
-            let tempName = "clipboard_file_\(UUID().uuidString)_\(name)"
-            fileURL = tempDir.appendingPathComponent(tempName)
-            try? data.write(to: fileURL)
-        } else {
-            return
-        }
-
-        NSWorkspace.shared.open(fileURL)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-            try? FileManager.default.removeItem(at: fileURL)
+        switch item.itemType {
+        case .image, .combined:
+            if let data = item.imageData { ExternalOpener.openImage(data) }
+        case .file:
+            // The file itself, under its name. This used to render the file's
+            // *icon* to a PNG for any non-image file (e.g. a PDF).
+            if let data = item.fileData { ExternalOpener.openFile(data, fileName: item.fileName ?? "Clipboard File") }
+        case .text:
+            break
         }
     }
 
     func openInTextEdit(_ item: CBItem) {
-        guard let text = item.content, !text.isEmpty else { return }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = "clipboard_text_\(UUID().uuidString).txt"
-        let fileURL = tempDir.appendingPathComponent(fileName)
-
-        do {
-            try text.write(to: fileURL, atomically: true, encoding: .utf8)
-            
-            // Try to open specifically with TextEdit, fallback to default for .txt
-            if let textEditURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") {
-                let config = NSWorkspace.OpenConfiguration()
-                NSWorkspace.shared.open([fileURL], withApplicationAt: textEditURL, configuration: config)
-            } else {
-                NSWorkspace.shared.open(fileURL)
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-                try? FileManager.default.removeItem(at: fileURL)
-            }
-        } catch {
-            ErrorLogger.shared.log("Failed to open text in TextEdit", category: "ExternalOpen", error: error)
-        }
+        guard let text = item.content else { return }
+        ExternalOpener.openTextInTextEdit(text)
     }
 
     deinit {

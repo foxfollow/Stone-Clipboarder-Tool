@@ -24,27 +24,27 @@ struct ActionsBottomButtonView: View {
         item.modelContext == nil
     }
 
-    // Computed property to determine if Preview button should be shown
+    // Decided from the item type alone: decoding the image on every render
+    // just to hide the button for an undecodable one isn't worth it.
     private var shouldShowPreviewButton: Bool {
         guard !isItemDeleted else { return false }
         switch item.itemType {
         case .image, .combined:
-            return item.image != nil
+            return true
         case .file:
-            return item.isImageFile && item.filePreviewImage != nil
+            return item.isImageFile
         case .text:
             return false
         }
     }
 
-    // Computed property to determine if OCR button should be shown
     private var shouldShowOCRButton: Bool {
         guard !isItemDeleted else { return false }
         switch item.itemType {
         case .image:
-            return item.image != nil
+            return true
         case .file:
-            return item.isImageFile && item.filePreviewImage != nil
+            return item.isImageFile
         case .combined, .text:
             return false
         }
@@ -138,75 +138,7 @@ struct ActionsBottomButtonView: View {
     }
     
     private func openInPreview() {
-        switch item.itemType {
-        case .image, .combined:
-            openImageInPreview()
-        case .file:
-            if item.isImageFile {
-                openImageFileInPreview()
-            }
-        case .text:
-            break // No preview for text
-        }
-    }
-    
-    private func openImageInPreview() {
-        guard let image = item.image else { return }
-        
-        // Create temporary file for the image
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = "clipboard_image_\(UUID().uuidString).png"
-        let tempFile = tempDir.appendingPathComponent(fileName)
-        
-        do {
-            // Convert image to PNG data
-            guard let tiffData = image.tiffRepresentation,
-                  let bitmapRep = NSBitmapImageRep(data: tiffData),
-                  let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-                ErrorLogger.shared.log("Failed to convert image to PNG", category: "ExternalOpen")
-                return
-            }
-            
-            // Write to temporary file
-            try pngData.write(to: tempFile)
-            
-            // Open in Preview.app
-            NSWorkspace.shared.open(tempFile)
-            
-            // Clean up temp file after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-                try? FileManager.default.removeItem(at: tempFile)
-            }
-            
-        } catch {
-            ErrorLogger.shared.log("Failed to create temp file for Preview", category: "ExternalOpen", error: error)
-        }
-    }
-    
-    private func openImageFileInPreview() {
-        guard let fileData = item.fileData,
-              let fileName = item.fileName else { return }
-        
-        // Create temporary file with original extension
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
-        let tempFile = tempDir.appendingPathComponent(tempFileName)
-        
-        do {
-            // Write file data to temporary file
-            try fileData.write(to: tempFile)
-            
-            // Open in Preview.app
-            NSWorkspace.shared.open(tempFile)
-            
-            // Clean up temp file after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-                try? FileManager.default.removeItem(at: tempFile)
-            }
-            
-        } catch {
-            ErrorLogger.shared.log("Failed to create temp file for Preview", category: "ExternalOpen", error: error)
-        }
+        cbViewModel.openInPreview(item)
     }
 
     private func extractTextFromImage() {

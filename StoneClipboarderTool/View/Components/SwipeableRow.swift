@@ -148,14 +148,15 @@ struct SwipeableRow<Content: View>: View {
     @State private var isDeleting = false
     @State private var showActionButtons = false
 
-    // Computed property to determine if Preview button should be shown
+    // From the type alone: this runs for every menu bar row on every render,
+    // and `item.image` decoded the full image each time.
     private var shouldShowPreviewButton: Bool {
         guard let item = item else { return false }
         switch item.itemType {
         case .image, .combined:
-            return item.image != nil
+            return true
         case .file:
-            return item.isImageFile && item.filePreviewImage != nil
+            return item.isImageFile
         case .text:
             return false
         }
