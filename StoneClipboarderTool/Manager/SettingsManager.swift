@@ -363,6 +363,12 @@ final class SettingsManager: ObservableObject {
             self.showMainWindow = true
         }
 
+        // The Quick Picker position was once written here although it only
+        // lives for a session now (QuickPickerWindowManager.lastOrigin).
+        for legacyKey in ["QuickPickerWindowX", "QuickPickerWindowY", "QuickPickerHasValidPosition"] {
+            defaults.removeObject(forKey: legacyKey)
+        }
+
         // Invariant repair: if persisted state has both disabled (e.g. manual defaults edit),
         // restore main-window visibility so the app stays reachable.
         if !self.showInMenubar && !self.showMainWindow {
