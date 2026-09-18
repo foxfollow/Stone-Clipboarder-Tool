@@ -66,6 +66,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         startGuardingActivationPolicy()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        guard !AppEnvironment.isRunningUnitTests else { return }
+        // Quick Look copies of clipboard items shouldn't outlive the app.
+        QPQuickLookCoordinator.removeAllPreviewSessions()
+    }
+
     /// Keeps Dock / Cmd+Tab presence matching `showMainWindow` after launch.
     ///
     /// Re-applying the policy in applicationDidFinishLaunching is not enough on
