@@ -7,8 +7,8 @@ import AppKit
 import Carbon.HIToolbox
 
 /// A physical key plus the modifiers that produce a character on a keyboard
-/// layout.
-private struct KeyStroke: Sendable {
+/// layout. Internal (not private) for the unit tests.
+struct KeyStroke: Sendable {
     let keyCode: CGKeyCode
     let flagsRawValue: UInt64
     /// True when the key code comes from a layout that is *not* the active one
@@ -36,7 +36,7 @@ private struct KeyStroke: Sendable {
 /// fallback layout's key codes — that is what a key-code reader on the far end
 /// of a remote-desktop session expects — while non-ASCII characters use the
 /// active layout.
-private struct KeyboardLayoutTables: Sendable {
+struct KeyboardLayoutTables: Sendable {
     /// Strokes from the layout the user is actually typing on.
     let active: [Character: KeyStroke]
     /// Strokes from the ASCII-capable layout macOS falls back to. Empty when
@@ -86,7 +86,7 @@ private struct KeyboardLayoutTables: Sendable {
         UInt16(kVK_ANSI_KeypadEnter), UInt16(kVK_ANSI_KeypadMinus), UInt16(kVK_ANSI_KeypadEquals),
     ]
 
-    private static func table(
+    static func table(
         from inputSource: TISInputSource?,
         overridesUnicode: Bool
     ) -> [Character: KeyStroke] {
