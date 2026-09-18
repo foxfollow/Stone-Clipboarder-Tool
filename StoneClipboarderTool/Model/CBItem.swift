@@ -259,6 +259,22 @@ final class CBItem {
         return thumbnail
     }
 
+    // MARK: - Search
+
+    /// The one matching rule behind every search box: text of text-like
+    /// items, the name of files, the "[Image - W×H]" label of images.
+    /// Case-insensitive. `query` is expected trimmed and non-empty.
+    func matchesSearch(_ query: String) -> Bool {
+        switch itemType {
+        case .text, .combined:
+            return content?.localizedCaseInsensitiveContains(query) ?? false
+        case .file:
+            return fileName?.localizedCaseInsensitiveContains(query) ?? false
+        case .image:
+            return displayContent.localizedCaseInsensitiveContains(query)
+        }
+    }
+
     // MARK: - Deduplication
 
     /// `contentPreview` holds this many leading characters of `content`.

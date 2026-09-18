@@ -605,7 +605,101 @@ class CBViewModel: ObservableObject {
         fetchItems()
     }
 
+    // MARK: - Read-only queries (Quick Picker, search)
+
+    private static let newestFirst = [SortDescriptor(\CBItem.timestamp, order: .reverse)]
+
+    /// A newest-first slice of the whole history.
+    func historyPage(offset: Int, limit: Int) -> [CBItem] {
+        guard let modelContext = _modelContext else { return [] }
+        var descriptor = FetchDescriptor<CBItem>(sortBy: Self.newestFirst)
+        descriptor.fetchOffset = offset
+        descriptor.fetchLimit = limit
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch a history page", category: "SwiftData", error: error)
+            return []
+        }
+    }
+
+    /// Every item of the given types, newest first. Filtered in memory:
+    /// SwiftData predicates can't reliably test the enum-typed `itemType`.
+    func items(ofTypes types: Set<CBItemType>) -> [CBItem] {
+        guard let modelContext = _modelContext else { return [] }
+        do {
+            return try modelContext.fetch(FetchDescriptor<CBItem>(sortBy: Self.newestFirst))
+                .filter { types.contains($0.itemType) }
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch items by type", category: "SwiftData", error: error)
+            return []
+        }
+    }
+
+    /// Items matching `query` anywhere in the history (optionally only the
+    /// given types), newest first, at most `limit`. Scans the store in pages
+    /// until enough matches are found, so older items are found too.
+    func searchItems(matching query: String, types: Set<CBItemType>? = nil, limit: Int = 300) -> [CBItem] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty, limit > 0 else { return [] }
+
+        let pageSize = 500
+        var results: [CBItem] = []
+        var offset = 0
+        while results.count < limit {
+            let page = historyPage(offset: offset, limit: pageSize)
+            for item in page where types?.contains(item.itemType) ?? true {
+                if item.matchesSearch(query) {
+                    results.append(item)
+                    if results.count == limit { break }
+                }
+            }
+            if page.count < pageSize { break }
+            offset += pageSize
+        }
+        return results
+    }
+
+    struct ItemTypeCounts: Equatable {
+        /// Text and text + image items.
+        var text = 0
+        /// Images and text + image items.
+        var images = 0
+        var files = 0
+    }
+
+    private var cachedTypeCounts: ItemTypeCounts?
+
+    /// Per-type counts for the Quick Picker tabs. Needs a full scan (no
+    /// predicate on `itemType`), so it's cached until the history changes.
+    func itemTypeCounts() -> ItemTypeCounts {
+        if let cachedTypeCounts { return cachedTypeCounts }
+        guard let modelContext = _modelContext else { return ItemTypeCounts() }
+
+        var counts = ItemTypeCounts()
+        do {
+            for item in try modelContext.fetch(FetchDescriptor<CBItem>()) {
+                switch item.itemType {
+                case .text: counts.text += 1
+                case .image: counts.images += 1
+                case .file: counts.files += 1
+                case .combined:
+                    counts.text += 1
+                    counts.images += 1
+                }
+            }
+        } catch {
+            ErrorLogger.shared.log("Failed to count items by type", category: "SwiftData", error: error)
+            return counts
+        }
+        cachedTypeCounts = counts
+        return counts
+    }
+
+    /// Recounts favorites and non-favorites (cheap fetchCounts) and drops the
+    /// cached per-type counts. Every change to the history ends up here.
     func refreshItemCounts() {
+        cachedTypeCounts = nil
         guard let modelContext = _modelContext else { return }
         do {
             let nonFavDescriptor = FetchDescriptor<CBItem>(
