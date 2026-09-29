@@ -36,18 +36,16 @@ struct PinChromeView: View {
             Image(systemName: typeIcon)
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
+                .allowsHitTesting(false)
 
-            // Drag affordance / title. The whole panel is draggable via
-            // isMovableByWindowBackground; double-click toggles collapse.
+            // Title. Clicks fall through to PinDragArea behind the bar, which
+            // moves the pin; double-click toggles collapse.
             Text(titleText)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    controller.toggleCollapsed()
-                }
+                .allowsHitTesting(false)
 
             // Click-through hint so the user knows how to regain interaction.
             if state.isClickThrough {
@@ -124,6 +122,9 @@ struct PinChromeView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
+        .background(
+            PinDragArea { controller.toggleCollapsed() }
+        )
         .background(
             Rectangle()
                 .fill(.thinMaterial)

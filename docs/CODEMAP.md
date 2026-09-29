@@ -88,7 +88,7 @@ by the Quick Picker and search, and opening items in other apps.
 | ZoomView/, Small/ActionsBottomButtonView | Detail pane: text/image/file preview, zoom, copy, edit, open, OCR, delete |
 | Menu/ | MenuBarView (popover list of `SwipeableRow`s), MenuBarItemView, PauseTimerView |
 | QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel, also used over full-screen apps) |
-| Pins/ | PinContentView, PinChromeView, PinImageView; all render from `PinViewState` |
+| Pins/ | PinContentView, PinChromeView (+ PinDragArea to move the pin), PinImageView; all render from `PinViewState` |
 | Settings/ | Sidebar + General, Hotkeys, Quick Picker, Pins, Excluded Apps (`@Query` is fine here), Accessibility, About |
 | Components/, Small/, Cells/ | Shared pieces: search bar, swipeable row, alerts, buttons, list cell |
 
@@ -148,7 +148,7 @@ app's container for sandboxed Debug builds).
 | Tab, ⇧Tab, ⌥P (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
 | ⌘C / ⌘W in a pin (local) | PinContentView `CommandKeyHandler` | while the pin is in a window |
-| Pinch zoom (local) | PinImageView | image pins |
+| Pinch zoom (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
 | Shortcut recording (local + global) | HotkeySettingsView | while recording |
 | Two-finger swipe (local) | SwipeableRow | while the row is in a window |
 

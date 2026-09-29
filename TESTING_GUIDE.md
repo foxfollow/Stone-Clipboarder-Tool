@@ -89,6 +89,11 @@ all pins.
       appear over full-screen apps when enabled.
 - [ ] Pin controls: opacity, lock, click-through (hold ⌘ to reach the
       controls), collapse, copy (⌘C), close (⌘W / Esc).
+- [ ] An unlocked pin moves by dragging its header (and a fit image by
+      dragging the image); a locked pin doesn't move or resize.
+- [ ] Image pin: the image is centered and grows/shrinks with the window;
+      pinch (also with another app active) and ⌘-scroll zoom toward the
+      cursor, a zoomed image pans on drag, double-click fits it again.
 - [ ] Copying a pinned file and pasting it in Finder a minute later works.
 - [ ] Settings → Pins → Active Pins lists every open pin, including pins of
       items no longer in the history, and updates immediately.
