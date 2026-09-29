@@ -56,6 +56,7 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 - **🛠️ Hotkey Recording**: Hotkeys recorded with Return, Tab, arrows, F-keys or punctuation were saved but never worked. They work now, and ⇧⌘ system shortcuts are refused while recording
 - **🛠️ File Paste**: A file copied back from your history can be pasted in Finder later, not only within five seconds
 - **🛠️ Restored Pins**: Pins restored at launch show their pin badge again and close when their item is deleted; the Active Pins list in Settings updates right away
+- **🛠️ Pin Moving and Image Zoom**: Unlocked pins can be moved again by dragging their header. Image pins fit and center in the window as you resize it, and zoom with a trackpad pinch or ⌘-scroll
 - **🐛 Open Files**: "Open" on a non-image file in the Quick Picker opens the file, not a picture of its icon
 - **🐛 Multi-Paste**: Pasting several items at once no longer saves the combined text as a new history item
 - **🛠️ Remote Desktop Typing**: Type-out paste into remote desktops, virtual machines and terminals dropped Shift and Option — "FGH" arrived as "fgh" and "!@#" as "123". Modifiers are now pressed as real keys and held long enough for the remote side to see them
