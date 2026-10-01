@@ -363,6 +363,7 @@
                 <div class="code-box w-full md:w-auto flex items-center justify-between gap-4 bg-[#1e1e1e] p-4 rounded-xl border border-white/10 font-mono text-[13px]">
                     <div class="leading-relaxed">
                         <code class="text-blue-400">brew tap foxfollow/stone</code><br />
+                        <code class="text-blue-400">brew trust foxfollow/stone</code><br />
                         <code class="text-blue-400">brew install stone-clipboarder-tool</code>
                     </div>
                     <button class="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 flex-shrink-0" id="copy-btn" onclick="copyInstallCmd()">
@@ -509,7 +510,7 @@
         }
 
         function copyInstallCmd() {
-            const cmd = "brew tap foxfollow/stone\nbrew install stone-clipboarder-tool";
+            const cmd = "brew tap foxfollow/stone\nbrew trust foxfollow/stone\nbrew install stone-clipboarder-tool";
             const btn = document.getElementById('copy-btn');
             const icon = btn.querySelector('i');
             if (navigator.clipboard && window.isSecureContext) {

@@ -30,10 +30,11 @@
 ### Homebrew (macOS)
 ```bash
 brew tap foxfollow/stone
+brew trust foxfollow/stone
 brew install stone-clipboarder-tool
 ```
 
-The app will be automatically configured to run without security warnings.
+Newer Homebrew refuses to load casks from untrusted third-party taps (`Refusing to load cask ... from untrusted tap`), so `brew trust` is needed once after tapping. The app will be automatically configured to run without security warnings.
 
 [Homebrew tap](https://github.com/foxfollow/homebrew-stone)
 
