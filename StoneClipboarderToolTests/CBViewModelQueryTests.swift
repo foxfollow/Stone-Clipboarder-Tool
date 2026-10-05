@@ -29,45 +29,78 @@ final class CBViewModelQueryTests: XCTestCase {
         try await super.tearDown()
     }
 
-    func testSearchFindsItemsOlderThanTheNewest300() throws {
+    func testSearchFindsItemsOlderThanTheNewest300() async throws {
         insert(CBItem(timestamp: base, content: "the needle", itemType: .text))
         for i in 1...400 {
             insert(CBItem(timestamp: base.addingTimeInterval(Double(i)), content: "filler \(i)", itemType: .text))
         }
         try context.save()
 
-        let found = viewModel.searchItems(matching: "  NEEDLE ")
+        let found = await viewModel.searchItems(matching: "  NEEDLE ")
 
         XCTAssertEqual(found.map(\.content), ["the needle"])
     }
 
-    func testSearchNoLongerMatchesEveryImage() throws {
+    func testSearchNoLongerMatchesEveryImage() async throws {
         insert(CBItem(timestamp: base, imageData: try pngData(), itemType: .image))
         insert(CBItem(timestamp: base.addingTimeInterval(1), content: "hello", itemType: .text))
         try context.save()
 
-        XCTAssertEqual(viewModel.searchItems(matching: "hello").map(\.itemType), [.text])
-        XCTAssertEqual(viewModel.searchItems(matching: "image").map(\.itemType), [.image], "images match their label")
+        let hello = await viewModel.searchItems(matching: "hello")
+        let image = await viewModel.searchItems(matching: "image")
+        XCTAssertEqual(hello.map(\.itemType), [.text])
+        XCTAssertEqual(image.map(\.itemType), [.image], "images match their label")
     }
 
-    func testSearchCanBeLimitedToTypes() throws {
+    func testSearchCanBeLimitedToTypes() async throws {
         insert(CBItem(timestamp: base, content: "cat pictures", itemType: .text))
         insert(CBItem(timestamp: base.addingTimeInterval(1), fileData: Data([1]), fileName: "cat.txt", itemType: .file))
         try context.save()
 
-        XCTAssertEqual(viewModel.searchItems(matching: "cat").count, 2)
-        XCTAssertEqual(viewModel.searchItems(matching: "cat", types: [.file]).map(\.fileName), ["cat.txt"])
+        let all = await viewModel.searchItems(matching: "cat")
+        let files = await viewModel.searchItems(matching: "cat", types: [.file])
+        XCTAssertEqual(all.count, 2)
+        XCTAssertEqual(files.map(\.fileName), ["cat.txt"])
     }
 
-    func testSearchStopsAtTheLimitNewestFirst() throws {
+    func testSearchStopsAtTheLimitNewestFirst() async throws {
         for i in 0..<20 {
             insert(CBItem(timestamp: base.addingTimeInterval(Double(i)), content: "match \(i)", itemType: .text))
         }
         try context.save()
 
-        let found = viewModel.searchItems(matching: "match", limit: 5)
+        let found = await viewModel.searchItems(matching: "match", limit: 5)
 
         XCTAssertEqual(found.map(\.content), (15..<20).reversed().map { "match \($0)" })
+    }
+
+    func testSearchLeavesOutAnItemDeletedBeforeItRuns() async throws {
+        let doomed = CBItem(timestamp: base.addingTimeInterval(1_000), content: "needle to delete", itemType: .text)
+        insert(doomed)
+        insert(CBItem(timestamp: base, content: "needle to keep", itemType: .text))
+        for i in 1...450 {
+            insert(CBItem(timestamp: base.addingTimeInterval(Double(i)), content: "filler \(i)", itemType: .text))
+        }
+        try context.save()
+
+        let search = Task { await viewModel.searchItems(matching: "needle") }
+        viewModel.deleteItem(doomed)
+        let found = await search.value
+
+        XCTAssertEqual(found.map(\.content), ["needle to keep"])
+    }
+
+    func testCancelledSearchReturnsNothing() async throws {
+        for i in 0..<450 {
+            insert(CBItem(timestamp: base.addingTimeInterval(Double(i)), content: "match \(i)", itemType: .text))
+        }
+        try context.save()
+
+        let search = Task { await viewModel.searchItems(matching: "match") }
+        search.cancel()
+        let found = await search.value
+
+        XCTAssertTrue(found.isEmpty)
     }
 
     func testHistoryPagesAreContiguous() throws {

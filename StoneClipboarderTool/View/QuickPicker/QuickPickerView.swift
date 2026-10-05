@@ -185,9 +185,7 @@ struct QuickPickerView: View {
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
                         if !Task.isCancelled {
-                            await MainActor.run {
-                                performSearch(newValue)
-                            }
+                            await performSearch(newValue)
                         }
                     }
                 } else {
@@ -624,7 +622,8 @@ struct QuickPickerView: View {
         // newest rows and filtering only those.
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !query.isEmpty && activeTab != .favorites {
-            performSearch(query)
+            searchTask?.cancel()
+            searchTask = Task { await performSearch(query) }
             return
         }
 
@@ -977,9 +976,12 @@ struct QuickPickerView: View {
     }
 
     /// Searches the whole history (limited to the tab's types), not just the
-    /// newest 300 rows as before.
-    private func performSearch(_ searchTerm: String) {
-        quickPickerItems = viewModel.searchItems(matching: searchTerm, types: activeTab.itemTypes)
+    /// newest 300 rows as before. Runs inside `searchTask`; a newer search or
+    /// tab switch cancels it.
+    private func performSearch(_ searchTerm: String) async {
+        let found = await viewModel.searchItems(matching: searchTerm, types: activeTab.itemTypes)
+        guard !Task.isCancelled else { return }
+        quickPickerItems = found
         hasMoreItems = false
         isLoadingItems = false
     }

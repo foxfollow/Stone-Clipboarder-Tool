@@ -154,7 +154,9 @@ struct ContentView: View {
             isSearching = true
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard !Task.isCancelled else { return }
-            searchResults = cbViewModel.searchItems(matching: query)
+            let found = await cbViewModel.searchItems(matching: query)
+            guard !Task.isCancelled else { return }
+            searchResults = found
             isSearching = false
         }
         .onAppear {

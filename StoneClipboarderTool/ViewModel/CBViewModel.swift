@@ -175,6 +175,17 @@ class CBViewModel: ObservableObject {
         }
     }
 
+    /// Bumped with every `.clipboardItemDeleted`, so a search suspended
+    /// between pages can tell its matches may include a deleted item.
+    private var deletionGeneration = 0
+
+    /// Posts `.clipboardItemDeleted` (`nil`: everything). The context
+    /// deletion must follow on a later main-queue turn.
+    private func announceDeletion(of id: PersistentIdentifier?) {
+        deletionGeneration += 1
+        NotificationCenter.default.post(name: .clipboardItemDeleted, object: id)
+    }
+
     func deleteItem(_ item: CBItem) {
         guard let modelContext = _modelContext else { return }
 
@@ -185,9 +196,7 @@ class CBViewModel: ObservableObject {
         }
 
         // Tell PinManager so any open pin for this item closes.
-        NotificationCenter.default.post(
-            name: .clipboardItemDeleted, object: item.persistentModelID
-        )
+        announceDeletion(of: item.persistentModelID)
 
         // Remove from published arrays so SwiftUI drops the view
         items.removeAll { $0.id == item.id }
@@ -216,9 +225,7 @@ class CBViewModel: ObservableObject {
         // Notify PinManager so pins referencing the about-to-be-deleted
         // items close themselves.
         for item in itemsToDelete {
-            NotificationCenter.default.post(
-                name: .clipboardItemDeleted, object: item.persistentModelID
-            )
+            announceDeletion(of: item.persistentModelID)
         }
 
         // Clear selection if deleted item is selected
@@ -453,7 +460,7 @@ class CBViewModel: ObservableObject {
         favoriteItems = []
         NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
         // Tell PinManager — `object: nil` means "all items wiped".
-        NotificationCenter.default.post(name: .clipboardItemDeleted, object: nil)
+        announceDeletion(of: nil)
 
         // 2. Defer actual context deletion to the NEXT run loop iteration.
         //    This gives SwiftUI a full layout pass to drop views that reference
@@ -510,28 +517,61 @@ class CBViewModel: ObservableObject {
         }
     }
 
+    private static let searchPageSize = 200
+
     /// Items matching `query` anywhere in the history (optionally only the
     /// given types), newest first, at most `limit`. Scans the store in pages
-    /// until enough matches are found, so older items are found too.
-    func searchItems(matching query: String, types: Set<CBItemType>? = nil, limit: Int = 300) -> [CBItem] {
+    /// until enough matches are found, so older items are found too. Pauses
+    /// between pages so a long scan doesn't freeze the UI; returns `[]` when
+    /// the calling task is cancelled.
+    func searchItems(matching query: String, types: Set<CBItemType>? = nil, limit: Int = 300) async -> [CBItem] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty, limit > 0 else { return [] }
 
-        let pageSize = 500
+        while true {
+            // A deletion announced earlier has its context deletion queued
+            // already; the pause lets it run before the scan.
+            guard await pauseBetweenPages() else { return [] }
+            let generation = deletionGeneration
+            guard let results = await scanHistory(for: query, types: types, limit: limit) else { return [] }
+            if generation == deletionGeneration { return results }
+            // An item was announced deleted during a pause and may be among
+            // the matches: scan again once its deletion has run.
+        }
+    }
+
+    /// nil when cancelled.
+    private func scanHistory(for query: String, types: Set<CBItemType>?, limit: Int) async -> [CBItem]? {
+        let pageSize = Self.searchPageSize
         var results: [CBItem] = []
+        // Items inserted during a pause shift the offsets; skip repeats.
+        var seen = Set<PersistentIdentifier>()
         var offset = 0
         while results.count < limit {
             let page = historyPage(offset: offset, limit: pageSize)
             for item in page where types?.contains(item.itemType) ?? true {
+                guard seen.insert(item.persistentModelID).inserted else { continue }
                 if item.matchesSearch(query) {
                     results.append(item)
                     if results.count == limit { break }
                 }
             }
-            if page.count < pageSize { break }
+            if page.count < pageSize || results.count == limit { break }
             offset += pageSize
+            guard await pauseBetweenPages() else { return nil }
         }
         return results
+    }
+
+    /// Gives the run loop a turn (input, drawing, queued deletions). False
+    /// when the task is cancelled.
+    private func pauseBetweenPages() async -> Bool {
+        do {
+            try await Task.sleep(for: .milliseconds(1))
+            return true
+        } catch {
+            return false
+        }
     }
 
     struct ItemTypeCounts: Equatable {
@@ -713,9 +753,7 @@ class CBViewModel: ObservableObject {
             }
 
             for item in nonFavoriteOldItems {
-                NotificationCenter.default.post(
-                    name: .clipboardItemDeleted, object: item.persistentModelID
-                )
+                announceDeletion(of: item.persistentModelID)
             }
 
             items.removeAll { idsToDelete.contains($0.id) }
