@@ -92,6 +92,21 @@ final class CBViewModelDedupeTests: XCTestCase {
         XCTAssertNil(viewModel.existingItem(matching: CBItem.ContentKey(type: .file, fileData: Data([1, 2]), fileName: "b.bin")))
     }
 
+    func testOldFileIsFoundPastManyFilesWithTheSameName() throws {
+        let base = Date(timeIntervalSince1970: 6_000_000)
+        context.insert(CBItem(timestamp: base, fileData: Data([7, 7, 7]), fileName: "image.png", itemType: .file))
+        for i in 1...40 {
+            context.insert(CBItem(
+                timestamp: base.addingTimeInterval(Double(i)), fileData: Data([UInt8(i)]),
+                fileName: "image.png", itemType: .file))
+        }
+        try context.save()
+
+        let found = viewModel.existingItem(matching: CBItem.ContentKey(type: .file, fileData: Data([7, 7, 7]), fileName: "image.png"))
+
+        XCTAssertEqual(found?.timestamp, base)
+    }
+
     // MARK: - Helpers
 
     /// A 4×3 PNG; `red` flips one pixel so both images share a size.

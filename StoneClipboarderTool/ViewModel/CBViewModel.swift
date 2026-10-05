@@ -332,14 +332,17 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    /// Candidates compared per lookup. Bounds the external data loaded: many
-    /// screenshots share one size, and each image comparison reads its blob.
-    private let duplicateCandidateLimit = 25
+    /// Image candidates compared per lookup. Bounds the external data
+    /// loaded: many screenshots share one size, no other inline column tells
+    /// them apart, and each comparison reads an image blob. An identical
+    /// image older than the newest 25 of its size is saved again.
+    private let imageCandidateLimit = 25
 
     /// An item with the same content anywhere in the history, not only among
-    /// the loaded rows. An inline column (text preview, image size, file
-    /// name) selects the newest few candidates; only those are compared in
-    /// full.
+    /// the loaded rows. Inline columns (text preview; file name and byte
+    /// size; image size) select the candidates, newest first, and only
+    /// those are compared in full. Text and file candidates are almost
+    /// always the item itself; image candidates are capped.
     func existingItem(matching key: CBItem.ContentKey) -> CBItem? {
         guard let modelContext = _modelContext else { return nil }
 
@@ -355,12 +358,13 @@ class CBViewModel: ObservableObject {
             let size = key.imageSize
             guard size != nil else { return nil }
             descriptor = FetchDescriptor(predicate: #Predicate { $0.imageSize == size }, sortBy: newestFirst)
+            descriptor.fetchLimit = imageCandidateLimit
         case .file:
             let name = key.fileName
-            guard name != nil else { return nil }
-            descriptor = FetchDescriptor(predicate: #Predicate { $0.fileName == name }, sortBy: newestFirst)
+            guard name != nil, let byteCount = key.fileData.map({ Int64($0.count) }) else { return nil }
+            descriptor = FetchDescriptor(
+                predicate: #Predicate { $0.fileName == name && $0.fileSize == byteCount }, sortBy: newestFirst)
         }
-        descriptor.fetchLimit = duplicateCandidateLimit
 
         do {
             return try modelContext.fetch(descriptor).first { $0.hasSameContent(as: key) }
