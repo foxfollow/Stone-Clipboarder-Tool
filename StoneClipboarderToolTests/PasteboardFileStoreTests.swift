@@ -41,6 +41,17 @@ final class PasteboardFileStoreTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: second), Data([2]))
     }
 
+    func testFailedWriteKeepsThePreviousFile() throws {
+        let first = try PasteboardFileStore.write(Data([1]), fileName: "keep.txt", root: root)
+        // A read-only store makes the next copy fail.
+        let fileManager = FileManager.default
+        try fileManager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: root.path)
+        defer { try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path) }
+
+        XCTAssertThrowsError(try PasteboardFileStore.write(Data([2]), fileName: "next.txt", root: root))
+        XCTAssertEqual(try Data(contentsOf: first), Data([1]))
+    }
+
     func testFileNameCannotEscapeTheFolder() {
         XCTAssertEqual(PasteboardFileStore.safeFileName("../../etc/passwd"), "passwd")
         XCTAssertEqual(PasteboardFileStore.safeFileName(""), "Clipboard File")

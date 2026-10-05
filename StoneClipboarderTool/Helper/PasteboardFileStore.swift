@@ -20,16 +20,27 @@ enum PasteboardFileStore {
             .appendingPathComponent("Pasteboard", isDirectory: true)
     }
 
-    /// Writes `data` as `fileName` into a fresh folder, removing the files of
-    /// earlier copies, and returns the URL to put on the pasteboard.
-    /// `root` is only overridden by tests.
+    /// Writes `data` as `fileName` into a fresh folder and returns the URL to
+    /// put on the pasteboard. The files of earlier copies are removed only
+    /// after the write succeeds: if it fails, the pasteboard still points at
+    /// the previous file and that file must stay. `root` is only overridden
+    /// by tests.
     static func write(_ data: Data, fileName: String, root: URL = directory) throws -> URL {
-        removeAll(root: root)
+        let fileManager = FileManager.default
         let folder = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent(safeFileName(fileName))
-        try data.write(to: url)
-        return url
+        do {
+            try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+            let url = folder.appendingPathComponent(safeFileName(fileName))
+            try data.write(to: url)
+            let earlier = (try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+            for item in earlier where item.lastPathComponent != folder.lastPathComponent {
+                try? fileManager.removeItem(at: item)
+            }
+            return url
+        } catch {
+            try? fileManager.removeItem(at: folder)
+            throw error
+        }
     }
 
     static func removeAll(root: URL = directory) {
