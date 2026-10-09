@@ -75,9 +75,9 @@ struct QPItemList: View {
                                 performAction()
                             }
                             .contextMenu {
-                                // Open in Preview (for images/files)
+                                // Images open in Preview, files in their default app
                                 if let onOpenPreview = onOpenPreview, shouldShowPreview(for: item) {
-                                    Button("Open in Preview") {
+                                    Button(item.itemType == .file && !item.isImageFile ? "Open" : "Open in Preview") {
                                         onOpenPreview(item)
                                     }
                                 }
@@ -170,27 +170,10 @@ struct QPItemList: View {
         return hasMoreItems && !isLoading && index >= filteredItems.count - 3
             && filteredItems.count >= 25
     }
+    /// Every item but plain text can be opened: images (and the image of a
+    /// text + image item) in Preview, files in their default app.
     private func shouldShowPreview(for item: CBItem) -> Bool {
-        switch item.itemType {
-        case .image, .combined:
-            return item.image != nil
-        case .file:
-            // For files, we preview if it's an image file with a preview, OR if it's just a file (we can open it)
-            // Actually, for "Open in Preview", better to stick to images/pdfs that Preview.app handles well.
-            // But ActionsBottomButtonView only checked for images.
-            // Let's allow opening any file in "Preview" logic if it's an image, or fallback to file opening.
-            // But CBViewModel.openInPreview handles generic files too.
-            // Let's just return true for .file to allow trying.
-            // Wait, ActionsBottomButtonView logic:
-            // case .file: return item.isImageFile && item.filePreviewImage != nil
-            // Let's match that for "Preview" specifically?
-            // Actually, users might want to QuickLook any file.
-            // User said "Open with Previewer".
-            // Let's stick to safe logic:
-            return item.itemType == .image || item.itemType == .combined || item.itemType == .file
-        case .text:
-            return false
-        }
+        item.itemType != .text
     }
 }
 

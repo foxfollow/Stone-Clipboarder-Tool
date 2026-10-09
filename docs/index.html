@@ -254,6 +254,8 @@
             .screenshot-card:hover img { transform: none; }
         }
     </style>
+    <link href="resources/motion.css" rel="stylesheet" />
+    <script src="resources/motion.js" defer></script>
 </head>
 
 <body class="bg-dark-900 text-white antialiased">
@@ -319,7 +321,7 @@
                     View on GitHub
                 </a>
             </div>
-            <div class="anim-fade anim-d4 flex flex-wrap items-center justify-center gap-3 mb-20">
+            <div class="anim-fade anim-d4 flex flex-wrap items-center justify-center gap-3 mb-16">
                 <a href="installation.html" class="sub-link text-sm text-gray-400 hover:text-white transition-colors no-underline">
                     <i class="fa-solid fa-book mr-1"></i> Installation Guide
                 </a>
@@ -332,6 +334,7 @@
                     <i class="fa-solid fa-rss mr-1"></i> Update Feed
                 </a>
             </div>
+            <div class="clip-demo" aria-hidden="true"></div>
         </section>
 
         <!-- Screenshot Showcase -->
@@ -383,6 +386,7 @@
                 <div class="code-box w-full md:w-auto flex items-center justify-between gap-4 bg-[#1e1e1e] p-4 rounded-xl border border-white/10 font-mono text-[13px]">
                     <div class="leading-relaxed">
                         <code class="text-blue-400">brew tap foxfollow/stone</code><br />
+                        <code class="text-blue-400">brew trust foxfollow/stone</code><br />
                         <code class="text-blue-400">brew install stone-clipboarder-tool</code>
                     </div>
                     <button class="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 flex-shrink-0" id="copy-btn" onclick="copyInstallCmd()">
@@ -633,7 +637,7 @@
 
         // Homebrew copy
         function copyInstallCmd() {
-            const cmd = "brew tap foxfollow/stone\nbrew install stone-clipboarder-tool";
+            const cmd = "brew tap foxfollow/stone\nbrew trust foxfollow/stone\nbrew install stone-clipboarder-tool";
             const btn = document.getElementById('copy-btn');
             const icon = btn.querySelector('i');
             if (navigator.clipboard && window.isSecureContext) {

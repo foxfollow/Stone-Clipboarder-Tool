@@ -9,7 +9,8 @@ import AppKit
 import SwiftUI
 import Combine
 
-class MenuBarManager: ObservableObject {
+@MainActor
+final class MenuBarManager: ObservableObject {
     private var statusBarItem: NSStatusItem?
     private var popover: NSPopover?
     private var cbViewModel: CBViewModel?
@@ -17,7 +18,6 @@ class MenuBarManager: ObservableObject {
     private var clipboardManager: ClipboardManager?
     private var cancellables = Set<AnyCancellable>()
 
-    @MainActor
     func setupMenuBar(cbViewModel: CBViewModel, settingsManager: SettingsManager, clipboardManager: ClipboardManager) {
         // Store references for refresh capability
         self.cbViewModel = cbViewModel
@@ -61,7 +61,6 @@ class MenuBarManager: ObservableObject {
         self.clipboardManager = nil
     }
 
-    @MainActor
     func refreshMenuBar() {
         guard let cbViewModel = cbViewModel,
             let settingsManager = settingsManager,
@@ -89,7 +88,6 @@ class MenuBarManager: ObservableObject {
         popover?.contentViewController = NSHostingController(rootView: menuBarView)
     }
 
-    @MainActor
     @objc private func togglePopover(_ sender: AnyObject?) {
         guard let button = statusBarItem?.button else {
             // Try to refresh if button is nil
@@ -121,7 +119,6 @@ class MenuBarManager: ObservableObject {
     /// show() lets the popover appear without forcing a Space switch.
     /// Window level is left at NSPopover's default to avoid interfering with
     /// other floating UI (e.g. QuickLook).
-    @MainActor
     private func makePopoverFullscreenSafe(_ popover: NSPopover) {
         guard let popoverWindow = popover.contentViewController?.view.window else { return }
         popoverWindow.collectionBehavior = [
@@ -130,11 +127,13 @@ class MenuBarManager: ObservableObject {
     }
 
     /// Update the menu bar icon based on pause state
-    @MainActor
     func updateIcon() {
+        updateIcon(isPaused: clipboardManager?.isPaused ?? false)
+    }
+
+    private func updateIcon(isPaused: Bool) {
         guard let button = statusBarItem?.button else { return }
 
-        let isPaused = clipboardManager?.isPaused ?? false
         let iconName = isPaused ? "arrow.trianglehead.2.clockwise.rotate.90.page.on.clipboard" : "doc.on.clipboard"
 
         button.image = NSImage(
@@ -150,12 +149,11 @@ class MenuBarManager: ObservableObject {
         // Clear existing observers
         cancellables.removeAll()
 
-        // Observe isPaused property changes
+        // $isPaused emits on willSet, before the property holds the new
+        // value, so use the emitted value rather than reading isPaused back.
         clipboardManager.$isPaused
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateIcon()
-                }
+            .sink { [weak self] isPaused in
+                self?.updateIcon(isPaused: isPaused)
             }
             .store(in: &cancellables)
     }

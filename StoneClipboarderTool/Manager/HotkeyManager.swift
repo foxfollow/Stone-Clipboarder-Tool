@@ -95,7 +95,7 @@ class HotkeyManager: ObservableObject {
             GetApplicationEventTarget(), callback, 1, &eventType, selfPtr, &eventHandler)
 
         if status != noErr {
-            print("Failed to install event handler: \(status)")
+            ErrorLogger.shared.log("Failed to install hotkey event handler (OSStatus \(status))", category: "Hotkeys")
         }
     }
 
@@ -133,6 +133,7 @@ class HotkeyManager: ObservableObject {
                 // wouldn't otherwise be registerable.
                 ensureMissingHotkeyConfigs()
             }
+            clearUnusableShortcuts()
 
             refreshHotkeyRegistrations()
 
@@ -158,6 +159,32 @@ class HotkeyManager: ObservableObject {
         } catch {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to add missing hotkey configs", category: "SwiftData", error: error)
+        }
+    }
+
+    /// Stored shortcuts that can't be registered — e.g. keys recorded by older
+    /// versions whose recorder accepted more keys than registration knew, or
+    /// the legacy "None" string — become nil, which the UI shows as "None".
+    /// Done once at load so registration never has to touch the model.
+    private func clearUnusableShortcuts() {
+        guard let modelContext = modelContext else { return }
+        let unusable = hotkeyConfigs.filter { config in
+            config.shortcutKeys != nil && HotkeyShortcut(config.shortcutKeys) == nil
+        }
+        guard !unusable.isEmpty else { return }
+
+        for config in unusable {
+            if let keys = config.shortcutKeys, !keys.isEmpty, keys != "None" {
+                ErrorLogger.shared.log(
+                    "Cleared unusable shortcut \(keys) for \(config.action)", category: "Hotkeys")
+            }
+            config.shortcutKeys = nil
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to clear unusable shortcuts", category: "SwiftData", error: error)
         }
     }
 
@@ -214,28 +241,16 @@ class HotkeyManager: ObservableObject {
         for config in hotkeyConfigs {
             guard config.isEnabled,
                 let action = config.hotkeyAction,
-                let shortcut = config.shortcutKeys,
-                !shortcut.isEmpty,
-                shortcut != "None"
+                let shortcut = HotkeyShortcut(config.shortcutKeys)
             else {
                 continue
             }
 
-            registerHotkeyFromConfig(config: config, action: action, shortcut: shortcut)
+            registerHotkey(shortcut, for: action)
         }
     }
 
-    @MainActor
-    private func registerHotkeyFromConfig(
-        config: HotkeyConfig, action: HotkeyAction, shortcut: String
-    ) {
-        guard let (keyCode, modifiers) = parseShortcut(shortcut) else {
-            print("Failed to parse shortcut: \(shortcut), setting to None")
-            // Set invalid shortcuts to None
-            config.shortcutKeys = "None"
-            return
-        }
-
+    private func registerHotkey(_ shortcut: HotkeyShortcut, for action: HotkeyAction) {
         let actionClosure: () -> Void
 
         switch action {
@@ -263,17 +278,8 @@ class HotkeyManager: ObservableObject {
             }
         }
 
-        registerHotkey(keyCode: keyCode, modifiers: modifiers, action: actionClosure)
-    }
-
-    @MainActor
-    private func registerHotkey(
-        keyCode: UInt32, modifiers: [KeyModifier], action: @escaping () -> Void
-    ) {
-        let modifierFlags = modifiers.reduce(0) { result, modifier in
-            result | modifier.carbonFlag
-        }
-
+        let keyCode = UInt32(shortcut.keyCode)
+        let modifierFlags = shortcut.carbonModifiers
         let hotkeyID = generateHotkeyID(keyCode: keyCode, modifiers: modifierFlags)
         var eventHotKeyRef: EventHotKeyRef?
 
@@ -290,9 +296,10 @@ class HotkeyManager: ObservableObject {
 
         if status == noErr, let hotKeyRef = eventHotKeyRef {
             registeredHotkeys[hotkeyID] = hotKeyRef
-            hotkeyActions[hotkeyID] = action
+            hotkeyActions[hotkeyID] = actionClosure
         } else {
-            print("Failed to register hotkey: keyCode=\(keyCode), status=\(status)")
+            ErrorLogger.shared.log(
+                "Failed to register hotkey \(shortcut.stringValue) (OSStatus \(status))", category: "Hotkeys")
         }
     }
 
@@ -307,54 +314,6 @@ class HotkeyManager: ObservableObject {
 
     private func generateHotkeyID(keyCode: UInt32, modifiers: UInt32) -> UInt32 {
         return (modifiers << 16) | keyCode
-    }
-
-    // MARK: - Shortcut Parsing
-
-    private func parseShortcut(_ shortcut: String) -> (keyCode: UInt32, modifiers: [KeyModifier])? {
-        let components = shortcut.components(separatedBy: CharacterSet.whitespacesAndNewlines)
-            .joined()
-
-        var modifiers: [KeyModifier] = []
-        var keyChar = ""
-
-        for char in components {
-            switch char {
-            case "⌃":
-                modifiers.append(.control)
-            case "⌥":
-                modifiers.append(.option)
-            case "⇧":
-                modifiers.append(.shift)
-            case "⌘":
-                modifiers.append(.command)
-            default:
-                keyChar.append(char)
-            }
-        }
-
-        // Must have both modifiers and a key character
-        guard !modifiers.isEmpty, !keyChar.isEmpty, let keyCode = keyCodeForCharacter(keyChar)
-        else {
-            return nil
-        }
-
-        return (keyCode, modifiers)
-    }
-
-    private func keyCodeForCharacter(_ character: String) -> UInt32? {
-        let characterMap: [String: UInt32] = [
-            "1": 18, "2": 19, "3": 20, "4": 21, "5": 23,
-            "6": 22, "7": 26, "8": 28, "9": 25, "0": 29,
-            "space": 49,
-            "a": 0, "b": 11, "c": 8, "d": 2, "e": 14,
-            "f": 3, "g": 5, "h": 4, "i": 34, "j": 38,
-            "k": 40, "l": 37, "m": 46, "n": 45, "o": 31,
-            "p": 35, "q": 12, "r": 15, "s": 1, "t": 17,
-            "u": 32, "v": 9, "w": 13, "x": 7, "y": 16,
-            "z": 6
-        ]
-        return characterMap[character.lowercased()]
     }
 
     // MARK: - Actions
@@ -379,10 +338,7 @@ class HotkeyManager: ObservableObject {
             return
         }
 
-        let item = items[index]
-        Task { @MainActor in
-            pasteItemToActiveApplication(item)
-        }
+        pasteItemToActiveApplication(items[index])
     }
 
     private func executeFavoriteAction(index: Int) {
@@ -401,116 +357,16 @@ class HotkeyManager: ObservableObject {
             return
         }
 
-        let item = favoriteItems[index]
-        Task { @MainActor in
-            pasteItemToActiveApplication(item)
-        }
+        pasteItemToActiveApplication(favoriteItems[index])
     }
 
-    @MainActor
     private func pasteItemToActiveApplication(_ item: CBItem) {
-        guard cbViewModel != nil else {
-            return
-        }
-
-        guard !item.displayContent.isEmpty else {
-            return
-        }
-
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-
-        var copySuccessful = false
-
-        switch item.itemType {
-        case .text:
-            if let content = item.content,
-                !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            {
-                pasteboard.setString(content, forType: .string)
-                copySuccessful = true
-            }
-        case .image:
-            if let imageData = item.imageData,
-                !imageData.isEmpty,
-                let image = NSImage(data: imageData)
-            {
-                pasteboard.writeObjects([image])
-                copySuccessful = true
-            }
-        case .file:
-            if let fileData = item.fileData,
-                !fileData.isEmpty,
-                let fileName = item.fileName,
-                !fileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            {
-                let tempDir = FileManager.default.temporaryDirectory
-                let tempFile = tempDir.appendingPathComponent(fileName)
-                do {
-                    try fileData.write(to: tempFile)
-                    pasteboard.writeObjects([tempFile as NSURL])
-                    copySuccessful = true
-                } catch {
-                    print("Failed to write temp file: \(error)")
-                }
-            }
-        case .combined:
-            // Copy both text and image to clipboard
-            var objects: [NSPasteboardWriting] = []
-
-            if let content = item.content,
-               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            {
-                objects.append(content as NSPasteboardWriting)
-            }
-
-            if let imageData = item.imageData,
-               !imageData.isEmpty,
-               let image = NSImage(data: imageData)
-            {
-                objects.append(image)
-            }
-
-            if !objects.isEmpty {
-                pasteboard.writeObjects(objects)
-                copySuccessful = true
-            }
-        }
-
-        if copySuccessful {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.simulatePasteKeyPress()
-            }
-
-            Task { @MainActor in
-                guard let viewModel = self.cbViewModel else { return }
-                viewModel.copyAndUpdateItem(item)
-
-            }
-        }
-    }
-
-    private func simulatePasteKeyPress() {
-        guard let source = CGEventSource(stateID: .hidSystemState) else {
-            return
-        }
-
-        guard
-            let keyDownEvent = CGEvent(
-                keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
-            let keyUpEvent = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-        else {
-            return
-        }
-
-        keyDownEvent.flags = .maskCommand
-        keyUpEvent.flags = .maskCommand
-
-        keyDownEvent.post(tap: .cghidEventTap)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            keyUpEvent.post(tap: .cghidEventTap)
-        }
+        // Through the view model → ClipboardManager, which records the new
+        // pasteboard change count so the monitor doesn't capture our own write
+        // (an image written here used to come back as a duplicate item). It
+        // also moves the item to the top of the history.
+        guard let cbViewModel, cbViewModel.copyAndUpdateItem(item) else { return }
+        PasteSimulator.paste()
     }
 
     // MARK: - Helper Methods
@@ -527,24 +383,6 @@ class HotkeyManager: ObservableObject {
         }
         return bytes.withUnsafeBytes { ptr in
             ptr.load(as: FourCharCode.self)
-        }
-    }
-}
-
-// MARK: - Key Modifier Enum
-
-enum KeyModifier {
-    case control
-    case option
-    case shift
-    case command
-
-    var carbonFlag: UInt32 {
-        switch self {
-        case .control: return UInt32(controlKey)
-        case .option: return UInt32(optionKey)
-        case .shift: return UInt32(shiftKey)
-        case .command: return UInt32(cmdKey)
         }
     }
 }

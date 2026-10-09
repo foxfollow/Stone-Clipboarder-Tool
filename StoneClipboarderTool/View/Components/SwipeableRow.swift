@@ -45,31 +45,37 @@ class TwoFingerSwipeNSView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         self.wantsLayer = true
-        setupEventMonitoring()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         self.wantsLayer = true
-        setupEventMonitoring()
     }
 
-    private func setupEventMonitoring() {
-        // Monitor scroll wheel events at the application level
+    /// Watches scroll events only while the row is in a window. The monitor
+    /// is app-wide and runs for every scroll event, and a LazyVStack keeps
+    /// row views alive off screen; it used to be installed in init for every
+    /// row ever created. The overlay doesn't take hits (so it can't just
+    /// override scrollWheel), hence the monitor.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        removeEventMonitor()
+        guard window != nil else { return }
+
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            guard let self = self else { return event }
-
-            // Check if the event is within our bounds
-            if self.window != nil {
-                let locationInWindow = event.locationInWindow
-                let locationInView = self.convert(locationInWindow, from: nil)
-
-                if self.bounds.contains(locationInView) {
-                    self.handleScrollWheel(with: event)
-                }
+            guard let self, let window = self.window, event.window === window else { return event }
+            let locationInView = self.convert(event.locationInWindow, from: nil)
+            if self.bounds.contains(locationInView) {
+                self.handleScrollWheel(with: event)
             }
-
             return event // Always return the event to allow normal scrolling
+        }
+    }
+
+    private func removeEventMonitor() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
         }
     }
 
@@ -78,7 +84,6 @@ class TwoFingerSwipeNSView: NSView {
             NSEvent.removeMonitor(monitor)
         }
     }
-
 
     private func handleScrollWheel(with event: NSEvent) {
         // Only handle precise trackpad gestures
@@ -148,14 +153,15 @@ struct SwipeableRow<Content: View>: View {
     @State private var isDeleting = false
     @State private var showActionButtons = false
 
-    // Computed property to determine if Preview button should be shown
+    // From the type alone: this runs for every menu bar row on every render,
+    // and `item.image` decoded the full image each time.
     private var shouldShowPreviewButton: Bool {
         guard let item = item else { return false }
         switch item.itemType {
         case .image, .combined:
-            return item.image != nil
+            return true
         case .file:
-            return item.isImageFile && item.filePreviewImage != nil
+            return item.isImageFile
         case .text:
             return false
         }
@@ -169,14 +175,6 @@ struct SwipeableRow<Content: View>: View {
         } else {
             return Color.clear
         }
-    }
-
-    init(@ViewBuilder content: () -> Content, onDelete: @escaping () -> Void) {
-        self.content = content()
-        self.onDelete = onDelete
-        self.item = nil
-        self.onPreview = nil
-        self.onOpenMain = nil
     }
 
     init(
@@ -341,29 +339,5 @@ struct SwipeableRow<Content: View>: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             onDelete()
         }
-    }
-}
-
-// Alternative simple version that responds to keyboard delete key
-struct KeyboardDeleteableRow<Content: View>: View {
-    let content: Content
-    let onDelete: () -> Void
-    @FocusState private var isFocused: Bool
-
-    init(@ViewBuilder content: () -> Content, onDelete: @escaping () -> Void) {
-        self.content = content()
-        self.onDelete = onDelete
-    }
-
-    var body: some View {
-        content
-            .focusable()
-            .focused($isFocused)
-            .onDeleteCommand {
-                onDelete()
-            }
-            .onTapGesture {
-                isFocused = true
-            }
     }
 }

@@ -5,15 +5,13 @@
 //  Created by Heorhii Savoiskyi on 13.08.2025.
 //
 
-import Carbon
+import SwiftData
 import SwiftUI
 
 struct HotkeySettingsView: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var hotkeyManager: HotkeyManager
     @Environment(\.modelContext) private var modelContext
-    @State private var showingConflictAlert = false
-    @State private var conflictMessage = ""
     @State private var currentlyRecordingID: UUID? = nil
 
     var body: some View {
@@ -84,11 +82,6 @@ struct HotkeySettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Hotkey Settings")
-        .alert("Hotkey Conflict", isPresented: $showingConflictAlert) {
-            Button("OK") { /* No action needed for acknowledgement */ }
-        } message: {
-            Text(conflictMessage)
-        }
         .onChange(of: settingsManager.maxLastItems) { _, _ in
             hotkeyManager.refreshHotkeyRegistrations()
         }
@@ -302,19 +295,16 @@ struct HotkeyConfigRow: View {
             globalEventMonitor = nil
         }
 
-        if !recordedShortcut.isEmpty && isValidShortcut(recordedShortcut) {
-            // Check for duplicate shortcuts
-            let existingShortcut = hotkeyManager.hotkeyConfigs.first { otherConfig in
-                otherConfig.id != config.id && otherConfig.shortcutKeys == recordedShortcut
+        if let shortcut = HotkeyShortcut(recordedShortcut), !shortcut.isReservedBySystem {
+            // A shortcut drives one action only: take it away from any other.
+            // Compared structurally, so older stored spellings still match.
+            for other in hotkeyManager.hotkeyConfigs
+            where other.id != config.id && HotkeyShortcut(other.shortcutKeys) == shortcut {
+                other.shortcutKeys = nil
+                other.timestamp = Date()
             }
 
-            if let existing = existingShortcut {
-                // Clear the existing conflicting shortcut
-                existing.shortcutKeys = nil
-                existing.timestamp = Date()
-            }
-
-            saveHotkeyChange(shortcut: recordedShortcut, enabled: config.isEnabled)
+            saveHotkeyChange(shortcut: shortcut.stringValue, enabled: config.isEnabled)
         } else {
             // Invalid or empty shortcut, set to None
             saveHotkeyChange(shortcut: nil, enabled: config.isEnabled)
@@ -324,134 +314,34 @@ struct HotkeyConfigRow: View {
     }
 
     private func handleKeyEvent(_ event: NSEvent) {
-        switch event.type {
-        case .flagsChanged:
-            // Don't update recordedShortcut for modifier-only changes
-            break
+        // Modifier-only changes, presses without a modifier and keys global
+        // hotkeys can't use are ignored; recording just continues.
+        guard event.type == .keyDown,
+              let shortcut = HotkeyShortcut(keyCode: event.keyCode, modifierFlags: event.modifierFlags)
+        else { return }
 
-        case .keyDown:
-            let modifiers = event.modifierFlags.intersection([.control, .option, .shift, .command])
-            if !modifiers.isEmpty, let keyString = keyStringForKeyCode(event.keyCode) {
-                let shortcut = formatModifiers(modifiers) + keyString
-
-                // Filter out common system shortcuts
-                if isSystemShortcut(shortcut) {
-                    blockedShortcut = shortcut
-                    recordedShortcut = ""
-                    // Clear blocked message after 1 second
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        if isRecording && blockedShortcut == shortcut {
-                            blockedShortcut = ""
-                        }
-                    }
-                    return
-                }
-
-                blockedShortcut = ""
-                recordedShortcut = shortcut
-
-                // Auto-stop after capturing valid combination
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    if isRecording && recordedShortcut == shortcut {
-                        stopRecording()
-                    }
+        let text = shortcut.stringValue
+        if shortcut.isReservedBySystem {
+            blockedShortcut = text
+            recordedShortcut = ""
+            // Clear blocked message after 1 second
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                if isRecording && blockedShortcut == text {
+                    blockedShortcut = ""
                 }
             }
-
-        default:
-            break
-        }
-    }
-
-    private func formatModifiers(_ modifiers: NSEvent.ModifierFlags) -> String {
-        var result = ""
-        if modifiers.contains(.control) { result += "⌃" }
-        if modifiers.contains(.option) { result += "⌥" }
-        if modifiers.contains(.shift) { result += "⇧" }
-        if modifiers.contains(.command) { result += "⌘" }
-        return result
-    }
-
-    private func keyStringForKeyCode(_ keyCode: UInt16) -> String? {
-        // Static lookup table mapping key codes to display strings
-        let keyCodeMap: [UInt16: String] = [
-            18: "1", 19: "2", 20: "3", 21: "4", 23: "5",
-            22: "6", 26: "7", 28: "8", 25: "9", 29: "0",
-            49: "Space",
-            0: "A",  11: "B", 8: "C",  2: "D",  14: "E",
-            3: "F",  5: "G",  4: "H",  34: "I", 38: "J",
-            40: "K", 37: "L", 46: "M", 45: "N", 31: "O",
-            35: "P", 12: "Q", 15: "R", 1: "S",  17: "T",
-            32: "U", 9: "V",  13: "W", 7: "X",  16: "Y",
-            6: "Z",
-            36: "Return", 53: "Escape", 51: "Delete",
-            48: "Tab",    76: "Enter",
-            123: "←",    124: "→",    125: "↓",  126: "↑",
-        ]
-        if let mapped = keyCodeMap[keyCode] {
-            return mapped
-        }
-        // Fallback: try to get character from key code
-        return getCharacterFromKeyCode(keyCode)
-    }
-
-    private func getCharacterFromKeyCode(_ keyCode: UInt16) -> String? {
-        // Create a keyboard layout and try to get the character
-        let inputSource = TISCopyCurrentKeyboardLayoutInputSource().takeRetainedValue()
-        guard
-            let layoutData = TISGetInputSourceProperty(
-                inputSource, kTISPropertyUnicodeKeyLayoutData)
-        else {
-            return nil
+            return
         }
 
-        let keyboardLayout = unsafeBitCast(
-            CFDataGetBytePtr((layoutData.assumingMemoryBound(to: CFData.self) as! CFData)),
-            to: UnsafePointer<UCKeyboardLayout>.self)
+        blockedShortcut = ""
+        recordedShortcut = text
 
-        var deadKeyState: UInt32 = 0
-        var chars = [UniChar](repeating: 0, count: 4)
-        var actualStringLength: Int = 0
-
-        let result = UCKeyTranslate(
-            keyboardLayout,
-            keyCode,
-            UInt16(kUCKeyActionDisplay),
-            0,  // no modifiers for character lookup
-            UInt32(LMGetKbdType()),
-            OptionBits(kUCKeyTranslateNoDeadKeysBit),
-            &deadKeyState,
-            4,
-            &actualStringLength,
-            &chars
-        )
-
-        if result == noErr && actualStringLength > 0 {
-            let str = String(utf16CodeUnits: chars, count: actualStringLength).uppercased()
-            return str
+        // Auto-stop after capturing valid combination
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if isRecording && recordedShortcut == text {
+                stopRecording()
+            }
         }
-
-        return nil
-    }
-
-    private func isSystemShortcut(_ shortcut: String) -> Bool {
-        let systemShortcuts = [
-            "⌘A", "⌘C", "⌘V", "⌘X", "⌘Z", "⌘Y", "⌘S", "⌘O", "⌘N", "⌘W", "⌘Q",
-            "⌘T", "⌘R", "⌘P", "⌘F", "⌘G", "⌘H", "⌘M", "⌘,", "⌘Space",
-            "⌘⇧Z", "⌘⇧T", "⌘⇧N", "⌘⇧W", "⌘⇧A", "⌘⇧S", "⌘⇧P",
-            "⌃Space", "⌥Space", "⌘⌥Space", "⌘⌃Space",
-            "⌘Tab", "⌘⇧Tab", "⌘`", "⌘⇧`",
-        ]
-        return systemShortcuts.contains(shortcut)
-    }
-
-    private func isValidShortcut(_ shortcut: String) -> Bool {
-        let modifierChars: Set<Character> = ["⌃", "⌥", "⇧", "⌘"]
-        let modifiers = shortcut.filter { modifierChars.contains($0) }
-        let keys = shortcut.filter { !modifierChars.contains($0) }
-
-        // Must have at least one modifier and one key, and not be a system shortcut
-        return !modifiers.isEmpty && !keys.isEmpty && !isSystemShortcut(shortcut)
     }
 
     private func saveHotkeyChange(shortcut: String?, enabled: Bool) {
