@@ -134,13 +134,8 @@ struct QuickPickerView: View {
                     performTypePaste()
                     return .handled
                 }
-                let optionHeld = keyPress.modifiers.contains(.option)
-                let hasMultiSelection = (selectedRange()?.count ?? 0) > 1
-                // ⌥⏎ on a Shift-extended range is always OCR intent — bypass
-                // the per-user `enableOCROptionKey` toggle, which only gates
-                // the single-item shortcut.
-                if optionHeld && (hasMultiSelection || settingsManager?.enableOCROptionKey == true) {
-                    performOCRAction()
+                if keyPress.modifiers.contains(.option) {
+                    performOptionReturn()
                 } else {
                     performAction()
                 }
@@ -282,6 +277,12 @@ struct QuickPickerView: View {
             }
             tabInterceptor.onOptionP = {
                 togglePinForSelection()
+            }
+            // ⌥⏎ is intercepted too: with the search field focused, the field
+            // editor takes it as insertNewlineIgnoringFieldEditor:, SwiftUI
+            // submits the field and onSubmit pastes the image instead of OCR.
+            tabInterceptor.onOptionReturn = {
+                performOptionReturn()
             }
             tabInterceptor.start()
 
@@ -765,6 +766,18 @@ struct QuickPickerView: View {
         onPreviewToggle(filteredItems[selectedIndex])
     }
 
+    // ⌥⏎ on a Shift-extended range is always OCR intent — bypass the
+    // per-user `enableOCROptionKey` toggle, which only gates the single-item
+    // shortcut.
+    private func performOptionReturn() {
+        let hasMultiSelection = (selectedRange()?.count ?? 0) > 1
+        if hasMultiSelection || settingsManager?.enableOCROptionKey == true {
+            performOCRAction()
+        } else {
+            performAction()
+        }
+    }
+
     private func performOCRAction() {
         // Multi-select: combine text from text items + OCR'd text from
         // images, preserving order.
@@ -1008,10 +1021,14 @@ final class TabKeyInterceptor: ObservableObject {
     // ⌥P pin toggle. Matched by physical key code, not character, so it works
     // on non-Latin layouts (e.g. Ukrainian ЙЦУКЕН, where the P key types "з").
     var onOptionP: (() -> Void)?
+    // ⌥⏎ OCR paste. The search field's editor would otherwise turn it into a
+    // submit (plain paste) before SwiftUI's .onKeyPress sees it.
+    var onOptionReturn: (() -> Void)?
 
     private var monitor: Any?
     private static let tabKeyCode: UInt16 = 48
     private static let pKeyCode: UInt16 = 35
+    private static let returnKeyCodes: Set<UInt16> = [36, 76]  // Return, keypad Enter
 
     func start() {
         guard monitor == nil else { return }
@@ -1032,6 +1049,7 @@ final class TabKeyInterceptor: ObservableObject {
         onTab = nil
         onShiftTab = nil
         onOptionP = nil
+        onOptionReturn = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
@@ -1047,6 +1065,17 @@ final class TabKeyInterceptor: ObservableObject {
                 self?.onOptionP?()
             }
             return nil  // swallow so no character is typed into the search field
+        }
+
+        // ⌥⏎ (no Control/Command — ⌘⇧⏎ type-paste stays with .onKeyPress).
+        if Self.returnKeyCodes.contains(event.keyCode),
+           flags.contains(.option),
+           !flags.contains(.control),
+           !flags.contains(.command) {
+            DispatchQueue.main.async { [weak self] in
+                self?.onOptionReturn?()
+            }
+            return nil  // swallow so the field editor doesn't submit or insert a newline
         }
 
         guard event.keyCode == Self.tabKeyCode else { return event }
