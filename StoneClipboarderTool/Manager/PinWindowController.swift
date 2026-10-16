@@ -156,11 +156,11 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
             }
         case .file:
             if let data = state.fileData, let name = state.fileName {
-                let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(name)
                 do {
-                    try data.write(to: tmp)
-                    pb.writeObjects([tmp as NSURL])
+                    let fileURL = try PasteboardFileStore.write(data, fileName: name)
+                    pb.writeObjects([fileURL as NSURL])
                 } catch {
+                    ErrorLogger.shared.log("Failed to write pinned file for the pasteboard", category: "Pins", error: error)
                     if let s = state.content { pb.setString(s, forType: .string) }
                 }
             }
@@ -171,72 +171,25 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
     /// "Open with Preview / TextEdit" elsewhere in the app. Works off the
     /// context-free snapshot so it's safe regardless of the model's state.
     func openInDefaultApp() {
-        let tempDir = FileManager.default.temporaryDirectory
-
         switch state.itemType {
         case .text, .combined:
             let text = state.editedText
             if !text.isEmpty {
-                let url = tempDir.appendingPathComponent("pinned_text_\(UUID().uuidString).txt")
-                do {
-                    try text.write(to: url, atomically: true, encoding: .utf8)
-                    openInTextEditOrDefault(url)
-                    scheduleTempCleanup(url)
-                } catch { /* best-effort */ }
+                ExternalOpener.openTextInTextEdit(text)
                 return
             }
             // Combined with no text → fall through to the image.
             if state.itemType == .combined, let data = state.imageData {
-                openImageData(data, in: tempDir)
+                ExternalOpener.openImage(data)
             }
         case .image:
             if let data = state.imageData {
-                openImageData(data, in: tempDir)
+                ExternalOpener.openImage(data)
             }
         case .file:
             if let data = state.fileData, let name = state.fileName {
-                let url = tempDir.appendingPathComponent("pinned_\(UUID().uuidString)_\(name)")
-                do {
-                    try data.write(to: url)
-                    NSWorkspace.shared.open(url)
-                    scheduleTempCleanup(url)
-                } catch { /* best-effort */ }
+                ExternalOpener.openFile(data, fileName: name)
             }
-        }
-    }
-
-    private func openImageData(_ data: Data, in tempDir: URL) {
-        // Normalize to PNG so Preview opens it cleanly regardless of source
-        // representation (clipboard images are often TIFF).
-        let url = tempDir.appendingPathComponent("pinned_image_\(UUID().uuidString).png")
-        let pngData: Data?
-        if let rep = NSBitmapImageRep(data: data) {
-            pngData = rep.representation(using: .png, properties: [:])
-        } else if let img = NSImage(data: data), let png = img.pngRepresentation {
-            pngData = png
-        } else {
-            pngData = nil
-        }
-        guard let pngData else { return }
-        do {
-            try pngData.write(to: url)
-            NSWorkspace.shared.open(url)
-            scheduleTempCleanup(url)
-        } catch { /* best-effort */ }
-    }
-
-    private func openInTextEditOrDefault(_ url: URL) {
-        if let textEditURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") {
-            let config = NSWorkspace.OpenConfiguration()
-            NSWorkspace.shared.open([url], withApplicationAt: textEditURL, configuration: config)
-        } else {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func scheduleTempCleanup(_ url: URL) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-            try? FileManager.default.removeItem(at: url)
         }
     }
 

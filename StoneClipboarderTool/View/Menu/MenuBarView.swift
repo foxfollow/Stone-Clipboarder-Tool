@@ -114,145 +114,15 @@ struct MenuBarView: View {
         .background(Color(NSColor.controlBackgroundColor))
     }
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            cbViewModel.deleteItems(at: offsets, from: cbViewModel.items)
-        }
-    }
-
     private func openInPreview(item: CBItem) {
-        cbViewModel.openInPreview(item: item)
+        cbViewModel.openInPreview(item)
     }
 
     private func showMainWindow() {
-        settingsManager.showMainWindow = true
-
-        // First activate the app
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-
-        // Find the main window
-        var foundWindow: NSWindow?
-        for window in NSApp.windows {
-            if window.title == "Clipboard History"
-                || window.contentView?.subviews.first is NSHostingView<ContentView>
-            {
-                foundWindow = window
-                break
-            }
-        }
-
-        guard let window = foundWindow else { return }
-
-        // Force the window to appear on current space
-        window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
-
-        // If window is minimized, restore it
-        if window.isMiniaturized {
-            window.deminiaturize(nil)
-        }
-
-        // Multiple strategies to ensure window appears
-
-        // Strategy 1: Use very high window level temporarily to appear above everything
-        let originalLevel = window.level
-        window.level = .screenSaver
-        window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
-
-        // Strategy 2: Force window center and visibility
-        DispatchQueue.main.async {
-            // Center window on current screen
-            if let screen = NSScreen.main {
-                let screenFrame = screen.visibleFrame
-                let windowFrame = window.frame
-                let x = screenFrame.midX - windowFrame.width / 2
-                let y = screenFrame.midY - windowFrame.height / 2
-                window.setFrameOrigin(NSPoint(x: x, y: y))
-            }
-
-            // Make sure it's visible
-            window.makeKeyAndOrderFront(nil)
-            window.orderFrontRegardless()
-        }
-
-        // Strategy 3: Reset window level after a delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            window.level = originalLevel
-            window.makeKeyAndOrderFront(nil)
-
-            // Final activation to ensure focus
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        MainWindow.show(settingsManager: settingsManager)
     }
 
     private func showMainWindowAndSelectItem(_ item: CBItem) {
-        settingsManager.showMainWindow = true
-
-        // First activate the app
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-
-        // Find the main window
-        var foundWindow: NSWindow?
-        for window in NSApp.windows {
-            if window.title == "Clipboard History"
-                || window.contentView?.subviews.first is NSHostingView<ContentView>
-            {
-                foundWindow = window
-                break
-            }
-        }
-
-        guard let window = foundWindow else { return }
-
-        // Force the window to appear on current space
-        window.collectionBehavior = [.moveToActiveSpace, .fullScreenPrimary]
-
-        // If window is minimized, restore it
-        if window.isMiniaturized {
-            window.deminiaturize(nil)
-        }
-
-        // Multiple strategies to ensure window appears
-
-        // Strategy 1: Use very high window level temporarily to appear above everything
-        let originalLevel = window.level
-        window.level = .screenSaver
-        window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
-
-        // Strategy 2: Force window center and visibility
-        DispatchQueue.main.async {
-            // Center window on current screen
-            if let screen = NSScreen.main {
-                let screenFrame = screen.visibleFrame
-                let windowFrame = window.frame
-                let x = screenFrame.midX - windowFrame.width / 2
-                let y = screenFrame.midY - windowFrame.height / 2
-                window.setFrameOrigin(NSPoint(x: x, y: y))
-            }
-
-            // Make sure it's visible
-            window.makeKeyAndOrderFront(nil)
-            window.orderFrontRegardless()
-        }
-
-        // Strategy 3: Reset window level after a delay and select item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            window.level = originalLevel
-            window.makeKeyAndOrderFront(nil)
-
-            // Final activation to ensure focus
-            NSApp.activate(ignoringOtherApps: true)
-
-            // Select the item after window is properly shown
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                NotificationCenter.default.post(
-                    name: NSNotification.Name("SelectClipboardItem"),
-                    object: "\(item.id)"
-                )
-            }
-        }
+        MainWindow.show(settingsManager: settingsManager, selecting: item)
     }
 }

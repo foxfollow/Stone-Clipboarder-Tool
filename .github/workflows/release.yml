@@ -225,6 +225,29 @@ jobs:
           echo "📊 Architecture:"
           file "$EXECUTABLE"
 
+      - name: Verify version numbers
+        run: |
+          # The GitHub release is created under the tag's version, but the
+          # appcast download URL and Sparkle versions come from the built app.
+          # A tag pushed without bumping MARKETING_VERSION would publish an
+          # appcast that points at a release which doesn't exist.
+          if [[ "$VERSION" != "$SHORT_VERSION" ]]; then
+            echo "❌ ERROR: tag/input version ($VERSION) != MARKETING_VERSION of the built app ($SHORT_VERSION)"
+            echo "Bump MARKETING_VERSION in StoneClipboarderTool.xcodeproj/project.pbxproj or fix the tag."
+            exit 1
+          fi
+
+          # Sparkle offers an update only when sparkle:version (the build
+          # number) is higher than the installed one.
+          LATEST_BUILD=$(grep -o '<sparkle:version>[0-9]*</sparkle:version>' docs/appcast.xml | grep -o '[0-9][0-9]*' | sort -n | tail -1)
+          if [[ -n "$LATEST_BUILD" && "$BUILD_NUMBER" -le "$LATEST_BUILD" ]]; then
+            echo "❌ ERROR: build number $BUILD_NUMBER is not above the newest appcast build ($LATEST_BUILD)."
+            echo "Bump CURRENT_PROJECT_VERSION, or remove the stale <item> if this is a re-release."
+            exit 1
+          fi
+
+          echo "✅ Version $SHORT_VERSION (build $BUILD_NUMBER) matches the tag and is newer than the appcast"
+
       - name: Re-sign app with ad-hoc signature
         run: |
           echo "🔐 Applying ad-hoc signature..."

@@ -172,19 +172,29 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
         QPQuickLookCoordinator.cleanupOldPreviewSessions()
     }
 
-    /// Removes session directories older than 1 hour that are no longer needed.
+    /// How long a preview copy may outlive its preview. Long enough for
+    /// "Open with…" from the Quick Look panel to hand the file to another app;
+    /// short, because these are plain copies of clipboard items (text as .txt).
+    static let previewSessionLifetime: TimeInterval = 10 * 60
+
+    /// Removes session directories older than `previewSessionLifetime`.
     static func cleanupOldPreviewSessions() {
         let dir = previewsDirectory
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: [.creationDateKey], options: .skipsHiddenFiles
         ) else { return }
-        let cutoff = Date().addingTimeInterval(-3600)
+        let cutoff = Date().addingTimeInterval(-previewSessionLifetime)
         for url in contents {
             let created = (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? .distantPast
             if created < cutoff {
                 try? FileManager.default.removeItem(at: url)
             }
         }
+    }
+
+    /// Removes every preview copy. Called when the app quits.
+    static func removeAllPreviewSessions() {
+        try? FileManager.default.removeItem(at: previewsDirectory)
     }
 
     deinit {

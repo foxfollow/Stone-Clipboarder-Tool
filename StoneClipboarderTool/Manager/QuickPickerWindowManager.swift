@@ -40,11 +40,6 @@ class KeyCapturingPanel: NSPanel {
         return canBecomeKey
     }
 
-    override func becomeFirstResponder() -> Bool {
-        let result = super.becomeFirstResponder()
-        return result
-    }
-
     override func sendEvent(_ event: NSEvent) {
         super.sendEvent(event)
 
@@ -81,9 +76,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     nonisolated(unsafe) private var keyMonitor: Any?
     nonisolated(unsafe) private var localKeyMonitor: Any?
     private var previousApp: NSRunningApplication?
-    private var isDragging = false
-    private var dragOffset: NSPoint = NSPoint.zero
     private var menuBarRefreshCallback: (() -> Void)?
+    /// Where the user last left the picker. Kept for this session only: the
+    /// picker opens centered after every launch.
+    private var lastOrigin: NSPoint?
     // Debounced dismiss used when QL panel is open — avoids frame-check fragility
     // and double-scheduling when the user clicks twice on the QL panel.
     nonisolated(unsafe) private var pendingQLDismiss: DispatchWorkItem?
@@ -93,8 +89,6 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     func setCBViewModel(_ viewModel: CBViewModel) {
         self.cbViewModel = viewModel
-        // Reset position flag on app start for fresh center positioning
-        UserDefaults.standard.set(false, forKey: "QuickPickerHasValidPosition")
     }
 
     func setSettingsManager(_ manager: SettingsManager) {
@@ -120,7 +114,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         }
 
         guard let cbViewModel = cbViewModel else {
-            print("CBViewModel is nil")
+            ErrorLogger.shared.log("CBViewModel is nil — QuickPicker cannot start", category: "QuickPicker")
             return
         }
 
@@ -186,7 +180,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
         // Create content view
         guard let pinManager = pinManager else {
-            print("PinManager is nil — QuickPicker cannot start")
+            ErrorLogger.shared.log("PinManager is nil — QuickPicker cannot start", category: "QuickPicker")
             return
         }
         let contentView = QuickPickerView(
@@ -217,11 +211,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         // Set position (saved position or center)
         if let screen = NSScreen.main {
             let screenFrame = screen.visibleFrame
-            let savedPosition = getSavedWindowPosition()
 
             let origin: NSPoint
-            if isPositionValid(savedPosition, screenFrame: screenFrame) {
-                origin = savedPosition
+            if let lastOrigin, isPositionValid(lastOrigin, screenFrame: screenFrame) {
+                origin = lastOrigin
             } else {
                 // Default to center
                 origin = NSPoint(
@@ -279,8 +272,8 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         removeLocalKeyMonitoring()
 
         if let window = window {
-            // Save window position before closing
-            saveWindowPosition(window.frame.origin)
+            // Remember the position for the next open in this session
+            lastOrigin = window.frame.origin
             window.orderOut(nil)
             window.close()
         }
@@ -423,14 +416,6 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     func hidePreviewPanel() {
         quickLookCoordinator.hidePreview()
         customPreviewManager.hidePreview()
-    }
-
-    func handleKeyEvent(_ event: NSEvent) {
-        // This method is no longer used - key handling moved to local monitor
-    }
-
-    func isQuickPickerVisible() -> Bool {
-        return window?.isVisible == true
     }
 
     private func setupEventMonitoring() {
@@ -582,29 +567,8 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     // MARK: - Window Position Management
 
-    private func saveWindowPosition(_ position: NSPoint) {
-        UserDefaults.standard.set(position.x, forKey: "QuickPickerWindowX")
-        UserDefaults.standard.set(position.y, forKey: "QuickPickerWindowY")
-        UserDefaults.standard.set(true, forKey: "QuickPickerHasValidPosition")
-    }
-
-    private func getSavedWindowPosition() -> NSPoint {
-        let x = UserDefaults.standard.double(forKey: "QuickPickerWindowX")
-        let y = UserDefaults.standard.double(forKey: "QuickPickerWindowY")
-        return NSPoint(x: x, y: y)
-    }
-
     private func isPositionValid(_ position: NSPoint, screenFrame: NSRect) -> Bool {
-        // On app relaunch, always reset to center (fresh start)
-        let hasValidPosition = UserDefaults.standard.bool(forKey: "QuickPickerHasValidPosition")
-        if !hasValidPosition {
-            return false
-        }
-
-        // Check if saved position exists (not 0,0 default)
-        guard position.x != 0 || position.y != 0 else { return false }
-
-        // Check if position is completely within screen bounds (no corner hanging)
+        // Only if the whole picker fits on the current screen (no corner hanging)
         let windowSize = NSSize(width: 500, height: 430)
         let windowRect = NSRect(origin: position, size: windowSize)
 

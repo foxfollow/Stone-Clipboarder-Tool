@@ -38,9 +38,9 @@ final class PinnedItemConfig {
     var isCollapsed: Bool
     var imageZoom: Double
 
-    // Best-effort link back to the source CBItem so QuickPicker / main window
-    // can show a pin indicator and toggle the pin off. Match on timestamp +
-    // content equality; nil when no match.
+    // Timestamp of the source CBItem when it was pinned. Informational: the
+    // link back to the history (pin badge, closing on delete) is made by
+    // content — see `contentKey` and PinManager.restorePersistedPins.
     var sourceTimestamp: Date?
 
     var createdAt: Date
@@ -91,5 +91,13 @@ final class PinnedItemConfig {
 
     var frame: NSRect {
         NSRect(x: x, y: y, width: width, height: height)
+    }
+
+    /// The snapshot as a dedup key, to find the history item it came from.
+    /// Reads external-storage fields: call outside SwiftUI body evaluation.
+    var contentKey: CBItem.ContentKey {
+        CBItem.ContentKey(
+            type: itemType, content: content, imageData: imageData,
+            fileData: fileData, fileName: fileName)
     }
 }

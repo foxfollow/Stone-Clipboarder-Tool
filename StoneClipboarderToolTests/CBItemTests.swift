@@ -128,25 +128,19 @@ final class CBItemTests: XCTestCase {
         XCTAssertTrue(a.isDuplicate(of: b))
     }
 
-    func testFindExistingItemReturnsMatch() {
-        let items = [
-            CBItem(timestamp: Date(), content: "a", itemType: .text),
-            CBItem(timestamp: Date(), content: "b", itemType: .text),
-            CBItem(timestamp: Date(), content: "c", itemType: .text)
-        ]
-        let probe = CBItem(timestamp: Date(), content: "b", itemType: .text)
-        let found = CBItem.findExistingItem(in: items, matching: probe)
-        XCTAssertNotNil(found)
-        XCTAssertEqual(found?.content, "b")
+    func testContentKeyMatchesOnlyTheSameContent() {
+        let item = CBItem(timestamp: Date(), content: "b", itemType: .text)
+        XCTAssertTrue(item.hasSameContent(as: CBItem.ContentKey(type: .text, content: "b")))
+        XCTAssertFalse(item.hasSameContent(as: CBItem.ContentKey(type: .text, content: "missing")))
+        XCTAssertFalse(item.hasSameContent(as: CBItem.ContentKey(type: .combined, content: "b")))
     }
 
-    func testFindExistingItemReturnsNilWhenAbsent() {
-        let items = [
-            CBItem(timestamp: Date(), content: "a", itemType: .text),
-            CBItem(timestamp: Date(), content: "b", itemType: .text)
-        ]
-        let probe = CBItem(timestamp: Date(), content: "missing", itemType: .text)
-        XCTAssertNil(CBItem.findExistingItem(in: items, matching: probe))
+    func testContentKeyCarriesTheInlineLookupColumns() {
+        let long = String(repeating: "y", count: 250)
+        let key = CBItem.ContentKey(type: .text, content: long)
+        let item = CBItem(timestamp: Date(), content: long, itemType: .text)
+        XCTAssertEqual(key.preview, item.contentPreview, "the store lookup filters on contentPreview")
+        XCTAssertEqual(key.preview?.count, CBItem.previewLength)
     }
 
     func testFavoriteAndOrderIndexAreSet() {

@@ -6,7 +6,6 @@
 
 import SwiftUI
 import AppKit
-import Vision
 
 struct ActionsBottomButtonView: View {
     @EnvironmentObject var cbViewModel: CBViewModel
@@ -24,27 +23,27 @@ struct ActionsBottomButtonView: View {
         item.modelContext == nil
     }
 
-    // Computed property to determine if Preview button should be shown
+    // Decided from the item type alone: decoding the image on every render
+    // just to hide the button for an undecodable one isn't worth it.
     private var shouldShowPreviewButton: Bool {
         guard !isItemDeleted else { return false }
         switch item.itemType {
         case .image, .combined:
-            return item.image != nil
+            return true
         case .file:
-            return item.isImageFile && item.filePreviewImage != nil
+            return item.isImageFile
         case .text:
             return false
         }
     }
 
-    // Computed property to determine if OCR button should be shown
     private var shouldShowOCRButton: Bool {
         guard !isItemDeleted else { return false }
         switch item.itemType {
         case .image:
-            return item.image != nil
+            return true
         case .file:
-            return item.isImageFile && item.filePreviewImage != nil
+            return item.isImageFile
         case .combined, .text:
             return false
         }
@@ -67,7 +66,6 @@ struct ActionsBottomButtonView: View {
                     // Save changes first, then copy
                     saveTextChanges()
                 }
-//                cbViewModel.copyItem(item)
                 cbViewModel.copyAndUpdateItem(item)
             }
             .buttonStyle(.bordered)
@@ -138,79 +136,11 @@ struct ActionsBottomButtonView: View {
     }
     
     private func openInPreview() {
-        switch item.itemType {
-        case .image, .combined:
-            openImageInPreview()
-        case .file:
-            if item.isImageFile {
-                openImageFileInPreview()
-            }
-        case .text:
-            break // No preview for text
-        }
-    }
-    
-    private func openImageInPreview() {
-        guard let image = item.image else { return }
-        
-        // Create temporary file for the image
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = "clipboard_image_\(UUID().uuidString).png"
-        let tempFile = tempDir.appendingPathComponent(fileName)
-        
-        do {
-            // Convert image to PNG data
-            guard let tiffData = image.tiffRepresentation,
-                  let bitmapRep = NSBitmapImageRep(data: tiffData),
-                  let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-                print("Failed to convert image to PNG")
-                return
-            }
-            
-            // Write to temporary file
-            try pngData.write(to: tempFile)
-            
-            // Open in Preview.app
-            NSWorkspace.shared.open(tempFile)
-            
-            // Clean up temp file after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-                try? FileManager.default.removeItem(at: tempFile)
-            }
-            
-        } catch {
-            print("Error creating temp file for Preview: \(error.localizedDescription)")
-        }
-    }
-    
-    private func openImageFileInPreview() {
-        guard let fileData = item.fileData,
-              let fileName = item.fileName else { return }
-        
-        // Create temporary file with original extension
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
-        let tempFile = tempDir.appendingPathComponent(tempFileName)
-        
-        do {
-            // Write file data to temporary file
-            try fileData.write(to: tempFile)
-            
-            // Open in Preview.app
-            NSWorkspace.shared.open(tempFile)
-            
-            // Clean up temp file after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-                try? FileManager.default.removeItem(at: tempFile)
-            }
-            
-        } catch {
-            print("Error creating temp file for Preview: \(error.localizedDescription)")
-        }
+        cbViewModel.openInPreview(item)
     }
 
+    /// OCR the image into a new text item (on-device, see TextRecognizer).
     private func extractTextFromImage() {
-        // Get the image based on item type
         let imageToProcess: NSImage?
         switch item.itemType {
         case .image:
@@ -221,54 +151,21 @@ struct ActionsBottomButtonView: View {
             imageToProcess = nil
         }
 
-        guard let image = imageToProcess,
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            print("Failed to get image for OCR")
+        guard let image = imageToProcess, let cgImage = TextRecognizer.cgImage(from: image) else {
+            ErrorLogger.shared.log("Failed to get image for OCR", category: "OCR")
             return
         }
 
-        // Create Vision request
-        let request = VNRecognizeTextRequest { request, error in
-            if let error = error {
-                print("OCR error: \(error.localizedDescription)")
-                return
-            }
-
-            guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                print("No text recognized")
-                return
-            }
-
-            // Extract all recognized text
-            let recognizedText = observations.compactMap { observation in
-                observation.topCandidates(1).first?.string
-            }.joined(separator: "\n")
-
-            if recognizedText.isEmpty {
-                print("No text found in image")
-                return
-            }
-
-            // Create a new text item with extracted text on main thread
-            DispatchQueue.main.async {
-                cbViewModel.addTextItem(content: recognizedText)
-                print("Extracted \(recognizedText.count) characters from image")
-            }
-        }
-
-        // Configure request for best accuracy
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-
-        // Perform OCR
-        let requestHandler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try requestHandler.perform([request])
-            } catch {
-                print("Failed to perform OCR: \(error.localizedDescription)")
+            let recognizedText = TextRecognizer.recognizeText(in: cgImage)
+            DispatchQueue.main.async {
+                guard let recognizedText else {
+                    ErrorLogger.shared.debug("No text found in image", category: "OCR")
+                    return
+                }
+                cbViewModel.addTextItem(content: recognizedText)
+                ErrorLogger.shared.debug("Extracted \(recognizedText.count) characters from image", category: "OCR")
             }
         }
     }
-
 }

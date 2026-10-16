@@ -9,7 +9,6 @@ import AppKit
 import ApplicationServices
 import SwiftData
 import SwiftUI
-import Vision
 
 enum QPTab: Hashable, CaseIterable, Identifiable {
     case all
@@ -31,6 +30,16 @@ enum QPTab: Hashable, CaseIterable, Identifiable {
         guard let i = cases.firstIndex(of: self) else { return .all }
         return cases[(i - 1 + cases.count) % cases.count]
     }
+
+    /// Item types listed on the tab; nil = every type (All, Favorites).
+    var itemTypes: Set<CBItemType>? {
+        switch self {
+        case .all, .favorites: return nil
+        case .text: return [.text, .combined]
+        case .images: return [.image, .combined]
+        case .files: return [.file]
+        }
+    }
 }
 
 struct QuickPickerView: View {
@@ -47,10 +56,7 @@ struct QuickPickerView: View {
     @State private var isLoadingItems = false
     @State private var hasMoreItems = true
     @State private var searchTask: Task<Void, Never>?
-    @State private var favoriteCount: Int = 0
-    @State private var textCount: Int = 0
-    @State private var imageCount: Int = 0
-    @State private var fileCount: Int = 0
+    @State private var typeCounts = CBViewModel.ItemTypeCounts()
     @FocusState private var isSearchFocused: Bool
 
     let onClose: () -> Void
@@ -88,35 +94,19 @@ struct QuickPickerView: View {
         // Favorites) and other state changes update the view without an
         // extra disk fetch.
         let base: [CBItem]
-        switch activeTab {
-        case .all:
-            base = quickPickerItems
-        case .favorites:
+        if activeTab == .favorites {
             base = quickPickerItems.filter { $0.isFavorite }
-        case .text:
-            base = quickPickerItems.filter { $0.itemType == .text || $0.itemType == .combined }
-        case .images:
-            base = quickPickerItems.filter { $0.itemType == .image || $0.itemType == .combined }
-        case .files:
-            base = quickPickerItems.filter { $0.itemType == .file }
+        } else if let types = activeTab.itemTypes {
+            base = quickPickerItems.filter { types.contains($0.itemType) }
+        } else {
+            base = quickPickerItems
         }
 
         let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedSearch.isEmpty {
             return base
         }
-
-        return base.filter { item in
-            switch item.itemType {
-            case .text, .combined:
-                if let content = item.content {
-                    return content.localizedCaseInsensitiveContains(trimmedSearch)
-                }
-                return false
-            case .image, .file:
-                return item.displayContent.localizedCaseInsensitiveContains(trimmedSearch)
-            }
-        }
+        return base.filter { $0.matchesSearch(trimmedSearch) }
     }
 
     var body: some View {
@@ -144,13 +134,8 @@ struct QuickPickerView: View {
                     performTypePaste()
                     return .handled
                 }
-                let optionHeld = keyPress.modifiers.contains(.option)
-                let hasMultiSelection = (selectedRange()?.count ?? 0) > 1
-                // ⌥⏎ on a Shift-extended range is always OCR intent — bypass
-                // the per-user `enableOCROptionKey` toggle, which only gates
-                // the single-item shortcut.
-                if optionHeld && (hasMultiSelection || settingsManager?.enableOCROptionKey == true) {
-                    performOCRAction()
+                if keyPress.modifiers.contains(.option) {
+                    performOptionReturn()
                 } else {
                     performAction()
                 }
@@ -195,9 +180,7 @@ struct QuickPickerView: View {
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
                         if !Task.isCancelled {
-                            await MainActor.run {
-                                performSearch(newValue)
-                            }
+                            await performSearch(newValue)
                         }
                     }
                 } else {
@@ -294,6 +277,12 @@ struct QuickPickerView: View {
             }
             tabInterceptor.onOptionP = {
                 togglePinForSelection()
+            }
+            // ⌥⏎ is intercepted too: with the search field focused, the field
+            // editor takes it as insertNewlineIgnoringFieldEditor:, SwiftUI
+            // submits the field and onSubmit pastes the image instead of OCR.
+            tabInterceptor.onOptionReturn = {
+                performOptionReturn()
             }
             tabInterceptor.start()
 
@@ -450,13 +439,13 @@ struct QuickPickerView: View {
             // "All" is everything on disk, favorites included.
             return viewModel.totalItemCount + viewModel.favoriteItemCount
         case .favorites:
-            return favoriteCount
+            return viewModel.favoriteItemCount
         case .text:
-            return textCount
+            return typeCounts.text
         case .images:
-            return imageCount
+            return typeCounts.images
         case .files:
-            return fileCount
+            return typeCounts.files
         }
     }
 
@@ -594,23 +583,10 @@ struct QuickPickerView: View {
         .foregroundStyle(.tertiary)
     }
 
-    // Single fetch + in-memory tally. SwiftData #Predicate over String-backed
-    // enums is finicky; iterating once is simple, accurate, and cheap at
-    // typical clipboard-history sizes.
+    /// Favorites count comes live from the view model; per-type counts need
+    /// a full scan, which the view model caches until the history changes.
     private func loadTabCounts() {
-        guard let modelContext = viewModel.modelContext else { return }
-        do {
-            let all = try modelContext.fetch(FetchDescriptor<CBItem>())
-            favoriteCount = all.lazy.filter { $0.isFavorite }.count
-            textCount = all.lazy.filter { $0.itemType == .text || $0.itemType == .combined }.count
-            imageCount = all.lazy.filter { $0.itemType == .image || $0.itemType == .combined }.count
-            fileCount = all.lazy.filter { $0.itemType == .file }.count
-        } catch {
-            favoriteCount = 0
-            textCount = 0
-            imageCount = 0
-            fileCount = 0
-        }
+        typeCounts = viewModel.itemTypeCounts()
     }
 
     private func togglePinForSelection() {
@@ -630,7 +606,6 @@ struct QuickPickerView: View {
         guard selectedIndex < filteredItems.count else { return }
         let item = filteredItems[selectedIndex]
         viewModel.toggleFavorite(item)
-        loadTabCounts()
         // Toggling favorite can re-filter the list (Favorites tab) — drop
         // the multi-select anchor so the range doesn't reference stale rows.
         selectionAnchor = nil
@@ -644,49 +619,24 @@ struct QuickPickerView: View {
     }
 
     private func reloadForActiveTab() {
+        // Switching tabs keeps an active search instead of listing the tab's
+        // newest rows and filtering only those.
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty && activeTab != .favorites {
+            searchTask?.cancel()
+            searchTask = Task { await performSearch(query) }
+            return
+        }
+
         switch activeTab {
         case .all:
             loadInitialItems()
         case .favorites:
-            loadFavoritesOnly()
-        case .text:
-            loadByTypes([.text, .combined])
-        case .images:
-            loadByTypes([.image, .combined])
-        case .files:
-            loadByTypes([.file])
-        }
-    }
-
-    private func loadFavoritesOnly() {
-        guard let modelContext = viewModel.modelContext else { return }
-        let descriptor = FetchDescriptor<CBItem>(
-            predicate: #Predicate<CBItem> { $0.isFavorite },
-            sortBy: [SortDescriptor(\.orderIndex, order: .forward)]
-        )
-        do {
-            quickPickerItems = try modelContext.fetch(descriptor)
+            quickPickerItems = viewModel.favoriteItems
             hasMoreItems = false
             isLoadingItems = false
-        } catch {
-            quickPickerItems = []
-            hasMoreItems = false
-            isLoadingItems = false
-        }
-    }
-
-    private func loadByTypes(_ types: [CBItemType]) {
-        guard let modelContext = viewModel.modelContext else { return }
-        let descriptor = FetchDescriptor<CBItem>(
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-        )
-        do {
-            let all = try modelContext.fetch(descriptor)
-            quickPickerItems = all.filter { types.contains($0.itemType) }
-            hasMoreItems = false
-            isLoadingItems = false
-        } catch {
-            quickPickerItems = []
+        case .text, .images, .files:
+            quickPickerItems = viewModel.items(ofTypes: activeTab.itemTypes ?? [])
             hasMoreItems = false
             isLoadingItems = false
         }
@@ -701,15 +651,10 @@ struct QuickPickerView: View {
         guard selectedIndex < filteredItems.count else { return }
 
         let item = filteredItems[selectedIndex]
-
-        viewModel.markItemAccessed(item)
-        copyToPasteboard(item)
+        guard viewModel.copyAndUpdateItem(item) else { return }
 
         onClose()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            simulatePaste()
-        }
+        PasteSimulator.paste()
     }
 
     // Resolved Shift+Arrow selection range, clamped to current items.
@@ -760,20 +705,20 @@ struct QuickPickerView: View {
             let joined = items.compactMap { $0.content }.joined(separator: "\n")
             items.forEach { viewModel.markItemAccessed($0) }
 
-            let pb = NSPasteboard.general
-            pb.clearContents()
-            pb.setString(joined, forType: .string)
+            // Through ClipboardManager, so the monitor doesn't save the joined
+            // text as yet another history item.
+            viewModel.getClipboardManager().copyToClipboard(joined)
 
             onClose()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                simulatePaste()
-            }
+            PasteSimulator.paste()
         } else {
             items.forEach { viewModel.markItemAccessed($0) }
             onClose()
+            // One Accessibility alert up front rather than one per item.
+            guard PasteSimulator.ensureAccessibility() else { return }
             // Let focus return to the previously-active window first, then
             // start the sequential paste chain.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + PasteSimulator.defaultDelay) {
                 pasteSequentially(items, at: 0)
             }
         }
@@ -786,14 +731,12 @@ struct QuickPickerView: View {
         guard index < items.count else { return }
         let item = items[index]
         viewModel.copyAndUpdateItem(item)
+        PasteSimulator.paste(after: 0.05)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            simulatePaste()
-            let next = index + 1
-            guard next < items.count else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                pasteSequentially(items, at: next)
-            }
+        let next = index + 1
+        guard next < items.count else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            pasteSequentially(items, at: next)
         }
     }
 
@@ -823,8 +766,16 @@ struct QuickPickerView: View {
         onPreviewToggle(filteredItems[selectedIndex])
     }
 
-    private func copyToPasteboard(_ item: CBItem) {
-        viewModel.copyAndUpdateItem(item)
+    // ⌥⏎ on a Shift-extended range is always OCR intent — bypass the
+    // per-user `enableOCROptionKey` toggle, which only gates the single-item
+    // shortcut.
+    private func performOptionReturn() {
+        let hasMultiSelection = (selectedRange()?.count ?? 0) > 1
+        if hasMultiSelection || settingsManager?.enableOCROptionKey == true {
+            performOCRAction()
+        } else {
+            performAction()
+        }
     }
 
     private func performOCRAction() {
@@ -856,7 +807,7 @@ struct QuickPickerView: View {
         }
 
         guard let image = imageToProcess,
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+              let cgImage = TextRecognizer.cgImage(from: image) else {
             // Couldn't get CGImage — fall through to normal paste
             performAction()
             return
@@ -868,17 +819,17 @@ struct QuickPickerView: View {
 
         // Run OCR on background thread
         DispatchQueue.global(qos: .userInitiated).async {
-            guard let recognizedText = Self.recognizeText(in: cgImage),
+            guard let recognizedText = TextRecognizer.recognizeText(in: cgImage),
                   !recognizedText.isEmpty else { return }
 
             DispatchQueue.main.async {
+                // Straight to the pasteboard on purpose: the clipboard monitor
+                // then saves the recognized text as a history item, honoring
+                // pause and excluded apps.
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(recognizedText, forType: .string)
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    self.simulatePaste()
-                }
+                PasteSimulator.paste()
             }
         }
     }
@@ -903,20 +854,20 @@ struct QuickPickerView: View {
                 if let c = item.content, !c.isEmpty { return .text(c) }
                 if item.itemType == .combined,
                    let img = item.image,
-                   let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                   let cg = TextRecognizer.cgImage(from: img) {
                     return .image(cg)
                 }
                 return nil
             case .image:
                 guard let img = item.image,
-                      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                      let cg = TextRecognizer.cgImage(from: img) else {
                     return nil
                 }
                 return .image(cg)
             case .file:
                 guard item.isImageFile,
                       let img = item.filePreviewImage,
-                      let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                      let cg = TextRecognizer.cgImage(from: img) else {
                     return nil
                 }
                 return .image(cg)
@@ -944,7 +895,7 @@ struct QuickPickerView: View {
                 case .text(let s):
                     parts.append(s)
                 case .image(let cg):
-                    if let recognized = Self.recognizeText(in: cg) {
+                    if let recognized = TextRecognizer.recognizeText(in: cg) {
                         parts.append(recognized)
                     }
                 }
@@ -954,62 +905,13 @@ struct QuickPickerView: View {
             guard !combined.isEmpty else { return }
 
             DispatchQueue.main.async {
+                // Straight to the pasteboard on purpose, like single OCR: the
+                // monitor saves the recognized text as a history item.
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.setString(combined, forType: .string)
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    simulatePaste()
-                }
+                PasteSimulator.paste()
             }
-        }
-    }
-
-    // Synchronous Vision OCR. Safe to call concurrently — each invocation
-    // creates its own request and handler with no captured mutable state.
-    private static func recognizeText(in cgImage: CGImage) -> String? {
-        final class Box { var text: String = "" }
-        let box = Box()
-
-        let request = VNRecognizeTextRequest { req, _ in
-            guard let observations = req.results as? [VNRecognizedTextObservation] else {
-                return
-            }
-            box.text = observations.compactMap { $0.topCandidates(1).first?.string }
-                .joined(separator: "\n")
-        }
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        do {
-            try handler.perform([request])
-        } catch {
-            return nil
-        }
-        return box.text.isEmpty ? nil : box.text
-    }
-
-    private func simulatePaste() {
-        if !AccessibilityAlertHelper.isAccessibilityGranted {
-            AccessibilityAlertHelper.showAccessibilityAlert()
-            return
-        }
-
-        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
-
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-
-        keyDown?.flags = .maskCommand
-        keyUp?.flags = .maskCommand
-
-        let location = CGEventTapLocation.cghidEventTap
-
-        keyDown?.post(tap: location)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            keyUp?.post(tap: location)
         }
     }
 
@@ -1052,10 +954,7 @@ struct QuickPickerView: View {
 
         guard let text = targetText, !text.isEmpty else { return }
 
-        if !AccessibilityAlertHelper.isAccessibilityGranted {
-            AccessibilityAlertHelper.showAccessibilityAlert()
-            return
-        }
+        guard PasteSimulator.ensureAccessibility() else { return }
 
         onClose()
         // Let focus return to the previously-active window before typing.
@@ -1064,113 +963,40 @@ struct QuickPickerView: View {
         }
     }
 
+    private static let initialPageSize = 30
+    private static let pageSize = 50
+
     private func loadInitialItems() {
-        guard let modelContext = viewModel.modelContext else { return }
-
-        // Get the most recent 30 items synchronously for instant display
-        var recentDescriptor = FetchDescriptor<CBItem>(
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-        )
-        recentDescriptor.fetchLimit = 30
-
-        do {
-            let recentItems = try modelContext.fetch(recentDescriptor)
-            self.quickPickerItems = recentItems
-            self.hasMoreItems = recentItems.count == 30
-            self.isLoadingItems = false
-
-            // Don't automatically load more - only when user scrolls
-            // The 30 items are enough for immediate use
-        } catch {
-            print("Failed to load recent QuickPicker items: \(error)")
-            self.quickPickerItems = []
-            self.hasMoreItems = false
-            self.isLoadingItems = false
-        }
+        quickPickerItems = viewModel.historyPage(offset: 0, limit: Self.initialPageSize)
+        hasMoreItems = quickPickerItems.count == Self.initialPageSize
+        isLoadingItems = false
     }
 
     private func loadMoreItems() {
-        guard let modelContext = viewModel.modelContext, !isLoadingItems, hasMoreItems else {
-            return
-        }
-
+        guard !isLoadingItems, hasMoreItems else { return }
         isLoadingItems = true
 
+        // Next turn, so the appearing row's callback doesn't mutate the list.
+        // Everything loaded stays: the old 150-row window re-fetched and
+        // discarded the same page forever, so rows past 150 never showed.
         Task {
-            var descriptor = FetchDescriptor<CBItem>(
-                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-            )
-            descriptor.fetchOffset = quickPickerItems.count
-            descriptor.fetchLimit = 50
-
-            do {
-                let newItems = try modelContext.fetch(descriptor)
-                await MainActor.run {
-                    self.quickPickerItems.append(contentsOf: newItems)
-                    self.hasMoreItems = newItems.count == 50
-                    self.isLoadingItems = false
-
-                    // Clean up memory - keep only last 150 items loaded, but always keep first 30
-                    if self.quickPickerItems.count > 150 {
-                        let firstThirty = Array(self.quickPickerItems.prefix(30))
-                        let remaining = Array(self.quickPickerItems.dropFirst(30).prefix(120))
-                        self.quickPickerItems = firstThirty + remaining
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    print("Failed to load more QuickPicker items: \(error)")
-                    self.hasMoreItems = false
-                    self.isLoadingItems = false
-                }
-            }
+            let page = viewModel.historyPage(offset: quickPickerItems.count, limit: Self.pageSize)
+            let loaded = Set(quickPickerItems.map(\.persistentModelID))
+            quickPickerItems.append(contentsOf: page.filter { !loaded.contains($0.persistentModelID) })
+            hasMoreItems = page.count == Self.pageSize
+            isLoadingItems = false
         }
     }
 
-    private func performSearch(_ searchTerm: String) {
-        guard let modelContext = viewModel.modelContext else { return }
-
-        isLoadingItems = true
-
-        Task {
-            let trimmedSearch = searchTerm.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            // Fetch items for search - use a reasonable limit
-            var descriptor = FetchDescriptor<CBItem>(
-                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-            )
-            descriptor.fetchLimit = 300  // Reasonable limit for search
-
-            do {
-                let allItems = try modelContext.fetch(descriptor)
-                let searchLower = trimmedSearch.lowercased()
-
-                let searchResults = allItems.filter { item in
-                    switch item.itemType {
-                    case .text, .combined:
-                        return item.content?.lowercased().contains(searchLower) == true
-                            || item.contentPreview?.lowercased().contains(searchLower) == true
-                    case .file:
-                        return item.fileName?.lowercased().contains(searchLower) == true
-                    case .image:
-                        return true  // Show all images in search for now
-                    }
-                }
-
-                await MainActor.run {
-                    self.quickPickerItems = searchResults
-                    self.hasMoreItems = false  // Don't paginate search results
-                    self.isLoadingItems = false
-                }
-            } catch {
-                await MainActor.run {
-                    print("Failed to search QuickPicker items: \(error)")
-                    self.quickPickerItems = []
-                    self.hasMoreItems = false
-                    self.isLoadingItems = false
-                }
-            }
-        }
+    /// Searches the whole history (limited to the tab's types), not just the
+    /// newest 300 rows as before. Runs inside `searchTask`; a newer search or
+    /// tab switch cancels it.
+    private func performSearch(_ searchTerm: String) async {
+        let found = await viewModel.searchItems(matching: searchTerm, types: activeTab.itemTypes)
+        guard !Task.isCancelled else { return }
+        quickPickerItems = found
+        hasMoreItems = false
+        isLoadingItems = false
     }
 }
 
@@ -1195,10 +1021,14 @@ final class TabKeyInterceptor: ObservableObject {
     // ⌥P pin toggle. Matched by physical key code, not character, so it works
     // on non-Latin layouts (e.g. Ukrainian ЙЦУКЕН, where the P key types "з").
     var onOptionP: (() -> Void)?
+    // ⌥⏎ OCR paste. The search field's editor would otherwise turn it into a
+    // submit (plain paste) before SwiftUI's .onKeyPress sees it.
+    var onOptionReturn: (() -> Void)?
 
     private var monitor: Any?
     private static let tabKeyCode: UInt16 = 48
     private static let pKeyCode: UInt16 = 35
+    private static let returnKeyCodes: Set<UInt16> = [36, 76]  // Return, keypad Enter
 
     func start() {
         guard monitor == nil else { return }
@@ -1219,6 +1049,7 @@ final class TabKeyInterceptor: ObservableObject {
         onTab = nil
         onShiftTab = nil
         onOptionP = nil
+        onOptionReturn = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
@@ -1234,6 +1065,17 @@ final class TabKeyInterceptor: ObservableObject {
                 self?.onOptionP?()
             }
             return nil  // swallow so no character is typed into the search field
+        }
+
+        // ⌥⏎ (no Control/Command — ⌘⇧⏎ type-paste stays with .onKeyPress).
+        if Self.returnKeyCodes.contains(event.keyCode),
+           flags.contains(.option),
+           !flags.contains(.control),
+           !flags.contains(.command) {
+            DispatchQueue.main.async { [weak self] in
+                self?.onOptionReturn?()
+            }
+            return nil  // swallow so the field editor doesn't submit or insert a newline
         }
 
         guard event.keyCode == Self.tabKeyCode else { return event }
@@ -1260,7 +1102,5 @@ final class TabKeyInterceptor: ObservableObject {
 
 
 #Preview {
-    QuickPickerView(viewModel: CBViewModel(), pinManager: PinManager()) {
-        print("Closed")
-    }
+    QuickPickerView(viewModel: CBViewModel(), pinManager: PinManager()) { /* preview: no-op close */ }
 }

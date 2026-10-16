@@ -10,7 +10,8 @@ import Foundation
 import SwiftData
 import UniformTypeIdentifiers
 
-class ClipboardManager: ObservableObject {
+@MainActor
+final class ClipboardManager: ObservableObject {
     private var timer: Timer?
     private var lastChangeCount: Int = 0
     private let pasteboard = NSPasteboard.general
@@ -65,8 +66,9 @@ class ClipboardManager: ObservableObject {
     }
     
     func startMonitoring() {
+        // Scheduled on the main run loop, so the block runs on the main actor.
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkClipboard()
+            MainActor.assumeIsolated { self?.checkClipboard() }
         }
     }
     
@@ -75,6 +77,36 @@ class ClipboardManager: ObservableObject {
         timer = nil
     }
     
+    /// What gets captured from a pasteboard holding text and/or an image.
+    enum CaptureKind: Equatable {
+        case text, image, combined
+    }
+
+    /// The capture-mode rules, kept pure so they can be tested. Files are
+    /// handled before this and always captured.
+    nonisolated static func captureKinds(
+        for mode: ClipboardCaptureMode, hasText: Bool, hasImage: Bool
+    ) -> [CaptureKind] {
+        switch mode {
+        case .textOnly:
+            // Prefer text when both are present (Word also puts a picture of
+            // the selection on the pasteboard), but still capture standalone
+            // images such as screenshots.
+            return hasText ? [.text] : (hasImage ? [.image] : [])
+        case .imageOnly:
+            return hasImage ? [.image] : (hasText ? [.text] : [])
+        case .both:
+            return (hasText ? [.text] : []) + (hasImage ? [.image] : [])
+        case .bothAsOne:
+            if hasText && hasImage { return [.combined] }
+            return hasText ? [.text] : (hasImage ? [.image] : [])
+        }
+    }
+
+    /// Files above this size are skipped, checked before anything is read.
+    nonisolated static let maxFileSize = 100 * 1024 * 1024
+
+    /// Runs every 0.5 s: must stay cheap until changeCount differs.
     private func checkClipboard() {
         guard pasteboard.changeCount != lastChangeCount else { return }
 
@@ -90,133 +122,73 @@ class ClipboardManager: ObservableObject {
             return
         }
 
-        let captureMode = settingsManager?.clipboardCaptureMode ?? .textOnly
-
-        // ALWAYS check for files first to prevent them from being captured as text
-        // This is critical to fix the issue where file URLs were being saved as text
+        // Files first, so a copied file isn't also captured as its path text.
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL],
            let fileURL = urls.first,
            fileURL.isFileURL {
-            handleFileFromURL(fileURL)
-            return // Exit early - files are handled, don't process text/image
+            captureFile(at: fileURL)
+            return
         }
 
-        // Now handle text and image based on capture mode
-        // Note: This only applies to non-file clipboard content
-        let hasText = pasteboard.string(forType: .string).map { !$0.isEmpty } ?? false
-        let hasImage = NSImage(pasteboard: pasteboard) != nil
+        // Read the text once; only probe for an image (no decoding) here.
+        let text = pasteboard.string(forType: .string).flatMap { $0.isEmpty ? nil : $0 }
+        let hasImage = NSImage.canInit(with: pasteboard)
+        let captureMode = settingsManager?.clipboardCaptureMode ?? .textOnly
 
-        switch captureMode {
-        case .textOnly:
-            // Prefer text when both text and image are present (e.g., Microsoft Word)
-            // But still capture standalone images (e.g., screenshots)
-            if hasText && hasImage {
-                // Both present - prefer text only
-                if let content = pasteboard.string(forType: .string) {
-                    onClipboardChange?(.text(content))
-                }
-            } else if hasText {
-                // Only text available
-                if let content = pasteboard.string(forType: .string) {
-                    onClipboardChange?(.text(content))
-                }
-            } else if hasImage {
-                // Only image available (e.g., screenshots) - capture it
-                if let image = NSImage(pasteboard: pasteboard) {
-                    onClipboardChange?(.image(image))
-                }
-            }
-
-        case .imageOnly:
-            // Prefer images when both are present
-            // But still capture text when there's no image
-            if hasText && hasImage {
-                // Both present - prefer image only
-                if let image = NSImage(pasteboard: pasteboard) {
-                    onClipboardChange?(.image(image))
-                }
-            } else if hasImage {
-                // Only image available
-                if let image = NSImage(pasteboard: pasteboard) {
-                    onClipboardChange?(.image(image))
-                }
-            } else if hasText {
-                // Only text available - capture it
-                if let content = pasteboard.string(forType: .string) {
-                    onClipboardChange?(.text(content))
-                }
-            }
-
-        case .both:
-            // Capture both text and image if both are present
-            // This is useful for apps like Microsoft Word that put both on clipboard
-            if hasText && hasImage {
-                // First capture text
-                if let content = pasteboard.string(forType: .string) {
-                    onClipboardChange?(.text(content))
-                }
-                // Then capture image as a separate item
-                if let image = NSImage(pasteboard: pasteboard) {
-                    onClipboardChange?(.image(image))
-                }
-            } else if hasText {
-                // Only text available
-                if let content = pasteboard.string(forType: .string) {
-                    onClipboardChange?(.text(content))
-                }
-            } else if hasImage {
-                // Only image available
-                if let image = NSImage(pasteboard: pasteboard) {
-                    onClipboardChange?(.image(image))
-                }
-            }
-
-        case .bothAsOne:
-            // Capture text and image together as one combined item
-            if hasText && hasImage {
-                // Both present - capture as combined item
-                if let content = pasteboard.string(forType: .string),
-                   let image = NSImage(pasteboard: pasteboard) {
-                    onClipboardChange?(.combined(content, image))
-                }
-            } else if hasText {
-                // Only text available
-                if let content = pasteboard.string(forType: .string) {
-                    onClipboardChange?(.text(content))
-                }
-            } else if hasImage {
-                // Only image available
-                if let image = NSImage(pasteboard: pasteboard) {
-                    onClipboardChange?(.image(image))
+        for kind in Self.captureKinds(for: captureMode, hasText: text != nil, hasImage: hasImage) {
+            switch kind {
+            case .text:
+                if let text { onClipboardChange?(.text(text)) }
+            case .image:
+                if let data = pasteboardImageData() { onClipboardChange?(.image(data)) }
+            case .combined:
+                if let text, let data = pasteboardImageData() {
+                    onClipboardChange?(.combined(text, data))
+                } else if let text {
+                    onClipboardChange?(.text(text))
                 }
             }
         }
     }
-    
-    private func handleFileFromURL(_ fileURL: URL) {
-        do {
-            // Check if file exists and is readable
-            guard try fileURL.checkResourceIsReachable() else { return }
-            
-            // Get file data safely
-            let fileData = try Data(contentsOf: fileURL)
-            
-            // Get UTI from file extension
-            let uti = UTType(filenameExtension: fileURL.pathExtension)?.identifier ?? "public.data"
-            
-            // Safety check for file size (limit to 100MB)
-            let maxFileSize = 100 * 1024 * 1024 // 100MB
-            guard fileData.count <= maxFileSize else {
-                print("File too large: \(fileData.count) bytes")
-                return
+
+    /// Image bytes as the source app provided them: PNG, else TIFF, else
+    /// whatever NSImage can read (PDF, JPEG, …) re-encoded as TIFF. Keeping
+    /// the original encoding stores a Retina screenshot in a few MB instead of
+    /// an uncompressed TIFF many times that size, and identical copies stay
+    /// byte-identical for deduplication.
+    private func pasteboardImageData() -> Data? {
+        if let png = pasteboard.data(forType: .png) { return png }
+        if let tiff = pasteboard.data(forType: .tiff) { return tiff }
+        return NSImage(pasteboard: pasteboard)?.tiffRepresentation
+    }
+
+    private func captureFile(at url: URL) {
+        let fileURL = url.resolvingSymlinksInPath()
+        let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        // Folders, packages (.app) and unreachable URLs have no single blob to store.
+        guard values?.isRegularFile == true else { return }
+        if let size = values?.fileSize, size > Self.maxFileSize {
+            ErrorLogger.shared.debug("Skipped copied file over the size limit (\(size) bytes)", category: "Clipboard")
+            return
+        }
+
+        let uti = UTType(filenameExtension: fileURL.pathExtension)?.identifier ?? "public.data"
+        // Up to 100 MB: read off the main thread (this runs from the poll
+        // timer), then hand the item over on the main actor.
+        Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                let data = try Data(contentsOf: fileURL)
+                await self?.deliver(.file(url, uti, data))
+            } catch {
+                ErrorLogger.shared.log("Failed to read copied file", category: "Clipboard", error: error)
             }
-            
-            onClipboardChange?(.file(fileURL, uti, fileData))
-        } catch {
-            print("Error reading file: \(error.localizedDescription)")
         }
     }
-    
+
+    private func deliver(_ content: ClipboardContent) {
+        onClipboardChange?(content)
+    }
+
     func copyToClipboard(_ text: String) {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
@@ -229,44 +201,24 @@ class ClipboardManager: ObservableObject {
         lastChangeCount = pasteboard.changeCount
     }
     
-    @MainActor
-    private func createSavePanel() -> NSSavePanel? {
-        // Try to create save panel safely
-        let savePanel = NSSavePanel()
-
-        // Test if we can access basic properties (will fail in strict sandbox)
-        _ = savePanel.canCreateDirectories
-        return savePanel
-    }
-    
-    func copyFileToClipboard(data: Data, fileName: String, uti: String) {
-        // Create a temporary file to copy to clipboard
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempFile = tempDir.appendingPathComponent(fileName)
-        
+    /// Puts a file on the pasteboard. The file stays on disk until the next
+    /// file copy — see PasteboardFileStore.
+    @discardableResult
+    func copyFileToClipboard(data: Data, fileName: String) -> Bool {
         do {
-            try data.write(to: tempFile)
-            
+            let fileURL = try PasteboardFileStore.write(data, fileName: fileName)
             pasteboard.clearContents()
-            pasteboard.writeObjects([tempFile as NSURL])
+            pasteboard.writeObjects([fileURL as NSURL])
             lastChangeCount = pasteboard.changeCount
-            
-            // Clean up temp file after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                try? FileManager.default.removeItem(at: tempFile)
-            }
+            return true
         } catch {
-            print("Error creating temp file for clipboard: \(error.localizedDescription)")
+            ErrorLogger.shared.log("Failed to create temp file for clipboard", category: "Clipboard", error: error)
+            return false
         }
     }
-    
-    @MainActor
+
     func saveItemToFile(_ item: CBItem) {
-        // Try to create save panel - if it crashes, it's likely a sandbox issue
-        guard let savePanel = createSavePanel() else {
-            print("Cannot create save panel - check app sandbox entitlements")
-            return
-        }
+        let savePanel = NSSavePanel()
 
         // Configure save panel based on item type
         switch item.itemType {
@@ -352,57 +304,44 @@ class ClipboardManager: ObservableObject {
                         }
                     }
 
-                    await self.logSuccessOnMain()
-
+                    ErrorLogger.shared.debug("Item saved to file", category: "SaveToFile")
                 } catch {
-                    await self.logErrorOnMain(error)
+                    ErrorLogger.shared.log("Failed to save item to file", category: "SaveToFile", error: error)
                 }
             }
         }
     }
     
-    @MainActor
-    private func logSuccessOnMain() {
-        print("File saved successfully")
-    }
-    
-    @MainActor
-    private func logErrorOnMain(_ error: Error) {
-        print("Error saving file: \(error.localizedDescription)")
-    }
-    
-    func copyItemToClipboard(_ item: CBItem) {
+    /// Puts the item on the pasteboard. Returns false when it has nothing to
+    /// copy (missing content or undecodable image data).
+    @discardableResult
+    func copyItemToClipboard(_ item: CBItem) -> Bool {
         switch item.itemType {
         case .text:
-            if let content = item.content {
-                copyToClipboard(content)
-            }
+            guard let content = item.content, !content.isEmpty else { return false }
+            copyToClipboard(content)
+            return true
         case .image:
-            if let image = item.image {
-                copyToClipboard(image)
-            }
+            guard let image = item.image else { return false }
+            copyToClipboard(image)
+            return true
         case .file:
-            if let fileData = item.fileData,
-               let fileName = item.fileName,
-               let uti = item.fileUTI {
-                copyFileToClipboard(data: fileData, fileName: fileName, uti: uti)
-            }
+            guard let fileData = item.fileData, let fileName = item.fileName else { return false }
+            return copyFileToClipboard(data: fileData, fileName: fileName)
         case .combined:
             // Copy both text and image to clipboard
-            pasteboard.clearContents()
             var objects: [NSPasteboardWriting] = []
-
-            if let content = item.content {
+            if let content = item.content, !content.isEmpty {
                 objects.append(content as NSPasteboardWriting)
             }
             if let image = item.image {
                 objects.append(image)
             }
-
-            if !objects.isEmpty {
-                pasteboard.writeObjects(objects)
-                lastChangeCount = pasteboard.changeCount
-            }
+            guard !objects.isEmpty else { return false }
+            pasteboard.clearContents()
+            pasteboard.writeObjects(objects)
+            lastChangeCount = pasteboard.changeCount
+            return true
         }
     }
 
@@ -420,7 +359,7 @@ class ClipboardManager: ObservableObject {
 
         // Schedule timer to resume monitoring
         pauseTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: false) { [weak self] _ in
-            self?.resumeMonitoring()
+            MainActor.assumeIsolated { self?.resumeMonitoring() }
         }
     }
 

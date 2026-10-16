@@ -13,11 +13,18 @@
 //  for the pin's window directly and applies the magnification ourselves, so
 //  it works whether or not the pin is the key window.
 //
+//  Magnify events that reach the scroll view through the responder chain
+//  (`magnify(with:)`) are handled too; the monitor consumes the ones it
+//  applies, so a gesture is never applied twice.
+//
 //  Window-move interplay: a *zoomed-in* image pans on drag (and doesn't move
-//  the window); a fit image still moves the window; the chrome bar always
-//  moves the window. Driven by `mouseDownCanMoveWindow` + `isPannable`.
+//  the window); a fit image moves the window via `performDrag` (SwiftUI's
+//  hosting view defeats `isMovableByWindowBackground`); the chrome bar always
+//  moves the window (PinDragArea). A locked pin never moves.
 //
 //  `zoom` is a multiplier on top of the fit scale: 1.0 == fit-to-window.
+//  Resizing the pin keeps the multiplier, so a fit image grows and shrinks
+//  with the window. ⌘-scroll zooms too (for a mouse without pinch).
 //  Double-click resets to fit.
 //
 
@@ -45,6 +52,10 @@ struct PinImageView: NSViewRepresentable {
         scrollView.drawsBackground = true
         scrollView.backgroundColor = NSColor.black.withAlphaComponent(0.04)
 
+        // Centers the image while it is smaller than the viewport; the default
+        // clip view pins it to the bottom-left corner.
+        scrollView.contentView = PinCenteringClipView()
+
         let imageView = PinDraggableImageView()
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.imageAlignment = .alignCenter
@@ -61,6 +72,12 @@ struct PinImageView: NSViewRepresentable {
         // Re-fit whenever the scroll view lays out (initial sizing + resize).
         scrollView.onLayout = { [weak coordinator = context.coordinator] in
             coordinator?.applyLayout()
+        }
+        scrollView.onCommandScroll = { [weak coordinator = context.coordinator] event in
+            coordinator?.handleCommandScroll(event)
+        }
+        scrollView.onMagnify = { [weak coordinator = context.coordinator] event in
+            coordinator?.handleMagnify(event)
         }
 
         context.coordinator.startMagnifyMonitor()
@@ -91,7 +108,6 @@ struct PinImageView: NSViewRepresentable {
         var fitMagnification: CGFloat = 1.0
         private var didInitialFit = false
         private var magnifyMonitor: Any?
-        private var scrollProbe: Any?
 
         init(zoom: Binding<Double>) {
             self.zoom = zoom
@@ -102,14 +118,8 @@ struct PinImageView: NSViewRepresentable {
         func startMagnifyMonitor() {
             guard magnifyMonitor == nil else { return }
             magnifyMonitor = NSEvent.addLocalMonitorForEvents(matching: .magnify) { [weak self] event in
-                self?.handleMagnify(event)
-                return event
-            }
-            // Diagnostic: also watch scroll wheel so we can tell whether ANY
-            // trackpad events reach our app over the pin window.
-            scrollProbe = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-                self?.probeScroll(event)
-                return event
+                guard let self, self.handleMagnify(event) else { return event }
+                return nil
             }
             PinZoomLog.log("startMagnifyMonitor: installed local .magnify monitor")
         }
@@ -119,19 +129,11 @@ struct PinImageView: NSViewRepresentable {
                 NSEvent.removeMonitor(m)
                 magnifyMonitor = nil
             }
-            if let m = scrollProbe {
-                NSEvent.removeMonitor(m)
-                scrollProbe = nil
-            }
         }
 
-        private func probeScroll(_ event: NSEvent) {
-            guard let win = scrollView?.window else { return }
-            let mine = event.window === win
-            PinZoomLog.log("scrollWheel: eventWindow=\(Self.desc(event.window)) myWindow=\(Self.desc(win)) mine=\(mine)")
-        }
-
-        private func handleMagnify(_ event: NSEvent) {
+        /// Returns true when the gesture was for this pin and was applied.
+        @discardableResult
+        func handleMagnify(_ event: NSEvent) -> Bool {
             let win = scrollView?.window
             PinZoomLog.log(
                 "magnify recv: delta=\(String(format: "%.4f", event.magnification)) "
@@ -143,28 +145,41 @@ struct PinImageView: NSViewRepresentable {
                   let window = scrollView.window,
                   event.window === window else {
                 PinZoomLog.log("magnify SKIP: window mismatch or no scrollView")
-                return
+                return false
             }
             guard fitMagnification > 0 else {
                 PinZoomLog.log("magnify SKIP: fitMagnification not ready (\(fitMagnification))")
-                return
+                return false
             }
 
+            zoom(by: 1 + event.magnification, at: event.locationInWindow)
+            return true
+        }
+
+        /// ⌘-scroll zoom. Trackpads send many small precise deltas, wheels
+        /// send a few coarse lines.
+        func handleCommandScroll(_ event: NSEvent) {
+            let step: CGFloat = event.hasPreciseScrollingDeltas ? 0.01 : 0.1
+            let factor = max(0.5, min(1.5, 1 + event.scrollingDeltaY * step))
+            zoom(by: factor, at: event.locationInWindow)
+        }
+
+        private func zoom(by factor: CGFloat, at locationInWindow: NSPoint) {
+            guard let scrollView = scrollView, fitMagnification > 0 else { return }
             let minMag = fitMagnification * 0.25
             let maxMag = fitMagnification * 8.0
-            let factor = 1 + event.magnification
             let oldMag = scrollView.magnification
             let newMag = max(minMag, min(maxMag, oldMag * factor))
 
             // Zoom toward the cursor for a natural feel.
-            let pointInClip = scrollView.contentView.convert(event.locationInWindow, from: nil)
+            let pointInClip = scrollView.contentView.convert(locationInWindow, from: nil)
             scrollView.setMagnification(newMag, centeredAt: pointInClip)
 
-            zoom.wrappedValue = max(0.25, min(8.0, Double(newMag / fitMagnification)))
+            zoom.wrappedValue = max(0.25, min(8.0, Double(scrollView.magnification / fitMagnification)))
             updatePannable()
             PinZoomLog.log(
-                "magnify APPLY: \(String(format: "%.4f", oldMag)) -> \(String(format: "%.4f", newMag)) "
-                + "(after set: \(String(format: "%.4f", scrollView.magnification))) zoom=\(String(format: "%.3f", zoom.wrappedValue))"
+                "zoom APPLY: \(String(format: "%.4f", oldMag)) -> \(String(format: "%.4f", scrollView.magnification)) "
+                + "zoom=\(String(format: "%.3f", zoom.wrappedValue))"
             )
         }
 
@@ -176,8 +191,8 @@ struct PinImageView: NSViewRepresentable {
         // MARK: Layout
 
         /// Keep the document sized to the image and the fit baseline current.
-        /// Applies the persisted zoom only on first valid layout; afterward it
-        /// leaves the magnification alone (the monitor / user own it).
+        /// When the fit changes (first layout, window resize) the magnification
+        /// follows it at the current zoom multiplier.
         func applyLayout() {
             guard let scrollView = scrollView,
                   let imageView = imageView,
@@ -193,13 +208,19 @@ struct PinImageView: NSViewRepresentable {
             guard clip.width > 0, clip.height > 0 else { return }
 
             let fit = min(clip.width / natural.width, clip.height / natural.height)
+            let fitChanged = abs(fit - fitMagnification) > fit * 0.0001
             fitMagnification = fit
 
-            if !didInitialFit {
+            // NSScrollView clamps to 0.25…4.0 by default, which cuts zoom off
+            // early for large or small images.
+            scrollView.minMagnification = fit * 0.25
+            scrollView.maxMagnification = fit * 8.0
+
+            if !didInitialFit || fitChanged {
                 scrollView.magnification = fit * CGFloat(zoom.wrappedValue)
                 didInitialFit = true
                 PinZoomLog.log(
-                    "applyLayout INITIAL FIT: clip=\(Int(clip.width))x\(Int(clip.height)) "
+                    "applyLayout FIT: clip=\(Int(clip.width))x\(Int(clip.height)) "
                     + "natural=\(Int(natural.width))x\(Int(natural.height)) fit=\(String(format: "%.4f", fit)) "
                     + "magnification=\(String(format: "%.4f", scrollView.magnification))"
                 )
@@ -226,12 +247,57 @@ struct PinImageView: NSViewRepresentable {
 final class PinScrollView: NSScrollView {
     var isPannable: Bool = false
     var onLayout: (() -> Void)?
+    var onCommandScroll: ((NSEvent) -> Void)?
+    var onMagnify: ((NSEvent) -> Void)?
 
     override var mouseDownCanMoveWindow: Bool { !isPannable }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// Clicks on the letterbox around a fit image move the pin.
+    override func mouseDown(with event: NSEvent) {
+        if isPannable {
+            super.mouseDown(with: event)
+        } else {
+            PinDragAreaView.dragWindow(of: self, with: event)
+        }
+    }
+
+    override func magnify(with event: NSEvent) {
+        if let onMagnify {
+            onMagnify(event)
+        } else {
+            super.magnify(with: event)
+        }
+    }
 
     override func layout() {
         super.layout()
         onLayout?()
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if event.modifierFlags.contains(.command), let onCommandScroll {
+            onCommandScroll(event)
+        } else {
+            super.scrollWheel(with: event)
+        }
+    }
+}
+
+/// Clip view that keeps a document smaller than the viewport centered.
+final class PinCenteringClipView: NSClipView {
+    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+        var rect = super.constrainBoundsRect(proposedBounds)
+        guard let documentView else { return rect }
+        let doc = documentView.frame
+        if rect.width > doc.width {
+            rect.origin.x = doc.midX - rect.width / 2
+        }
+        if rect.height > doc.height {
+            rect.origin.y = doc.midY - rect.height / 2
+        }
+        return rect
     }
 }
 
@@ -248,13 +314,15 @@ final class PinDraggableImageView: NSImageView {
 
     override var mouseDownCanMoveWindow: Bool { !isPannable }
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
             onDoubleClick?()
             return
         }
         guard isPannable else {
-            super.mouseDown(with: event)
+            PinDragAreaView.dragWindow(of: self, with: event)
             return
         }
         lastWindowPoint = event.locationInWindow
@@ -295,18 +363,10 @@ final class PinDraggableImageView: NSImageView {
 
 // MARK: - Debug logging
 //
-// Temporary diagnostics for pin-image zoom. Prints to stdout (visible in the
-// Xcode console) with a "[PinZoom]" prefix so it's easy to filter and copy.
+// Diagnostics for pin-image zoom, at debug level in the unified log
+// (category "PinZoom"); free when debug logging is off.
 enum PinZoomLog {
-    static func log(_ message: String) {
-        // DEBUG if needed: uncomment to trace pin-image zoom in the console.
-        // let ts = Self.formatter.string(from: Date())
-        // print("[PinZoom \(ts)] \(message)")
+    static func log(_ message: @autoclosure () -> String) {
+        ErrorLogger.shared.debug(message(), category: "PinZoom")
     }
-
-    private static let formatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss.SSS"
-        return f
-    }()
 }

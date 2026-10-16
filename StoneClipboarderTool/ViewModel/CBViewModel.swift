@@ -19,6 +19,9 @@ class CBViewModel: ObservableObject {
     // counted against this number, so they can't be auto-cleaned.
     @Published var totalItemCount: Int = 0
     @Published var favoriteItemCount: Int = 0
+    /// Favorites in their user-defined order. Cached because views read it on
+    /// every render and hotkeys on every press; reloaded with `items`.
+    @Published private(set) var favoriteItems: [CBItem] = []
 
     var inMemoryItemCount: Int { items.count }
 
@@ -30,8 +33,12 @@ class CBViewModel: ObservableObject {
     private let clipboardManager = ClipboardManager()
     private var settingsManager: SettingsManager?
 
-    private let defaultFetchLimit = 100
-    private var currentFetchOffset = 0
+    /// Rows shown before the first scroll, and the fewest a refresh reloads.
+    private let initialBatchSize = 30
+    /// Rows appended per `loadMoreItems()`.
+    private let pageSize = 100
+    /// False once a page came back short: `items` holds the whole history.
+    private var canLoadMore = true
 
     // Memory management
     nonisolated(unsafe) private var memoryCleanupTimer: Timer?
@@ -45,7 +52,6 @@ class CBViewModel: ObservableObject {
     func setModelContext(_ context: ModelContext) {
         self._modelContext = context
         clipboardManager.setModelContext(context)
-        fetchItems()
     }
 
     func setSettingsManager(_ manager: SettingsManager) {
@@ -63,98 +69,94 @@ class CBViewModel: ObservableObject {
         return clipboardManager
     }
 
+    /// Loads history rows, newest first.
+    /// - reset: replace `items` with a fresh fetch of `limit` rows. The default
+    ///   keeps at least as many rows as are loaded now, so a refresh after a
+    ///   copy doesn't collapse a list the user has scrolled down.
+    /// - otherwise: append the next page (`limit` defaults to `pageSize`).
     func fetchItems(limit: Int? = nil, reset: Bool = false) {
+        if reset {
+            reloadItems(limit: limit ?? max(initialBatchSize, items.count))
+        } else {
+            loadNextPage(size: limit ?? pageSize)
+        }
+    }
+
+    private func reloadItems(limit: Int) {
         guard let modelContext = _modelContext else { return }
 
-        if reset {
-            currentFetchOffset = 0
-        } else {
-            isLoadingMore = true
-        }
-
-        let fetchLimit = limit ?? defaultFetchLimit
         var descriptor = FetchDescriptor<CBItem>(
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
-        descriptor.fetchLimit = fetchLimit
-        descriptor.fetchOffset = currentFetchOffset
+        descriptor.fetchLimit = limit
 
-        // Always preload last 10 items immediately for instant display
-        if reset {
-            // First, get the most recent 30 items synchronously for instant display
-            var recentDescriptor = FetchDescriptor<CBItem>(
+        do {
+            let fetched = try modelContext.fetch(descriptor)
+            items = fetched
+            canLoadMore = fetched.count == limit
+            trackFirstAccess(of: fetched)
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch recent items", category: "SwiftData", error: error)
+            items = []
+        }
+        reloadFavorites()
+        refreshItemCounts()
+    }
+
+    private func reloadFavorites() {
+        guard let modelContext = _modelContext else { return }
+        let descriptor = FetchDescriptor<CBItem>(
+            predicate: #Predicate { $0.isFavorite },
+            sortBy: [SortDescriptor(\.orderIndex, order: .forward)]
+        )
+        do {
+            favoriteItems = try modelContext.fetch(descriptor)
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch favorite items", category: "SwiftData", error: error)
+            favoriteItems = []
+        }
+    }
+
+    private func loadNextPage(size: Int) {
+        guard let modelContext = _modelContext, !isLoadingMore, canLoadMore else { return }
+        isLoadingMore = true
+
+        // One turn later, so a scroll-triggered call doesn't mutate the list
+        // from inside the appearing row's callback.
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.isLoadingMore = false }
+
+            var descriptor = FetchDescriptor<CBItem>(
                 sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
             )
-            recentDescriptor.fetchLimit = 30
+            // Deletes remove rows from `items` and every other change reloads
+            // it, so `items` is always the newest N rows and its count is the
+            // right offset; a separate counter drifted after each delete.
+            descriptor.fetchOffset = self.items.count
+            descriptor.fetchLimit = size
 
             do {
-                let recentItems = try modelContext.fetch(recentDescriptor)
-                
-                // Deduplicate items based on persistentModelID
-                var uniqueItems: [CBItem] = []
-                var seenIds = Set<PersistentIdentifier>()
-                
-                for item in recentItems {
-                    if !seenIds.contains(item.persistentModelID) {
-                        uniqueItems.append(item)
-                        seenIds.insert(item.persistentModelID)
-                    }
-                }
-                
-                // Defer @Published mutation to avoid publishing during view updates
-                DispatchQueue.main.async {
-                    self.items = uniqueItems
-                    self.currentFetchOffset = uniqueItems.count
-                    self.refreshItemCounts()
-                }
-
-                // Track access times for memory management
-                for item in uniqueItems {
-                    self.lastAccessTimes[item.persistentModelID] = Date()
-                }
-
-                // Don't automatically load more - only load when user actually scrolls
-                // The 30 items are enough for immediate use
+                let page = try modelContext.fetch(descriptor)
+                // A copy saved while this page was pending shifts rows down
+                // by one; skip anything already loaded.
+                let loaded = Set(self.items.map(\.persistentModelID))
+                let fresh = page.filter { !loaded.contains($0.persistentModelID) }
+                self.items.append(contentsOf: fresh)
+                self.canLoadMore = page.count == size
+                self.trackFirstAccess(of: fresh)
             } catch {
-                ErrorLogger.shared.log("Failed to fetch recent items", category: "SwiftData", error: error)
-                DispatchQueue.main.async {
-                    self.items = []
-                }
+                ErrorLogger.shared.log("Failed to fetch items (pagination)", category: "SwiftData", error: error)
             }
-        } else {
-            // For pagination, use async to avoid blocking UI
-            Task {
-                do {
-                    let newItems = try modelContext.fetch(descriptor)
-                    await MainActor.run {
-                        // Deduplicate new items and check against existing items
-                        var existingIds = Set(self.items.map { $0.persistentModelID })
-                        var uniqueNewItems: [CBItem] = []
-                        
-                        for item in newItems {
-                            if !existingIds.contains(item.persistentModelID) {
-                                uniqueNewItems.append(item)
-                                existingIds.insert(item.persistentModelID)
-                            }
-                        }
-                        
-                        self.items.append(contentsOf: uniqueNewItems)
-                        self.isLoadingMore = false
-                        self.currentFetchOffset += newItems.count
-                        self.refreshItemCounts()
+        }
+    }
 
-                        // Track access times for memory management
-                        for item in uniqueNewItems {
-                            self.lastAccessTimes[item.persistentModelID] = Date()
-                        }
-                    }
-                } catch {
-                    await MainActor.run {
-                        ErrorLogger.shared.log("Failed to fetch items (pagination)", category: "SwiftData", error: error)
-                        self.isLoadingMore = false
-                    }
-                }
-            }
+    /// Starts the inactivity clock for rows seen for the first time. Rows
+    /// already tracked keep their time: reloading the list is not access.
+    private func trackFirstAccess(of fetched: [CBItem]) {
+        let now = Date()
+        for item in fetched where lastAccessTimes[item.persistentModelID] == nil {
+            lastAccessTimes[item.persistentModelID] = now
         }
     }
 
@@ -173,22 +175,32 @@ class CBViewModel: ObservableObject {
         }
     }
 
+    /// Bumped with every `.clipboardItemDeleted`, so a search suspended
+    /// between pages can tell its matches may include a deleted item.
+    private var deletionGeneration = 0
+
+    /// Posts `.clipboardItemDeleted` (`nil`: everything). The context
+    /// deletion must follow on a later main-queue turn.
+    private func announceDeletion(of id: PersistentIdentifier?) {
+        deletionGeneration += 1
+        NotificationCenter.default.post(name: .clipboardItemDeleted, object: id)
+    }
+
     func deleteItem(_ item: CBItem) {
         guard let modelContext = _modelContext else { return }
 
         // Clear selection if this item is selected
         if selectedItem?.id == item.id {
             selectedItem = nil
-            NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+            NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
         }
 
         // Tell PinManager so any open pin for this item closes.
-        NotificationCenter.default.post(
-            name: .clipboardItemDeleted, object: item.persistentModelID
-        )
+        announceDeletion(of: item.persistentModelID)
 
-        // Remove from published array so SwiftUI drops the view
+        // Remove from published arrays so SwiftUI drops the view
         items.removeAll { $0.id == item.id }
+        favoriteItems.removeAll { $0.id == item.id }
 
         // Defer context deletion to next run loop so SwiftUI finishes layout first
         DispatchQueue.main.async { [weak self] in
@@ -213,19 +225,18 @@ class CBViewModel: ObservableObject {
         // Notify PinManager so pins referencing the about-to-be-deleted
         // items close themselves.
         for item in itemsToDelete {
-            NotificationCenter.default.post(
-                name: .clipboardItemDeleted, object: item.persistentModelID
-            )
+            announceDeletion(of: item.persistentModelID)
         }
 
         // Clear selection if deleted item is selected
         if let sel = selectedItem, idsToDelete.contains(sel.id) {
             selectedItem = nil
-            NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+            NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
         }
 
-        // Remove from published array so SwiftUI drops views
+        // Remove from published arrays so SwiftUI drops views
         items.removeAll { idsToDelete.contains($0.id) }
+        favoriteItems.removeAll { idsToDelete.contains($0.id) }
 
         // Defer context deletion to next run loop
         DispatchQueue.main.async { [weak self] in
@@ -255,25 +266,16 @@ class CBViewModel: ObservableObject {
         clipboardManager.startMonitoring()
     }
 
-    func stopClipboardMonitoring() {
-        clipboardManager.stopMonitoring()
-    }
-
-    func selectItem(_ item: CBItem) {
-        selectedItem = item
-        lastAccessTimes[item.persistentModelID] = Date()
-    }
-
     private func handleClipboardChange(_ clipboardContent: ClipboardContent) {
         switch clipboardContent {
         case .text(let content):
             addOrUpdateTextItem(content: content)
-        case .image(let image):
-            addOrUpdateImageItem(image: image)
+        case .image(let imageData):
+            addOrUpdateImageItem(imageData: imageData)
         case .file(let url, let uti, let data):
             addOrUpdateFileItem(url: url, uti: uti, data: data)
-        case .combined(let content, let image):
-            addOrUpdateCombinedItem(content: content, image: image)
+        case .combined(let content, let imageData):
+            addOrUpdateCombinedItem(content: content, imageData: imageData)
         }
     }
 
@@ -282,94 +284,42 @@ class CBViewModel: ObservableObject {
     }
 
     private func addOrUpdateTextItem(content: String) {
-        guard let modelContext = _modelContext else { return }
-
-        let tempItem = CBItem(timestamp: Date(), content: content, itemType: .text)
-
-        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            existingItem.timestamp = Date()
-        } else {
-            modelContext.insert(tempItem)
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-            performCleanupIfNeeded()
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to save text item", category: "SwiftData", error: error)
+        insertOrBump(CBItem.ContentKey(type: .text, content: content), errorMessage: "Failed to save text item") {
+            CBItem(timestamp: Date(), content: content, itemType: .text)
         }
     }
 
-    func addImageItem(image: NSImage) {
-        addOrUpdateImageItem(image: image)
-    }
-
-    private func addOrUpdateImageItem(image: NSImage) {
-        guard let modelContext = _modelContext else { return }
-        guard let imageData = image.tiffRepresentation else { return }
-
-        let tempItem = CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
-
-        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            existingItem.timestamp = Date()
-        } else {
-            modelContext.insert(tempItem)
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-            performCleanupIfNeeded()
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to save image item", category: "SwiftData", error: error)
+    private func addOrUpdateImageItem(imageData: Data) {
+        insertOrBump(CBItem.ContentKey(type: .image, imageData: imageData), errorMessage: "Failed to save image item") {
+            CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
         }
     }
 
-    private func addOrUpdateCombinedItem(content: String, image: NSImage) {
-        guard let modelContext = _modelContext else { return }
-        guard let imageData = image.tiffRepresentation else { return }
-
-        let tempItem = CBItem(
-            timestamp: Date(),
-            content: content,
-            imageData: imageData,
-            itemType: .combined
-        )
-
-        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            existingItem.timestamp = Date()
-        } else {
-            modelContext.insert(tempItem)
+    private func addOrUpdateCombinedItem(content: String, imageData: Data) {
+        let key = CBItem.ContentKey(type: .combined, content: content, imageData: imageData)
+        insertOrBump(key, errorMessage: "Failed to save combined item") {
+            CBItem(timestamp: Date(), content: content, imageData: imageData, itemType: .combined)
         }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-            performCleanupIfNeeded()
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to save combined item", category: "SwiftData", error: error)
-        }
-    }
-
-    func addFileItem(url: URL, uti: String?, data: Data?) {
-        addOrUpdateFileItem(url: url, uti: uti, data: data)
     }
 
     private func addOrUpdateFileItem(url: URL, uti: String?, data: Data?) {
+        let name = url.lastPathComponent
+        let key = CBItem.ContentKey(type: .file, fileData: data, fileName: name)
+        insertOrBump(key, errorMessage: "Failed to save file item") {
+            CBItem(timestamp: Date(), fileData: data, fileName: name, fileUTI: uti, itemType: .file)
+        }
+    }
+
+    /// Moves an existing identical item to the top, or inserts a new one.
+    /// `makeItem` runs only for new content: building a CBItem decodes the
+    /// image and renders its thumbnail.
+    private func insertOrBump(_ key: CBItem.ContentKey, errorMessage: String, makeItem: () -> CBItem) {
         guard let modelContext = _modelContext else { return }
 
-        let tempItem = CBItem(
-            timestamp: Date(), fileData: data, fileName: url.lastPathComponent, fileUTI: uti,
-            itemType: .file)
-
-        if let existingItem = CBItem.findExistingItem(in: items, matching: tempItem) {
-            existingItem.timestamp = Date()
+        if let existing = existingItem(matching: key) {
+            existing.timestamp = Date()
         } else {
-            modelContext.insert(tempItem)
+            modelContext.insert(makeItem())
         }
 
         do {
@@ -378,21 +328,61 @@ class CBViewModel: ObservableObject {
             performCleanupIfNeeded()
         } catch {
             modelContext.rollback()
-            ErrorLogger.shared.log("Failed to save file item", category: "SwiftData", error: error)
+            ErrorLogger.shared.log(errorMessage, category: "SwiftData", error: error)
         }
     }
 
-    func copyItem(_ item: CBItem) {
-        copyAndUpdateItem(item)
+    /// Image candidates compared per lookup. Bounds the external data
+    /// loaded: many screenshots share one size, no other inline column tells
+    /// them apart, and each comparison reads an image blob. An identical
+    /// image older than the newest 25 of its size is saved again.
+    private let imageCandidateLimit = 25
+
+    /// An item with the same content anywhere in the history, not only among
+    /// the loaded rows. Inline columns (text preview; file name and byte
+    /// size; image size) select the candidates, newest first, and only
+    /// those are compared in full. Text and file candidates are almost
+    /// always the item itself; image candidates are capped.
+    func existingItem(matching key: CBItem.ContentKey) -> CBItem? {
+        guard let modelContext = _modelContext else { return nil }
+
+        let newestFirst = [SortDescriptor(\CBItem.timestamp, order: .reverse)]
+        var descriptor: FetchDescriptor<CBItem>
+        switch key.type {
+        // Predicate values stay optional to match the optional columns.
+        case .text, .combined:
+            let preview = key.preview
+            guard preview != nil else { return nil }
+            descriptor = FetchDescriptor(predicate: #Predicate { $0.contentPreview == preview }, sortBy: newestFirst)
+        case .image:
+            let size = key.imageSize
+            guard size != nil else { return nil }
+            descriptor = FetchDescriptor(predicate: #Predicate { $0.imageSize == size }, sortBy: newestFirst)
+            descriptor.fetchLimit = imageCandidateLimit
+        case .file:
+            let name = key.fileName
+            guard name != nil, let byteCount = key.fileData.map({ Int64($0.count) }) else { return nil }
+            descriptor = FetchDescriptor(
+                predicate: #Predicate { $0.fileName == name && $0.fileSize == byteCount }, sortBy: newestFirst)
+        }
+
+        do {
+            return try modelContext.fetch(descriptor).first { $0.hasSameContent(as: key) }
+        } catch {
+            ErrorLogger.shared.log("Failed to look up a duplicate item", category: "SwiftData", error: error)
+            return nil
+        }
     }
 
-    func copyAndUpdateItem(_ item: CBItem) {
-        clipboardManager.copyItemToClipboard(item)
-
-        guard let modelContext = _modelContext else { return }
-        item.timestamp = Date()
+    /// Puts the item on the pasteboard and moves it to the top of the history.
+    /// Returns false when the item had nothing to copy.
+    @discardableResult
+    func copyAndUpdateItem(_ item: CBItem) -> Bool {
+        guard clipboardManager.copyItemToClipboard(item) else { return false }
 
         markItemAccessed(item)
+        guard let modelContext = _modelContext else { return true }
+        item.timestamp = Date()
 
         do {
             try modelContext.save()
@@ -401,90 +391,11 @@ class CBViewModel: ObservableObject {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to update item timestamp", category: "SwiftData", error: error)
         }
+        return true
     }
 
     func saveItemToFile(_ item: CBItem) {
         clipboardManager.saveItemToFile(item)
-    }
-
-    func openInPreview(item: CBItem) {
-        Task {
-            do {
-                try await openInPreviewAsync(item: item)
-            } catch {
-                print("Failed to open in preview: \(error)")
-            }
-        }
-    }
-
-    private func openInPreviewAsync(item: CBItem) async throws {
-        switch item.itemType {
-        case .image, .combined:
-            try await openImageInPreview(item)
-        case .file:
-            if item.isImageFile {
-                try await openImageFileInPreview(item)
-            } else {
-                throw NSError(
-                    domain: "CBViewModel", code: -1,
-                    userInfo: [
-                        NSLocalizedDescriptionKey: "Only image files can be opened in Preview"
-                    ])
-            }
-        case .text:
-            throw NSError(
-                domain: "CBViewModel", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Text items cannot be opened in Preview"])
-        }
-    }
-
-    private func openImageInPreview(_ item: CBItem) async throws {
-        guard let image = item.image else {
-            throw NSError(
-                domain: "CBViewModel", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "No image data available"])
-        }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = "clipboard_image_\(UUID().uuidString).png"
-        let tempFile = tempDir.appendingPathComponent(fileName)
-
-        guard let tiffData = image.tiffRepresentation,
-            let bitmapRep = NSBitmapImageRep(data: tiffData),
-            let pngData = bitmapRep.representation(using: .png, properties: [:])
-        else {
-            throw NSError(
-                domain: "CBViewModel", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to PNG"])
-        }
-
-        try pngData.write(to: tempFile)
-        NSWorkspace.shared.open(tempFile)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-            try? FileManager.default.removeItem(at: tempFile)
-        }
-    }
-
-    private func openImageFileInPreview(_ item: CBItem) async throws {
-        guard let fileData = item.fileData,
-            let fileName = item.fileName
-        else {
-            throw NSError(
-                domain: "CBViewModel", code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "No file data available"])
-        }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
-        let tempFile = tempDir.appendingPathComponent(tempFileName)
-
-        try fileData.write(to: tempFile)
-        NSWorkspace.shared.open(tempFile)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-            try? FileManager.default.removeItem(at: tempFile)
-        }
     }
 
     func updateItemContent(_ item: CBItem, newContent: String) {
@@ -539,40 +450,9 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    func updateFavoriteOrder(_ favorites: [CBItem]) {
-        guard let modelContext = _modelContext else { return }
-
-        for (index, item) in favorites.enumerated() {
-            item.orderIndex = index
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to update favorite order", category: "SwiftData", error: error)
-        }
-    }
-
-    var favoriteItems: [CBItem] {
-        guard let modelContext = _modelContext else { return [] }
-
-        let descriptor = FetchDescriptor<CBItem>(
-            predicate: #Predicate { $0.isFavorite },
-            sortBy: [SortDescriptor(\.orderIndex, order: .forward)]
-        )
-
-        do {
-            return try modelContext.fetch(descriptor)
-        } catch {
-            ErrorLogger.shared.log("Failed to fetch favorite items", category: "SwiftData", error: error)
-            return []
-        }
-    }
-
+    /// Newest first. `items` is kept in that order by every fetch and change.
     var recentItems: [CBItem] {
-        return items.sorted { $0.timestamp > $1.timestamp }
+        items
     }
 
     func deleteAllItems() {
@@ -581,9 +461,10 @@ class CBViewModel: ObservableObject {
         // 1. Clear all UI state synchronously so SwiftUI stops referencing items
         selectedItem = nil
         items = []
-        NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+        favoriteItems = []
+        NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
         // Tell PinManager — `object: nil` means "all items wiped".
-        NotificationCenter.default.post(name: .clipboardItemDeleted, object: nil)
+        announceDeletion(of: nil)
 
         // 2. Defer actual context deletion to the NEXT run loop iteration.
         //    This gives SwiftUI a full layout pass to drop views that reference
@@ -605,28 +486,138 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    func deleteAllFavorites() {
-        guard let modelContext = _modelContext else { return }
-
-        for item in items where item.isFavorite {
-            item.isFavorite = false
-            item.orderIndex = 0
-        }
-
-        do {
-            try modelContext.save()
-            fetchItems(reset: true)
-        } catch {
-            modelContext.rollback()
-            ErrorLogger.shared.log("Failed to clear all favorites", category: "SwiftData", error: error)
-        }
-    }
-
     func loadMoreItems() {
         fetchItems()
     }
 
+    // MARK: - Read-only queries (Quick Picker, search)
+
+    private static let newestFirst = [SortDescriptor(\CBItem.timestamp, order: .reverse)]
+
+    /// A newest-first slice of the whole history.
+    func historyPage(offset: Int, limit: Int) -> [CBItem] {
+        guard let modelContext = _modelContext else { return [] }
+        var descriptor = FetchDescriptor<CBItem>(sortBy: Self.newestFirst)
+        descriptor.fetchOffset = offset
+        descriptor.fetchLimit = limit
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch a history page", category: "SwiftData", error: error)
+            return []
+        }
+    }
+
+    /// Every item of the given types, newest first. Filtered in memory:
+    /// SwiftData predicates can't reliably test the enum-typed `itemType`.
+    func items(ofTypes types: Set<CBItemType>) -> [CBItem] {
+        guard let modelContext = _modelContext else { return [] }
+        do {
+            return try modelContext.fetch(FetchDescriptor<CBItem>(sortBy: Self.newestFirst))
+                .filter { types.contains($0.itemType) }
+        } catch {
+            ErrorLogger.shared.log("Failed to fetch items by type", category: "SwiftData", error: error)
+            return []
+        }
+    }
+
+    private static let searchPageSize = 200
+
+    /// Items matching `query` anywhere in the history (optionally only the
+    /// given types), newest first, at most `limit`. Scans the store in pages
+    /// until enough matches are found, so older items are found too. Pauses
+    /// between pages so a long scan doesn't freeze the UI; returns `[]` when
+    /// the calling task is cancelled.
+    func searchItems(matching query: String, types: Set<CBItemType>? = nil, limit: Int = 300) async -> [CBItem] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty, limit > 0 else { return [] }
+
+        while true {
+            // A deletion announced earlier has its context deletion queued
+            // already; the pause lets it run before the scan.
+            guard await pauseBetweenPages() else { return [] }
+            let generation = deletionGeneration
+            guard let results = await scanHistory(for: query, types: types, limit: limit) else { return [] }
+            if generation == deletionGeneration { return results }
+            // An item was announced deleted during a pause and may be among
+            // the matches: scan again once its deletion has run.
+        }
+    }
+
+    /// nil when cancelled.
+    private func scanHistory(for query: String, types: Set<CBItemType>?, limit: Int) async -> [CBItem]? {
+        let pageSize = Self.searchPageSize
+        var results: [CBItem] = []
+        // Items inserted during a pause shift the offsets; skip repeats.
+        var seen = Set<PersistentIdentifier>()
+        var offset = 0
+        while results.count < limit {
+            let page = historyPage(offset: offset, limit: pageSize)
+            for item in page where types?.contains(item.itemType) ?? true {
+                guard seen.insert(item.persistentModelID).inserted else { continue }
+                if item.matchesSearch(query) {
+                    results.append(item)
+                    if results.count == limit { break }
+                }
+            }
+            if page.count < pageSize || results.count == limit { break }
+            offset += pageSize
+            guard await pauseBetweenPages() else { return nil }
+        }
+        return results
+    }
+
+    /// Gives the run loop a turn (input, drawing, queued deletions). False
+    /// when the task is cancelled.
+    private func pauseBetweenPages() async -> Bool {
+        do {
+            try await Task.sleep(for: .milliseconds(1))
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    struct ItemTypeCounts: Equatable {
+        /// Text and text + image items.
+        var text = 0
+        /// Images and text + image items.
+        var images = 0
+        var files = 0
+    }
+
+    private var cachedTypeCounts: ItemTypeCounts?
+
+    /// Per-type counts for the Quick Picker tabs. Needs a full scan (no
+    /// predicate on `itemType`), so it's cached until the history changes.
+    func itemTypeCounts() -> ItemTypeCounts {
+        if let cachedTypeCounts { return cachedTypeCounts }
+        guard let modelContext = _modelContext else { return ItemTypeCounts() }
+
+        var counts = ItemTypeCounts()
+        do {
+            for item in try modelContext.fetch(FetchDescriptor<CBItem>()) {
+                switch item.itemType {
+                case .text: counts.text += 1
+                case .image: counts.images += 1
+                case .file: counts.files += 1
+                case .combined:
+                    counts.text += 1
+                    counts.images += 1
+                }
+            }
+        } catch {
+            ErrorLogger.shared.log("Failed to count items by type", category: "SwiftData", error: error)
+            return counts
+        }
+        cachedTypeCounts = counts
+        return counts
+    }
+
+    /// Recounts favorites and non-favorites (cheap fetchCounts) and drops the
+    /// cached per-type counts. Every change to the history ends up here.
     func refreshItemCounts() {
+        cachedTypeCounts = nil
         guard let modelContext = _modelContext else { return }
         do {
             let nonFavDescriptor = FetchDescriptor<CBItem>(
@@ -649,10 +640,10 @@ class CBViewModel: ObservableObject {
         performItemCountCleanupCore(maxItems: settingsManager.maxItemsToKeep)
 
         // Always run memory cleanup during manual cleanup, regardless of toggle
-        performMemoryCleanupCore()
+        releaseInactiveMemory()
 
         // Reset in-memory items to only the most recent batch
-        fetchItems(reset: true)
+        fetchItems(limit: initialBatchSize, reset: true)
     }
 
     // MARK: - Memory Management
@@ -678,60 +669,49 @@ class CBViewModel: ObservableObject {
             settingsManager.enableMemoryCleanup
         else { return }
 
-        performMemoryCleanupCore()
+        releaseInactiveMemory()
     }
 
-    private func performMemoryCleanupCore() {
+    /// Frees what inactive items hold in memory: their decoded thumbnails,
+    /// and — once none of them is in use — the rows loaded by scrolling past
+    /// the first batch (they reload on the next scroll). Favorites keep their
+    /// thumbnails. Never modifies the store: this used to nil `thumbnailData`,
+    /// which the next save deleted from disk, only to re-render it from the
+    /// full image on the next display.
+    func releaseInactiveMemory() {
         guard let settingsManager = settingsManager else { return }
 
         let now = Date()
         let maxInactiveTime = TimeInterval(settingsManager.maxInactiveTime * 60)
-        var itemsToCleanup: [CBItem] = []
-
-        for item in items {
-            if item.isFavorite {
-                continue
-            }
-
-            if let lastAccess = lastAccessTimes[item.persistentModelID],
-               now.timeIntervalSince(lastAccess) > maxInactiveTime {
-                itemsToCleanup.append(item)
-            }
+        let isInactive: (CBItem) -> Bool = { item in
+            guard let lastAccess = self.lastAccessTimes[item.persistentModelID] else { return true }
+            return now.timeIntervalSince(lastAccess) > maxInactiveTime
         }
 
-        for item in itemsToCleanup {
-            cleanupItemMemory(item)
+        let inactive = items.filter { !$0.isFavorite && isInactive($0) }
+        CBItem.evictThumbnails(for: inactive.map(\.persistentModelID))
+
+        var trimmed = 0
+        if items.count > initialBatchSize,
+           items.dropFirst(initialBatchSize).allSatisfy({ isInactive($0) && $0.id != selectedItem?.id }) {
+            trimmed = items.count - initialBatchSize
+            items.removeLast(trimmed)
+            canLoadMore = true
         }
 
         let cutoffTime = now.addingTimeInterval(-maxInactiveTime)
         lastAccessTimes = lastAccessTimes.filter { $1 > cutoffTime }
 
-        print("Memory cleanup: Released \(itemsToCleanup.count) inactive items (favorites preserved)")
+        ErrorLogger.shared.debug(
+            "Memory cleanup: released \(inactive.count) thumbnails, \(trimmed) scrolled rows (favorites preserved)",
+            category: "Memory")
     }
 
-    private func cleanupItemMemory(_ item: CBItem) {
-        item.thumbnailData = nil
-        lastAccessTimes.removeValue(forKey: item.persistentModelID)
-    }
-
+    /// After a saved copy: enforce the item cap. The check is a fetchCount, so
+    /// run it every time rather than guessing from `items.count`. Memory
+    /// cleanup has its own timer.
     private func performCleanupIfNeeded() {
-        guard let settingsManager = settingsManager else { return }
-
-        // Perform item count cleanup if enabled (check every 10 new items)
-        if settingsManager.enableAutoCleanup && items.count % 10 == 0 {
-            performItemCountCleanup()
-        }
-
-        // Perform memory cleanup if enabled (check every 100 items)
-        if settingsManager.enableMemoryCleanup && items.count % 100 == 0 {
-            Task {
-                await Task.detached {
-                    await MainActor.run {
-                        self.performMemoryCleanup()
-                    }
-                }.value
-            }
-        }
+        performItemCountCleanup()
     }
 
     private func performItemCountCleanup() {
@@ -773,13 +753,11 @@ class CBViewModel: ObservableObject {
 
             if let sel = selectedItem, idsToDelete.contains(sel.id) {
                 selectedItem = nil
-                NotificationCenter.default.post(name: .init("ClearClipboardSelection"), object: nil)
+                NotificationCenter.default.post(name: .clearClipboardSelection, object: nil)
             }
 
             for item in nonFavoriteOldItems {
-                NotificationCenter.default.post(
-                    name: .clipboardItemDeleted, object: item.persistentModelID
-                )
+                announceDeletion(of: item.persistentModelID)
             }
 
             items.removeAll { idsToDelete.contains($0.id) }
@@ -795,9 +773,9 @@ class CBViewModel: ObservableObject {
                 do {
                     try modelContext.save()
                     self?.fetchItems(reset: true)
-                    print(
-                        "Cleanup: Removed \(deletedCount) old items, keeping under \(maxItems) limit"
-                    )
+                    ErrorLogger.shared.debug(
+                        "Cleanup: removed \(deletedCount) old items, keeping under \(maxItems) limit",
+                        category: "Cleanup")
                 } catch {
                     modelContext.rollback()
                     ErrorLogger.shared.log("Failed to save item count cleanup", category: "SwiftData", error: error)
@@ -813,92 +791,25 @@ class CBViewModel: ObservableObject {
         lastAccessTimes[item.persistentModelID] = Date()
     }
 
-    func openFileInExternalApp(_ item: CBItem) throws {
-        guard item.itemType == .file else {
-            throw NSError(
-                domain: "CBViewModel",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Item is not a file"])
-        }
-
-        guard let fileData = item.fileData else {
-            throw NSError(
-                domain: "CBViewModel",
-                code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "No file data available"])
-        }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = item.fileName ?? "unknown_file"
-        // Use a unique name to avoid conflicts
-        let tempFileName = "clipboard_file_\(UUID().uuidString)_\(fileName)"
-        let tempFile = tempDir.appendingPathComponent(tempFileName)
-
-        try fileData.write(to: tempFile)
-        NSWorkspace.shared.open(tempFile)
-
-        // Clean up after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-            try? FileManager.default.removeItem(at: tempFile)
-        }
-    }
-
+    /// Opens the item in the app that fits it: an image (or the image of a
+    /// text + image item) in Preview, a file — whatever its type — in its
+    /// default app. Text items use `openInTextEdit`.
     func openInPreview(_ item: CBItem) {
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileURL: URL
-
-        if let image = item.image ?? item.filePreviewImage {
-            // It's an image (or file with image preview)
-            let fileName = "clipboard_image_\(UUID().uuidString).png"
-            fileURL = tempDir.appendingPathComponent(fileName)
-
-            guard let tiffData = image.tiffRepresentation,
-                  let bitmapRep = NSBitmapImageRep(data: tiffData),
-                  let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-                return
-            }
-
-            try? pngData.write(to: fileURL)
-        } else if item.itemType == .file, let data = item.fileData, let name = item.fileName {
-            // It's a file
-            let tempName = "clipboard_file_\(UUID().uuidString)_\(name)"
-            fileURL = tempDir.appendingPathComponent(tempName)
-            try? data.write(to: fileURL)
-        } else {
-            return
-        }
-
-        NSWorkspace.shared.open(fileURL)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-            try? FileManager.default.removeItem(at: fileURL)
+        switch item.itemType {
+        case .image, .combined:
+            if let data = item.imageData { ExternalOpener.openImage(data) }
+        case .file:
+            // The file itself, under its name. This used to render the file's
+            // *icon* to a PNG for any non-image file (e.g. a PDF).
+            if let data = item.fileData { ExternalOpener.openFile(data, fileName: item.fileName ?? "Clipboard File") }
+        case .text:
+            break
         }
     }
 
     func openInTextEdit(_ item: CBItem) {
-        guard let text = item.content, !text.isEmpty else { return }
-
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileName = "clipboard_text_\(UUID().uuidString).txt"
-        let fileURL = tempDir.appendingPathComponent(fileName)
-
-        do {
-            try text.write(to: fileURL, atomically: true, encoding: .utf8)
-            
-            // Try to open specifically with TextEdit, fallback to default for .txt
-            if let textEditURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") {
-                let config = NSWorkspace.OpenConfiguration()
-                NSWorkspace.shared.open([fileURL], withApplicationAt: textEditURL, configuration: config)
-            } else {
-                NSWorkspace.shared.open(fileURL)
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-                try? FileManager.default.removeItem(at: fileURL)
-            }
-        } catch {
-            print("Failed to open content in TextEdit: \(error)")
-        }
+        guard let text = item.content else { return }
+        ExternalOpener.openTextInTextEdit(text)
     }
 
     deinit {

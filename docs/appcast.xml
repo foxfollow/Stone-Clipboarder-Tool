@@ -10,6 +10,28 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
+        <new>
+            <li>🛠️ FIXED: Search in the Quick Picker and the main window now covers your whole history, not just the most recent items</li>
+            <li>🛠️ FIXED: The Quick Picker's All tab keeps loading past the first 150 items</li>
+            <li>🛠️ FIXED: Copying something new no longer collapses a scrolled main window list back to the top</li>
+            <li>🛠️ FIXED: Copying something that's already further down your history moves it to the top instead of saving it twice</li>
+            <li>🛠️ FIXED: Hotkeys recorded with Return, Tab, arrows, F-keys or punctuation were saved but never worked. They work now, and ⇧⌘ system shortcuts are refused while recording</li>
+            <li>🛠️ FIXED: A file copied back from your history can be pasted in Finder later, not only within five seconds</li>
+            <li>🛠️ FIXED: Pins restored at launch show their pin badge again and close when their item is deleted; the Active Pins list in Settings updates right away</li>
+            <li>🛠️ FIXED: Unlocked pins can be moved again by dragging their header. Image pins fit and center in the window as you resize it, and zoom with a trackpad pinch or ⌘-scroll</li>
+            <li>🐛 FIXED: "Open" on a non-image file in the Quick Picker opens the file, not a picture of its icon</li>
+            <li>🐛 FIXED: Pasting several items at once no longer saves the combined text as a new history item</li>
+            <li>🛠️ FIXED: Type-out paste into remote desktops, virtual machines and terminals dropped Shift and Option — "FGH" arrived as "fgh" and "!@#" as "123". Modifiers are now pressed as real keys and held long enough for the remote side to see them</li>
+            <li>🛠️ FIXED: With a non-Latin keyboard layout active (Ukrainian, Russian, …), type-out paste sent every Latin letter as "a" to apps that read key codes. Latin text now uses the keys of your ASCII layout</li>
+            <li>🐛 FIXED: Type-out paste no longer sends "*" and "+" from the numeric keypad, which the remote side could misread depending on its NumLock state</li>
+            <li>🛠️ FIXED: With "Show Main Window" off, the app could still appear in the Dock after a restart when it launched at login</li>
+            <li>🛡️ IMPROVED: Pasting with a hotkey without Accessibility permission now explains what's missing instead of silently doing nothing</li>
+            <li>✨ IMPROVED: Copied images are stored the way the source app provided them (often PNG) instead of as uncompressed TIFF, so screenshots take several times less space</li>
+            <li>🧹 IMPROVED: Copying a very large file no longer freezes the app; files over 100 MB are skipped without being read</li>
+            <li>🧹 IMPROVED: The Quick Picker opens faster with a large history, the menu bar draws its rows without decoding full images, and memory cleanup frees memory instead of deleting stored thumbnails</li>
+            <li>🛡️ IMPROVED: Quick Look preview copies are deleted after 10 minutes and when the app quits, instead of staying up to an hour</li>
+        </new>
+
     <item>
         <title>Version 1.7.3</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>

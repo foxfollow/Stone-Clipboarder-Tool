@@ -105,7 +105,11 @@ Thumbs.db
 *.gcno
 *.gcda
 coverage/
-test*
+# Root-level scratch scripts/archives (test_*.sh, test-tmp*.zip). Anchored to
+# the repo root on purpose: core.ignorecase is on for macOS clones, so an
+# unanchored `test*` also hid TESTING_GUIDE.md and any Test*.swift file.
+/test*
+!/TESTING_GUIDE.md
 
 # ===========================
 # Temporary & Backup Files
