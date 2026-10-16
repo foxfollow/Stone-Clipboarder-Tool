@@ -113,20 +113,30 @@ jobs:
 
       - name: Install Sparkle
         id: sparkle
+        # Homebrew disabled the `sparkle` cask (Gatekeeper check, 2026-09-01),
+        # so take sign_update from the official release archive instead.
+        # sign_update reads the private key: keep the checksum pinned and
+        # update both values together (same version as Package.resolved).
+        env:
+          SPARKLE_VERSION: "2.9.3"
+          SPARKLE_SHA256: "74a07da821f92b79310009954c0e15f350173374a3abe39095b4fc5096916be6"
         run: |
-          echo "📥 Installing Sparkle via Homebrew..."
-          brew install --cask sparkle
+          echo "📥 Downloading Sparkle $SPARKLE_VERSION..."
+          SPARKLE_DIR="$RUNNER_TEMP/sparkle"
+          ARCHIVE="$RUNNER_TEMP/Sparkle-$SPARKLE_VERSION.tar.xz"
+          curl -fsSL --retry 3 -o "$ARCHIVE" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
 
-          # Find sign_update tool
-          SIGN_UPDATE=""
-          for dir in /opt/homebrew/Caskroom/sparkle/*/bin /usr/local/Caskroom/sparkle/*/bin; do
-            if [[ -f "$dir/sign_update" ]]; then
-              SIGN_UPDATE="$dir/sign_update"
-              break
-            fi
-          done
+          if ! echo "$SPARKLE_SHA256  $ARCHIVE" | shasum -a 256 -c -; then
+            echo "❌ ERROR: Sparkle archive checksum mismatch"
+            exit 1
+          fi
 
-          if [[ -z "$SIGN_UPDATE" ]]; then
+          mkdir -p "$SPARKLE_DIR"
+          tar -xJf "$ARCHIVE" -C "$SPARKLE_DIR"
+          SIGN_UPDATE="$SPARKLE_DIR/bin/sign_update"
+
+          if [[ ! -f "$SIGN_UPDATE" ]]; then
             echo "❌ ERROR: sign_update tool not found"
             exit 1
           fi
