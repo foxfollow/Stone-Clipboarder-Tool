@@ -181,7 +181,12 @@ final class CBItemTests: XCTestCase {
         XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "my-title.txt")
         item.title = "Звіт"
         XCTAssertEqual(item.exportFileName(fallback: "scan.PDF"), "Звіт.PDF")
-        XCTAssertEqual(item.exportFileName(fallback: "Clipboard File"), "Звіт", "no extension to keep")
+        XCTAssertEqual(item.exportFileName(fallback: "Makefile"), "Makefile", "no extension: keep the original name")
+        item.title = "x.command"
+        XCTAssertEqual(
+            item.exportFileName(fallback: "script"), "script",
+            "a title must not give an extension-less file one that changes how it opens")
+        XCTAssertEqual(item.exportFileName(fallback: "notes.txt"), "x.command.txt")
     }
 
     func testExportFileNameIsAPlainName() {

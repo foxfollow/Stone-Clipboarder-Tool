@@ -106,8 +106,16 @@ final class CBItem {
     /// Name for a temp copy shown in Quick Look or opened in another app:
     /// the title when there is one, with `fallback`'s extension, otherwise
     /// `fallback` ("Clipboard Text.txt", the original file name, …).
+    ///
+    /// The extension always comes from `fallback`, never from the title: the
+    /// extension picks the app that opens the file, and a title such as
+    /// "x.command" must not turn a copied file into something Terminal runs.
+    /// A fallback without an extension is therefore kept as it is.
     func exportFileName(fallback: String) -> String {
         guard let title = displayTitle else { return fallback }
+        let ext = (fallback as NSString).pathExtension
+        guard !ext.isEmpty else { return fallback }
+
         // "/" and ":" would split or rename the path; keep the name readable.
         var base = title
             .replacingOccurrences(of: "/", with: "-")
@@ -116,8 +124,6 @@ final class CBItem {
             .trimmingCharacters(in: .whitespaces)
         if base.hasPrefix(".") { base = "_" + base }  // not a hidden file
 
-        let ext = (fallback as NSString).pathExtension
-        guard !ext.isEmpty else { return base }
         if (base as NSString).pathExtension.caseInsensitiveCompare(ext) == .orderedSame {
             return base
         }
