@@ -18,9 +18,14 @@ struct MenuBarItemView: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
+                if let title = item.displayTitle {
+                    Text(title)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
                 Text(contentPreview)
                     .font(.system(.body, design: .monospaced))
-                    .lineLimit(2)
+                    .lineLimit(item.displayTitle == nil ? 2 : 1)
                     .foregroundStyle(.primary)
                 if item.itemType != .text, let thumbnail = item.thumbnail {
                     Image(nsImage: thumbnail)

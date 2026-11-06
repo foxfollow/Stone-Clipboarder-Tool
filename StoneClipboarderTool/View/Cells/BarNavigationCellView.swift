@@ -14,6 +14,11 @@ struct BarNavigationCellView: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
+                if let title = item.displayTitle {
+                    Text(title)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
                 Text(contentPreview)
                     .font(.system(.body, design: .monospaced))
                     .foregroundStyle(.primary)

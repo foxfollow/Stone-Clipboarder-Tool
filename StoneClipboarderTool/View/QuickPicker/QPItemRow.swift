@@ -45,10 +45,23 @@ struct QPItemRow: View {
 
             // Content
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.displayContent)
-                    .font(.system(size: 13))
-                    .lineLimit(2)
-                    .foregroundStyle(.primary)
+                // A titled item shows its title, then one line of content,
+                // so the row keeps its height.
+                if let title = item.displayTitle {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                    Text(item.displayContent)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(item.displayContent)
+                        .font(.system(size: 13))
+                        .lineLimit(2)
+                        .foregroundStyle(.primary)
+                }
 
                 HStack(spacing: 4) {
                     Text(item.timestamp, style: .relative)
@@ -91,6 +104,7 @@ struct QPItemRow: View {
                             .foregroundStyle(.secondary)
                         rowKeyBadge("⌥⏎", help: "Extract text (OCR)")
                     }
+                    rowKeyBadge("⌥E", help: "Edit title, favorite and favorite order")
                     rowKeyBadge("⏎", help: "Paste")
                 }
             }
