@@ -21,6 +21,10 @@ final class CBItem {
     var itemType: CBItemType
     var isFavorite: Bool = false
     var orderIndex: Int = 0
+    /// Optional name the user gives an item (⌥E in the Quick Picker), shown
+    /// above its content so similar items are told apart at a glance. Added
+    /// in 1.9.0; optional, so existing stores migrate without a version bump.
+    var title: String?
 
     // Lightweight preview content for UI performance
     var contentPreview: String?
@@ -89,6 +93,14 @@ final class CBItem {
             let imagePart = imageSize ?? calculateImageSize()
             return "\(textPart)\n[Image - \(imagePart)]"
         }
+    }
+
+    /// The user's title, trimmed; nil when there is none.
+    var displayTitle: String? {
+        guard let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !trimmed.isEmpty
+        else { return nil }
+        return trimmed
     }
 
     var image: NSImage? {
@@ -260,10 +272,13 @@ final class CBItem {
 
     // MARK: - Search
 
-    /// The one matching rule behind every search box: text of text-like
-    /// items, the name of files, the "[Image - W×H]" label of images.
-    /// Case-insensitive. `query` is expected trimmed and non-empty.
+    /// The one matching rule behind every search box: the item's title, the
+    /// text of text-like items, the name of files, the "[Image - W×H]" label
+    /// of images. Case-insensitive. `query` is expected trimmed and non-empty.
     func matchesSearch(_ query: String) -> Bool {
+        if title?.localizedCaseInsensitiveContains(query) == true {
+            return true
+        }
         switch itemType {
         case .text, .combined:
             return content?.localizedCaseInsensitiveContains(query) ?? false

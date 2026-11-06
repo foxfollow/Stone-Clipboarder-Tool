@@ -154,4 +154,22 @@ final class CBItemTests: XCTestCase {
         XCTAssertTrue(item.isFavorite)
         XCTAssertEqual(item.orderIndex, 7)
     }
+
+    // MARK: - Title
+
+    func testDisplayTitleIsTrimmedAndNilWhenBlank() {
+        let item = CBItem(timestamp: Date(), content: "Dear Sir", itemType: .text)
+        XCTAssertNil(item.displayTitle)
+        item.title = "   "
+        XCTAssertNil(item.displayTitle)
+        item.title = "  Reply to bank \n"
+        XCTAssertEqual(item.displayTitle, "Reply to bank")
+    }
+
+    func testSearchMatchesTheTitle() {
+        let image = CBItem(timestamp: Date(), imageData: Data([1, 2, 3]), itemType: .image)
+        XCTAssertFalse(image.matchesSearch("passport"))
+        image.title = "Passport scan"
+        XCTAssertTrue(image.matchesSearch("passport"))
+    }
 }
