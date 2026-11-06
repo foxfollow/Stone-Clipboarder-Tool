@@ -77,7 +77,7 @@ struct QPItemEditorView: View {
 
     private var titleField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Title")
+            Label("Title", systemImage: "tag.fill")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
             TextField("e.g. Reply to the bank", text: $model.title)

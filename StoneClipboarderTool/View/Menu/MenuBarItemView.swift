@@ -19,8 +19,9 @@ struct MenuBarItemView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 if let title = item.displayTitle {
-                    Text(title)
+                    Label(title, systemImage: "tag.fill")
                         .font(.headline)
+                        .labelStyle(.titleAndIcon)
                         .lineLimit(1)
                 }
                 Text(contentPreview)
