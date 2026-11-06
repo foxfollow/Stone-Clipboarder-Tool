@@ -172,4 +172,27 @@ final class CBItemTests: XCTestCase {
         image.title = "Passport scan"
         XCTAssertTrue(image.matchesSearch("passport"))
     }
+
+    func testExportFileNameUsesTheTitleWithTheFallbackExtension() {
+        let item = CBItem(timestamp: Date(), content: "https://example.com", itemType: .text)
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "Clipboard Text.txt")
+
+        item.title = "my-title"
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "my-title.txt")
+        item.title = "Звіт"
+        XCTAssertEqual(item.exportFileName(fallback: "scan.PDF"), "Звіт.PDF")
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard File"), "Звіт", "no extension to keep")
+    }
+
+    func testExportFileNameIsAPlainName() {
+        let item = CBItem(timestamp: Date(), content: "x", itemType: .text)
+        item.title = "a/b: c"
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "a-b- c.txt")
+        item.title = "notes.txt"
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "notes.txt", "extension not doubled")
+        item.title = ".env"
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "_.env.txt", "not a hidden file")
+        item.title = String(repeating: "я", count: 300)
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt").count, CBItem.exportTitleLength + 4)
+    }
 }

@@ -42,7 +42,7 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
         switch item.itemType {
         case .text:
             guard let content = item.content else { return false }
-            let fileURL = tempDir.appendingPathComponent("Clipboard Text.txt")
+            let fileURL = tempDir.appendingPathComponent(item.exportFileName(fallback: "Clipboard Text.txt"))
             do {
                 try content.write(to: fileURL, atomically: true, encoding: .utf8)
                 previewURL = fileURL
@@ -53,7 +53,7 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
 
         case .image:
             guard let imageData = item.imageData else { return false }
-            let fileURL = tempDir.appendingPathComponent("Clipboard Image.png")
+            let fileURL = tempDir.appendingPathComponent(item.exportFileName(fallback: "Clipboard Image.png"))
             do {
                 // Convert to PNG for best Quick Look compatibility
                 if let image = NSImage(data: imageData),
@@ -70,8 +70,8 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
 
         case .file:
             guard let fileData = item.fileData else { return false }
-            let fileName = item.fileName ?? "Clipboard File"
-            let fileURL = tempDir.appendingPathComponent(fileName)
+            let fileName = item.exportFileName(fallback: item.fileName ?? "Clipboard File")
+            let fileURL = tempDir.appendingPathComponent(PasteboardFileStore.safeFileName(fileName))
             do {
                 try fileData.write(to: fileURL)
                 previewURL = fileURL
@@ -83,7 +83,7 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
         case .combined:
             // For combined items, prioritize image preview
             if let imageData = item.imageData {
-                let fileURL = tempDir.appendingPathComponent("Clipboard Image.png")
+                let fileURL = tempDir.appendingPathComponent(item.exportFileName(fallback: "Clipboard Image.png"))
                 do {
                     if let image = NSImage(data: imageData),
                        let pngData = image.pngRepresentation {
@@ -97,7 +97,7 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
                     return false
                 }
             } else if let content = item.content {
-                let fileURL = tempDir.appendingPathComponent("Clipboard Text.txt")
+                let fileURL = tempDir.appendingPathComponent(item.exportFileName(fallback: "Clipboard Text.txt"))
                 do {
                     try content.write(to: fileURL, atomically: true, encoding: .utf8)
                     previewURL = fileURL

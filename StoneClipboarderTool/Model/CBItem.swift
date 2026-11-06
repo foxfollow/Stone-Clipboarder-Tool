@@ -103,6 +103,31 @@ final class CBItem {
         return trimmed
     }
 
+    /// Name for a temp copy shown in Quick Look or opened in another app:
+    /// the title when there is one, with `fallback`'s extension, otherwise
+    /// `fallback` ("Clipboard Text.txt", the original file name, …).
+    func exportFileName(fallback: String) -> String {
+        guard let title = displayTitle else { return fallback }
+        // "/" and ":" would split or rename the path; keep the name readable.
+        var base = title
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        base = String(base.prefix(Self.exportTitleLength))
+            .trimmingCharacters(in: .whitespaces)
+        if base.hasPrefix(".") { base = "_" + base }  // not a hidden file
+
+        let ext = (fallback as NSString).pathExtension
+        guard !ext.isEmpty else { return base }
+        if (base as NSString).pathExtension.caseInsensitiveCompare(ext) == .orderedSame {
+            return base
+        }
+        return base + "." + ext
+    }
+
+    /// Room for the extension within the 255-byte name limit, even for
+    /// Cyrillic titles (2 bytes per letter in UTF-8).
+    static let exportTitleLength = 100
+
     var image: NSImage? {
         guard (itemType == .image || itemType == .combined), let imageData = imageData else { return nil }
         return NSImage(data: imageData)

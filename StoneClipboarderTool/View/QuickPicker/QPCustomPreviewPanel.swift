@@ -162,6 +162,7 @@ struct QPCustomPreviewPanel: View {
     }
 
     private var titleForType: String {
+        if let title = item.displayTitle { return title }
         switch item.itemType {
         case .text: return "Text"
         case .image: return "Image"
