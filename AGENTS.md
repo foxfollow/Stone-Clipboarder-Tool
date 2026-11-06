@@ -63,6 +63,10 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   -destination "platform=macOS" -only-testing:StoneClipboarderToolTests/CBViewModelListTests
 ```
 
+- Local test builds: `make run` builds Release with Xcode signing into the
+  default DerivedData and swaps the running app for it (sandboxed data);
+  `make install` builds like CI into /Applications (the release's data).
+  Both quit the running app. See `scripts/local-build.sh`.
 - Building needs Xcode 26: the app icon is an Icon Composer file and some
   views use macOS 26 APIs behind `#available`.
 - Don't quit or relaunch a running copy of the app without asking its
@@ -144,8 +148,9 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   sandboxed, data in `~/Library/Application Support/StoneClipboarderTool/`.
   Changing signing or entitlements moves user data and needs a migration
   plan.
-- Favorites have had no drag-to-reorder UI since Dec 2025. Their order is
-  the order they were favorited (`orderIndex`), which ⌃⇧1…0 follow.
+- Favorites have had no drag-to-reorder UI since Dec 2025. A new favorite
+  goes last; the Quick Picker's ⌥E editor moves one (`CBViewModel.moveFavorite`
+  renumbers `orderIndex` 0…n-1). ⌃⇧1…0 follow that order.
 
 ## Releasing
 

@@ -50,8 +50,8 @@ hand with this list.
 
 ## Global hotkeys
 
-Defaults: ⌃⌥1…0 last items, ⌃⇧1…0 favorites (in the order they were
-favorited), ⌃⌥Space Quick Picker, ⌃⌥P pin the latest item, ⌃⌥⇧P dismiss
+Defaults: ⌃⌥1…0 last items, ⌃⇧1…0 favorites (in Favorites order: as
+favorited, or as moved with ⌥E), ⌃⌥Space Quick Picker, ⌃⌥P pin the latest item, ⌃⌥⇧P dismiss
 all pins.
 
 - [ ] Each hotkey pastes into TextEdit, Notes and a browser field, and the

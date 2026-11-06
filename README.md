@@ -49,26 +49,10 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.8.0
-- **🛠️ Whole-History Search**: Search in the Quick Picker and the main window now covers your whole history, not just the most recent items
-- **🛠️ Quick Picker Scrolling**: The Quick Picker's All tab keeps loading past the first 150 items
-- **🛠️ Main Window List**: Copying something new no longer collapses a scrolled main window list back to the top
-- **🛠️ No More Duplicates**: Copying something that's already further down your history moves it to the top instead of saving it twice
-- **🛠️ Hotkey Recording**: Hotkeys recorded with Return, Tab, arrows, F-keys or punctuation were saved but never worked. They work now, and ⇧⌘ system shortcuts are refused while recording
-- **🛠️ File Paste**: A file copied back from your history can be pasted in Finder later, not only within five seconds
-- **🛠️ Restored Pins**: Pins restored at launch show their pin badge again and close when their item is deleted; the Active Pins list in Settings updates right away
-- **🛠️ Pin Moving and Image Zoom**: Unlocked pins can be moved again by dragging their header. Image pins fit and center in the window as you resize it, and zoom with a trackpad pinch or ⌘-scroll
-- **🐛 Open Files**: "Open" on a non-image file in the Quick Picker opens the file, not a picture of its icon
-- **🐛 Multi-Paste**: Pasting several items at once no longer saves the combined text as a new history item
-- **🛠️ Remote Desktop Typing**: Type-out paste into remote desktops, virtual machines and terminals dropped Shift and Option — "FGH" arrived as "fgh" and "!@#" as "123". Modifiers are now pressed as real keys and held long enough for the remote side to see them
-- **🛠️ Non-Latin Layouts**: With a non-Latin keyboard layout active (Ukrainian, Russian, …), type-out paste sent every Latin letter as "a" to apps that read key codes. Latin text now uses the keys of your ASCII layout
-- **🐛 Keypad Keys**: Type-out paste no longer sends "*" and "+" from the numeric keypad, which the remote side could misread depending on its NumLock state
-- **🛠️ Dock Icon**: With "Show Main Window" off, the app could still appear in the Dock after a restart when it launched at login
-- **🛡️ Accessibility Hint**: Pasting with a hotkey without Accessibility permission now explains what's missing instead of silently doing nothing
-- **✨ Smaller History**: Copied images are stored the way the source app provided them (often PNG) instead of as uncompressed TIFF, so screenshots take several times less space
-- **🧹 Large Files**: Copying a very large file no longer freezes the app; files over 100 MB are skipped without being read
-- **🧹 Snappier UI**: The Quick Picker opens faster with a large history, the menu bar draws its rows without decoding full images, and memory cleanup frees memory instead of deleting stored thumbnails
-- **🛡️ Preview Cleanup**: Quick Look preview copies are deleted after 10 minutes and when the app quits, instead of staying up to an hour
+### 🆕 New in Version 1.9.0
+- **🪟 Item Titles**: Name any clipboard item: press ⌥E in the Quick Picker to give it a title. The title shows above the content, marked with a tag, in the Quick Picker, the menu bar and the main window, and search finds it
+- **✨ Favorites Editor**: The ⌥E editor also adds an item to Favorites or removes it (removing asks first) and moves a favorite up or down with ⌥↑ / ⌥↓. Favorites can be reordered again, and ⌃⇧1…0 follow the new order
+- **✨ Named Previews**: Quick Look, "Open with TextEdit" and "Open in Preview" name the file after the item's title instead of "Clipboard Text.txt"
 
 **📖 [See the full changelog →](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)**
 
@@ -79,7 +63,8 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 - **Combined Clipboard Items**: Save text and image as a single item (BETA - Added in v1.2.0)
 - **Global Hotkeys**: System-wide keyboard shortcuts for instant clipboard access (⌃⌥1-0, ⌃⇧1-0)
 - **Quick Picker Window**: Spotlight-like floating panel (⌃⌥Space) for fast item selection
-- **Favorites System**: Keep frequently-used items; favorites are never auto-deleted
+- **Favorites System**: Keep frequently-used items; favorites are never auto-deleted. Reorder them with ⌥E in the Quick Picker
+- **Item Titles**: Name any item (⌥E in the Quick Picker) so items that start the same way are easy to tell apart
 - **Pinned Windows**: Pin any item to the screen as a floating, always-on-top window (⌃⌥P pins the latest item)
 - **Type-Out Paste**: ⌘⇧Return in the Quick Picker types text key by key, for fields and remote desktops that block pasting
 - **Menu Bar Integration**: Quick access to your most recent items (5–50, configurable) from the menu bar
