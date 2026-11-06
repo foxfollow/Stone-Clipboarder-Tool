@@ -130,6 +130,11 @@ final class CBItem {
         return base + "." + ext
     }
 
+    /// Temp file names for the item's text, image and file content.
+    var textExportFileName: String { exportFileName(fallback: "Clipboard Text.txt") }
+    var imageExportFileName: String { exportFileName(fallback: "Clipboard Image.png") }
+    var fileExportFileName: String { exportFileName(fallback: fileName ?? "Clipboard File") }
+
     /// Room for the extension within the 255-byte name limit, even for
     /// Cyrillic titles (2 bytes per letter in UTF-8).
     static let exportTitleLength = 100

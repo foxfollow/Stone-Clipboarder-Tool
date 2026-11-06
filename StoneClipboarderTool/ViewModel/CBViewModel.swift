@@ -843,16 +843,11 @@ class CBViewModel: ObservableObject {
     func openInPreview(_ item: CBItem) {
         switch item.itemType {
         case .image, .combined:
-            if let data = item.imageData {
-                ExternalOpener.openImage(data, fileName: item.exportFileName(fallback: "Clipboard Image.png"))
-            }
+            if let data = item.imageData { ExternalOpener.openImage(data, fileName: item.imageExportFileName) }
         case .file:
             // The file itself, under its name. This used to render the file's
             // *icon* to a PNG for any non-image file (e.g. a PDF).
-            if let data = item.fileData {
-                ExternalOpener.openFile(
-                    data, fileName: item.exportFileName(fallback: item.fileName ?? "Clipboard File"))
-            }
+            if let data = item.fileData { ExternalOpener.openFile(data, fileName: item.fileExportFileName) }
         case .text:
             break
         }
@@ -860,7 +855,7 @@ class CBViewModel: ObservableObject {
 
     func openInTextEdit(_ item: CBItem) {
         guard let text = item.content else { return }
-        ExternalOpener.openTextInTextEdit(text, fileName: item.exportFileName(fallback: "Clipboard Text.txt"))
+        ExternalOpener.openTextInTextEdit(text, fileName: item.textExportFileName)
     }
 
     deinit {

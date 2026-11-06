@@ -200,4 +200,19 @@ final class CBItemTests: XCTestCase {
         item.title = String(repeating: "я", count: 300)
         XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt").count, CBItem.exportTitleLength + 4)
     }
+
+    func testExportFileNamesPerContentKind() {
+        let file = CBItem(timestamp: Date(), fileData: Data([1]), fileName: "scan.pdf", itemType: .file)
+        XCTAssertEqual(file.textExportFileName, "Clipboard Text.txt")
+        XCTAssertEqual(file.imageExportFileName, "Clipboard Image.png")
+        XCTAssertEqual(file.fileExportFileName, "scan.pdf")
+
+        file.title = "Passport"
+        XCTAssertEqual(file.textExportFileName, "Passport.txt")
+        XCTAssertEqual(file.imageExportFileName, "Passport.png")
+        XCTAssertEqual(file.fileExportFileName, "Passport.pdf")
+
+        let unnamed = CBItem(timestamp: Date(), fileData: Data([1]), itemType: .file)
+        XCTAssertEqual(unnamed.fileExportFileName, "Clipboard File")
+    }
 }
