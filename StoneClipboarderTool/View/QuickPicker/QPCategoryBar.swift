@@ -16,13 +16,19 @@ struct QPCategoryChip: Identifiable, Equatable {
 
     var id: CategorySelection { selection }
 
-    /// Enabled categories with items in `facets`, in bar order: built-ins,
-    /// then one chip per language, then regex rules, then app groups.
-    static func chips(for categories: [ItemCategory], facets: FacetCounts) -> [QPCategoryChip] {
+    /// Enabled categories with items in `facets`, in bar order: image
+    /// categories first (only on the Images tab, `forImages`), then the
+    /// other built-ins, one chip per language, regex rules and app groups.
+    static func chips(for categories: [ItemCategory], facets: FacetCounts, forImages: Bool = false) -> [QPCategoryChip] {
         let enabled = categories.filter(\.isEnabled)
         var chips: [QPCategoryChip] = []
 
-        for category in enabled where category.kind == .builtIn {
+        if forImages {
+            for category in enabled where category.builtIn?.isImageCategory == true {
+                chips.append(chip(for: category, facets: facets))
+            }
+        }
+        for category in enabled where category.kind == .builtIn && category.builtIn?.isImageCategory != true {
             if category.builtIn == .language {
                 let languages = facets.languages.sorted { ($0.value, $1.key) > ($1.value, $0.key) }
                 for (code, count) in languages where count > 0 {
@@ -50,12 +56,14 @@ struct QPCategoryChip: Identifiable, Equatable {
     }
 }
 
-/// The chips under the Quick Picker's tabs. Clicking the active chip
-/// clears it; ⌥← / ⌥→ (handled by the picker) step through them.
+/// The chips under the Quick Picker's tabs. A click picks one chip,
+/// ⇧-click adds or removes one; ⌥← / ⌥→ and ⌥⇧← / ⌥⇧→ (handled by the
+/// picker) do the same from the keyboard.
 struct QPCategoryBar: View {
     let chips: [QPCategoryChip]
-    let selection: CategorySelection?
-    let onSelect: (CategorySelection?) -> Void
+    let selection: ChipSelection
+    /// The clicked chip and whether ⇧ was held.
+    let onClick: (CategorySelection, Bool) -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -64,19 +72,19 @@ struct QPCategoryBar: View {
                     HStack(spacing: 6) {
                         ForEach(chips) { chip in
                             Button {
-                                onSelect(selection == chip.selection ? nil : chip.selection)
+                                onClick(chip.selection, NSEvent.modifierFlags.contains(.shift))
                             } label: {
-                                CategoryChipView(chip: chip, isActive: selection == chip.selection)
+                                CategoryChipView(chip: chip, isActive: selection.selected.contains(chip.selection))
                             }
                             .buttonStyle(.plain)
                             .focusable(false)
                             .id(chip.id)
-                            .help(selection == chip.selection ? "Show all" : "Show only \(chip.name)")
+                            .help("Show only \(chip.name); ⇧-click to add it to the others")
                         }
                     }
                     .padding(.vertical, 1)
                 }
-                .onChange(of: selection) { _, newValue in
+                .onChange(of: selection.cursor) { _, newValue in
                     guard let newValue else { return }
                     withAnimation(.easeOut(duration: 0.15)) {
                         proxy.scrollTo(newValue, anchor: .center)
@@ -102,6 +110,6 @@ struct QPCategoryBar: View {
                 )
         }
         .foregroundStyle(.tertiary)
-        .help("Option+Left / Option+Right to switch categories; is:, app: and lang: in the search field filter too")
+        .help("⌥← / ⌥→ switch categories, ⌥⇧← / ⌥⇧→ select several in a row, ⇧-click adds one. is:, app: and lang: in the search field filter too.")
     }
 }

@@ -51,8 +51,8 @@ final class ItemFilterTests: XCTestCase {
         return rule
     }
 
-    private func filter(_ text: String, selection: CategorySelection? = nil) -> ItemFilter {
-        ItemFilter(categories: ItemCategory.builtIns + [docs], selection: selection, query: .parse(text))
+    private func filter(_ text: String, selections: Set<CategorySelection> = []) -> ItemFilter {
+        ItemFilter(categories: ItemCategory.builtIns + [docs], selections: selections, query: .parse(text))
     }
 
     func testEmptyFilterMatchesEverything() {
@@ -113,11 +113,81 @@ final class ItemFilterTests: XCTestCase {
 
     func testSelection() {
         let link = item(keys: ",link,")
-        XCTAssertTrue(filter("", selection: .category("link")).matches(link))
-        XCTAssertFalse(filter("", selection: .category("email")).matches(link))
-        XCTAssertFalse(filter("", selection: .category("missing")).matches(link))
-        XCTAssertTrue(filter("", selection: .language("uk")).matches(item(language: "uk")))
-        XCTAssertFalse(filter("", selection: .language("uk")).matches(item(language: "en")))
+        XCTAssertTrue(filter("", selections: [.category("link")]).matches(link))
+        XCTAssertFalse(filter("", selections: [.category("email")]).matches(link))
+        XCTAssertFalse(filter("", selections: [.category("missing")]).matches(link))
+        XCTAssertTrue(filter("", selections: [.language("uk")]).matches(item(language: "uk")))
+        XCTAssertFalse(filter("", selections: [.language("uk")]).matches(item(language: "en")))
+        let several = filter("", selections: [.category("email"), .language("uk")])
+        XCTAssertTrue(several.matches(item(language: "uk")), "any chip that is on")
+        XCTAssertTrue(several.matches(item(keys: ",email,")))
+        XCTAssertFalse(several.matches(link))
+    }
+
+    // MARK: - Chip selection
+
+    private let a = CategorySelection.category("a")
+    private let b = CategorySelection.category("b")
+    private let c = CategorySelection.language("uk")
+    private var chips: [CategorySelection] { [a, b, c] }
+
+    func testStepCyclesThroughNone() {
+        var selection = ChipSelection()
+        selection.step(1, in: chips)
+        XCTAssertEqual(selection.selected, [a])
+        selection.step(1, in: chips)
+        XCTAssertEqual(selection.selected, [b])
+        selection.step(1, in: chips)
+        selection.step(1, in: chips)
+        XCTAssertTrue(selection.isEmpty, "past the last chip comes none")
+        selection.step(-1, in: chips)
+        XCTAssertEqual(selection.selected, [c], "and backwards wraps to the last")
+        selection.step(1, in: [])
+        XCTAssertEqual(selection.selected, [c], "no chips: nothing changes")
+    }
+
+    func testExtendSelectsARunFromTheAnchor() {
+        var selection = ChipSelection()
+        selection.step(1, in: chips)            // a
+        selection.extend(1, in: chips)          // a…b
+        XCTAssertEqual(selection.selected, [a, b])
+        selection.extend(1, in: chips)          // a…c
+        selection.extend(1, in: chips)          // stays at the end
+        XCTAssertEqual(selection.selected, [a, b, c])
+        selection.extend(-1, in: chips)         // a…b again
+        XCTAssertEqual(selection.selected, [a, b])
+        selection.step(1, in: chips)            // a plain step ends the run
+        XCTAssertEqual(selection.selected, [c])
+
+        var fromNone = ChipSelection()
+        fromNone.extend(-1, in: chips)
+        XCTAssertEqual(fromNone.selected, [c], "from none, ⇧⌥← starts at the last chip")
+        fromNone.extend(-1, in: chips)
+        XCTAssertEqual(fromNone.selected, [b, c])
+    }
+
+    func testClicks() {
+        var selection = ChipSelection()
+        selection.click(a, adding: false)
+        XCTAssertEqual(selection.selected, [a])
+        selection.click(c, adding: true)
+        XCTAssertEqual(selection.selected, [a, c])
+        selection.click(a, adding: true)
+        XCTAssertEqual(selection.selected, [c], "⇧-click removes a chip that is on")
+        selection.click(b, adding: false)
+        XCTAssertEqual(selection.selected, [b], "a plain click keeps only that chip")
+        selection.click(b, adding: false)
+        XCTAssertTrue(selection.isEmpty, "clicking the only chip again clears it")
+    }
+
+    func testKeepOnlyAvailableChips() {
+        var selection = ChipSelection(selected: [a, c], cursor: c, anchor: a)
+        selection.keep(only: [a, b])
+        XCTAssertEqual(selection.selected, [a])
+        XCTAssertNil(selection.cursor)
+        XCTAssertEqual(selection.anchor, a)
+        selection.keep(only: [])
+        XCTAssertNil(selection.anchor)
     }
 
     // MARK: - Facets

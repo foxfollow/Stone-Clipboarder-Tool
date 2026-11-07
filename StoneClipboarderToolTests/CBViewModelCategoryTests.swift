@@ -257,7 +257,7 @@ final class CBViewModelCategoryTests: XCTestCase {
         var found = await viewModel.searchItems(filter: filter)
         XCTAssertEqual(found.map(\.content), ["https://example.com/invoice"])
 
-        filter = ItemFilter(categories: ItemCategory.builtIns, selection: .category("link"), query: .parse("other"))
+        filter = ItemFilter(categories: ItemCategory.builtIns, selections: [.category("link")], query: .parse("other"))
         found = await viewModel.searchItems(filter: filter, types: [.text])
         XCTAssertEqual(found.map(\.content), ["https://example.com/other"])
 

@@ -68,22 +68,85 @@ enum CategorySelection: Hashable {
     case language(String)
 }
 
+/// The chips that are on, plus a keyboard cursor and a range anchor, like
+/// the list's ⇧↑↓ selection. ⌥←/→ move to one chip (passing through "none"),
+/// ⌥⇧←/→ extend a run of neighbors, a click picks one, ⇧-click adds or
+/// removes one.
+struct ChipSelection: Equatable {
+    var selected: Set<CategorySelection> = []
+    var cursor: CategorySelection?
+    var anchor: CategorySelection?
+
+    var isEmpty: Bool { selected.isEmpty }
+
+    /// ⌥← / ⌥→: one chip, or none, wrapping around.
+    mutating func step(_ step: Int, in chips: [CategorySelection]) {
+        guard !chips.isEmpty else { return }
+        let options: [CategorySelection?] = [nil] + chips
+        let current = selected.isEmpty ? 0 : (options.firstIndex(of: cursor) ?? 0)
+        let next = options[(current + step + options.count) % options.count]
+        cursor = next
+        anchor = nil
+        selected = next.map { [$0] } ?? []
+    }
+
+    /// ⌥⇧← / ⌥⇧→: from the anchor to the moved cursor, no wrapping.
+    mutating func extend(_ step: Int, in chips: [CategorySelection]) {
+        guard !chips.isEmpty else { return }
+        let cursorIndex = selected.isEmpty ? nil : cursor.flatMap { chips.firstIndex(of: $0) }
+        let next: Int
+        if let cursorIndex {
+            next = min(max(cursorIndex + step, 0), chips.count - 1)
+        } else {
+            next = step > 0 ? 0 : chips.count - 1
+        }
+        if anchor.flatMap({ chips.firstIndex(of: $0) }) == nil {
+            anchor = chips[cursorIndex ?? next]
+        }
+        let anchorIndex = anchor.flatMap { chips.firstIndex(of: $0) } ?? next
+        cursor = chips[next]
+        selected = Set(chips[min(anchorIndex, next)...max(anchorIndex, next)])
+    }
+
+    /// A click picks only this chip (or clears it when it was the only
+    /// one); with ⇧ it toggles the chip and keeps the others.
+    mutating func click(_ chip: CategorySelection, adding: Bool) {
+        if adding {
+            if selected.contains(chip) { selected.remove(chip) } else { selected.insert(chip) }
+            anchor = chip
+        } else {
+            selected = selected == [chip] ? [] : [chip]
+            anchor = nil
+        }
+        cursor = chip
+    }
+
+    /// Drops chips the current tab doesn't show.
+    mutating func keep(only chips: [CategorySelection]) {
+        let available = Set(chips)
+        selected.formIntersection(available)
+        if let cursor, !available.contains(cursor) { self.cursor = nil }
+        if let anchor, !available.contains(anchor) { self.anchor = nil }
+    }
+}
+
 /// Everything the Quick Picker filters on besides the item type: the chip
 /// and the search query. Matches only inline columns, except the free
 /// text, which reads the content (`CBItem.matchesSearch`).
 struct ItemFilter {
     var categories: [ItemCategory] = []
-    var selection: CategorySelection?
+    /// Chips that are on; an item in any of them passes.
+    var selections: Set<CategorySelection> = []
     var query = QPSearchQuery()
     /// Free text also matches the text recognized in images.
     var searchImageText = true
 
-    var isEmpty: Bool { selection == nil && query.isEmpty }
+    var isEmpty: Bool { selections.isEmpty && query.isEmpty }
     /// True when only inline columns are checked (no content reads).
     var isCheap: Bool { query.text.isEmpty }
 
     func matches(_ item: CBItem) -> Bool {
-        if let selection, !matches(item, selection: selection) { return false }
+        if !selections.isEmpty, !selections.contains(where: { matches(item, selection: $0) }) { return false }
         for token in query.isTokens where !matches(item, isToken: token) { return false }
         for token in query.appTokens where !Self.matches(item, app: token) { return false }
         for token in query.langTokens where !Self.matches(item, language: token) { return false }

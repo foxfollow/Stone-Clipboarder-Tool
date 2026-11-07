@@ -27,6 +27,15 @@ final class QPCategoryChipTests: XCTestCase {
         XCTAssertEqual(chips.last?.selection, .category(group.id))
     }
 
+    func testImageCategoriesOnlyOnTheImagesTabAndFirst() {
+        var facets = FacetCounts()
+        facets.keys = ["link": 2, "ocr": 5, "barcode": 1]
+
+        XCTAssertEqual(QPCategoryChip.chips(for: ItemCategory.builtIns, facets: facets).map(\.name), ["Link"])
+        XCTAssertEqual(QPCategoryChip.chips(for: ItemCategory.builtIns, facets: facets, forImages: true).map(\.name),
+                       ["Text in Image", "QR & Barcode", "Link"])
+    }
+
     func testNoChipsWithoutCounts() {
         XCTAssertTrue(QPCategoryChip.chips(for: ItemCategory.builtIns, facets: FacetCounts()).isEmpty)
     }

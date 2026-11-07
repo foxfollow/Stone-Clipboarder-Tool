@@ -58,7 +58,7 @@ struct QuickPickerView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var typeCounts = CBViewModel.ItemTypeCounts()
     /// The chip picked in the category bar; nil = no category filter.
-    @State private var activeCategory: CategorySelection?
+    @State private var chipSelection = ChipSelection()
     /// Category, language and app counts for the active tab's chips.
     @State private var facets = FacetCounts()
     /// The open ⌥E editor, nil when closed.
@@ -121,13 +121,13 @@ struct QuickPickerView: View {
     /// The chip plus the search field (is:/app:/lang: tokens and text).
     private var itemFilter: ItemFilter {
         ItemFilter(
-            categories: categories, selection: activeCategory, query: .parse(searchText),
+            categories: categories, selections: chipSelection.selected, query: .parse(searchText),
             searchImageText: settingsManager?.searchImageText ?? true)
     }
 
     private var categoryChips: [QPCategoryChip] {
         guard settingsManager?.showCategoryBar ?? true else { return [] }
-        return QPCategoryChip.chips(for: categories, facets: facets)
+        return QPCategoryChip.chips(for: categories, facets: facets, forImages: activeTab == .images)
     }
 
     /// Content and regex categories shown as row badges.
@@ -139,18 +139,19 @@ struct QuickPickerView: View {
         categories.contains { $0.builtIn == .language && $0.isEnabled }
     }
 
-    /// ⌥← / ⌥→: step through "no chip", then each chip, wrapping around.
-    private func cycleCategory(by step: Int) {
-        let options: [CategorySelection?] = [nil] + categoryChips.map(\.selection)
-        guard options.count > 1 else { return }
-        let current = options.firstIndex(of: activeCategory) ?? 0
-        activeCategory = options[(current + step + options.count) % options.count]
+    /// ⌥← / ⌥→ move to one chip; with ⇧ they extend a run of chips.
+    private func moveChipSelection(by step: Int, extending: Bool) {
+        let chips = categoryChips.map(\.selection)
+        if extending {
+            chipSelection.extend(step, in: chips)
+        } else {
+            chipSelection.step(step, in: chips)
+        }
     }
 
-    /// Drops a chip the active tab doesn't show (no items of its types).
+    /// Drops chips the active tab doesn't show (no items of its types).
     private func dropUnavailableCategory() {
-        guard let activeCategory, !categoryChips.contains(where: { $0.selection == activeCategory }) else { return }
-        self.activeCategory = nil
+        chipSelection.keep(only: categoryChips.map(\.selection))
     }
 
     var body: some View {
@@ -264,7 +265,7 @@ struct QuickPickerView: View {
                 reloadForActiveTab()
                 isSearchFocused = true
             }
-            .onChange(of: activeCategory) { _, _ in
+            .onChange(of: chipSelection.selected) { _, _ in
                 selectedIndex = 0
                 selectionAnchor = nil
                 searchTask?.cancel()
@@ -288,8 +289,8 @@ struct QuickPickerView: View {
             searchBar
             tabBar
             if !categoryChips.isEmpty {
-                QPCategoryBar(chips: categoryChips, selection: activeCategory) { selection in
-                    activeCategory = selection
+                QPCategoryBar(chips: categoryChips, selection: chipSelection) { chip, adding in
+                    chipSelection.click(chip, adding: adding)
                     // Same focus re-grab as the tab pills.
                     isSearchFocused = false
                     DispatchQueue.main.async {
@@ -376,11 +377,8 @@ struct QuickPickerView: View {
             tabInterceptor.onOptionReturn = {
                 performOptionReturn()
             }
-            tabInterceptor.onOptionLeft = {
-                cycleCategory(by: -1)
-            }
-            tabInterceptor.onOptionRight = {
-                cycleCategory(by: 1)
+            tabInterceptor.onOptionArrow = { step, extending in
+                moveChipSelection(by: step, extending: extending)
             }
             tabInterceptor.onOptionE = {
                 guard let item = filteredItems[safe: selectedIndex] else { return }
@@ -1216,10 +1214,10 @@ final class TabKeyInterceptor: ObservableObject {
     // ⌥E opens the item editor. By key code: ⌥E is a dead key (´) on the US
     // layout and would start a composed character in the search field.
     var onOptionE: (() -> Void)?
-    // ⌥← / ⌥→ step through the category chips. Swallowed, so the search
-    // field doesn't jump a word; ⇧⌥← / ⇧⌥→ still select words.
-    var onOptionLeft: (() -> Void)?
-    var onOptionRight: (() -> Void)?
+    // ⌥← / ⌥→ step through the category chips, ⌥⇧← / ⌥⇧→ extend the chip
+    // selection (-1 / +1, extending). Swallowed, so the search field
+    // doesn't move or select by word.
+    var onOptionArrow: ((Int, Bool) -> Void)?
 
     enum EditorKey {
         case save, cancel, moveUp, moveDown, toggleFavorite
@@ -1263,8 +1261,7 @@ final class TabKeyInterceptor: ObservableObject {
         onOptionP = nil
         onOptionReturn = nil
         onOptionE = nil
-        onOptionLeft = nil
-        onOptionRight = nil
+        onOptionArrow = nil
         onEditorKey = nil
     }
 
@@ -1275,15 +1272,15 @@ final class TabKeyInterceptor: ObservableObject {
             return interceptForEditor(event, flags: flags, handler: onEditorKey)
         }
 
-        // ⌥← / ⌥→ (no Shift/Control/Command).
+        // ⌥← / ⌥→, with or without ⇧ (no Control/Command).
         if event.keyCode == Self.leftArrowKeyCode || event.keyCode == Self.rightArrowKeyCode,
            flags.contains(.option),
-           !flags.contains(.shift),
            !flags.contains(.control),
            !flags.contains(.command) {
-            let isLeft = event.keyCode == Self.leftArrowKeyCode
+            let step = event.keyCode == Self.leftArrowKeyCode ? -1 : 1
+            let extending = flags.contains(.shift)
             DispatchQueue.main.async { [weak self] in
-                if isLeft { self?.onOptionLeft?() } else { self?.onOptionRight?() }
+                self?.onOptionArrow?(step, extending)
             }
             return nil
         }
