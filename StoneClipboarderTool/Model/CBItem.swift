@@ -26,6 +26,18 @@ final class CBItem {
     /// in 1.9.0; optional, so existing stores migrate without a version bump.
     var title: String?
 
+    // Categories. All optional or defaulted, so stores migrate lightly.
+    /// Keys found by `ContentClassifier`, comma-wrapped: ",link,link.full,code,".
+    var categoryKeys: String?
+    /// BCP-47 code of the detected language ("uk", "en"); nil when unsure.
+    var languageCode: String?
+    /// `ContentClassifier.Ruleset.stamp` the keys were computed with; 0 =
+    /// never classified. A mismatch makes CBViewModel classify the item again.
+    var classificationStamp: Int = 0
+    /// The app in front when the item was (last) copied.
+    var sourceAppBundleID: String?
+    var sourceAppName: String?
+
     // Lightweight preview content for UI performance
     var contentPreview: String?
     var imageSize: String?
@@ -323,6 +335,31 @@ final class CBItem {
         case .image:
             return displayContent.localizedCaseInsensitiveContains(query)
         }
+    }
+
+    // MARK: - Categories
+
+    var categoryKeySet: Set<String> {
+        guard let categoryKeys else { return [] }
+        return Set(categoryKeys.split(separator: ",").map(String.init))
+    }
+
+    func hasCategoryKey(_ key: String) -> Bool {
+        categoryKeys?.contains(",\(key),") ?? false
+    }
+
+    /// Classifies text-like items with `ruleset` and stamps every item, so
+    /// images and files aren't picked up by the next rescan either.
+    func classify(with ruleset: ContentClassifier.Ruleset) {
+        if itemType == .text || itemType == .combined, let content {
+            let result = ContentClassifier.classify(content, ruleset: ruleset)
+            categoryKeys = result.keys.isEmpty ? nil : "," + result.keys.sorted().joined(separator: ",") + ","
+            languageCode = result.language
+        } else {
+            categoryKeys = nil
+            languageCode = nil
+        }
+        classificationStamp = ruleset.stamp
     }
 
     // MARK: - Deduplication
