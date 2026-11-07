@@ -21,12 +21,14 @@ struct QPSearchQuery: Equatable {
 
     static func parse(_ raw: String) -> QPSearchQuery {
         var query = QPSearchQuery()
-        var words: [String] = []
+        /// Where the tokens are in `raw`, so the free text keeps its spacing.
+        var tokenRanges: [Range<String.Index>] = []
         var scanner = Substring(raw)
 
         while let start = scanner.firstIndex(where: { !$0.isWhitespace }) {
             scanner = scanner[start...]
             let word: Substring
+            let wordStart = scanner.startIndex
             let head = scanner.prefix(5).lowercased()
             if let prefix = ["is:", "app:", "lang:"].first(where: { head.hasPrefix($0) }),
                scanner.dropFirst(prefix.count).first == "\"" {
@@ -46,21 +48,31 @@ struct QPSearchQuery: Equatable {
                 String(lower.dropFirst(prefix.count)).replacingOccurrences(of: "\"", with: "")
                     .trimmingCharacters(in: .whitespaces)
             }
+            let tokenRange = wordStart..<scanner.startIndex
             if lower.hasPrefix("is:"), !value(after: "is:").isEmpty {
                 query.isTokens.append(value(after: "is:"))
+                tokenRanges.append(tokenRange)
             } else if lower.hasPrefix("app:"), !value(after: "app:").isEmpty {
                 query.appTokens.append(value(after: "app:"))
+                tokenRanges.append(tokenRange)
             } else if lower.hasPrefix("lang:"), !value(after: "lang:").isEmpty {
                 query.langTokens.append(value(after: "lang:"))
-            } else {
-                words.append(String(word))
+                tokenRanges.append(tokenRange)
             }
         }
-        // Without tokens the text stays as typed (inner spacing and line
-        // breaks included), like a plain search.
-        query.text = query.hasTokens
-            ? words.joined(separator: " ")
-            : raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // The free text is the query as typed (inner spacing and line breaks
+        // kept, like a plain search) minus each token and the space after it.
+        var text = ""
+        var cursor = raw.startIndex
+        for range in tokenRanges {
+            text += raw[cursor..<range.lowerBound]
+            var next = range.upperBound
+            while next < raw.endIndex, raw[next].isWhitespace { next = raw.index(after: next) }
+            cursor = next
+        }
+        text += raw[cursor...]
+        query.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return query
     }
 }
