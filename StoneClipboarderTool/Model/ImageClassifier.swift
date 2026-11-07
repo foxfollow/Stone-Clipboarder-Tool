@@ -26,6 +26,9 @@ enum ImageClassifier {
     static let minTextLength = 3
     static let minTextConfidence: Float = 0.4
 
+    /// Bump when the visual pass changes, so images get it again.
+    static let visualVersion = 1
+
     /// Keys only the visual pass produces.
     static let visualKeys: Set<String> = [
         ItemCategory.BuiltIn.barcode.rawValue, ItemCategory.BuiltIn.face.rawValue,

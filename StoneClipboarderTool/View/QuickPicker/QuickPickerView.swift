@@ -265,6 +265,11 @@ struct QuickPickerView: View {
                 reloadForActiveTab()
                 isSearchFocused = true
             }
+            .onChange(of: viewModel.countsRevision) { _, _ in
+                // A capture or a background rescan while the picker is open.
+                loadTabCounts()
+                dropUnavailableCategory()
+            }
             .onChange(of: chipSelection.selected) { _, _ in
                 selectedIndex = 0
                 selectionAnchor = nil
@@ -380,6 +385,8 @@ struct QuickPickerView: View {
             tabInterceptor.onOptionArrow = { step, extending in
                 moveChipSelection(by: step, extending: extending)
             }
+            // Without chips, ⌥←/→ keep moving the cursor by word.
+            tabInterceptor.hasChips = { !categoryChips.isEmpty }
             tabInterceptor.onOptionE = {
                 guard let item = filteredItems[safe: selectedIndex] else { return }
                 openItemEditor(for: item)
@@ -1218,6 +1225,8 @@ final class TabKeyInterceptor: ObservableObject {
     // selection (-1 / +1, extending). Swallowed, so the search field
     // doesn't move or select by word.
     var onOptionArrow: ((Int, Bool) -> Void)?
+    /// Asked synchronously: ⌥←/→ are only taken while there are chips.
+    var hasChips: (() -> Bool)?
 
     enum EditorKey {
         case save, cancel, moveUp, moveDown, toggleFavorite
@@ -1262,6 +1271,7 @@ final class TabKeyInterceptor: ObservableObject {
         onOptionReturn = nil
         onOptionE = nil
         onOptionArrow = nil
+        hasChips = nil
         onEditorKey = nil
     }
 
@@ -1276,7 +1286,8 @@ final class TabKeyInterceptor: ObservableObject {
         if event.keyCode == Self.leftArrowKeyCode || event.keyCode == Self.rightArrowKeyCode,
            flags.contains(.option),
            !flags.contains(.control),
-           !flags.contains(.command) {
+           !flags.contains(.command),
+           hasChips?() ?? false {
             let step = event.keyCode == Self.leftArrowKeyCode ? -1 : 1
             let extending = flags.contains(.shift)
             DispatchQueue.main.async { [weak self] in

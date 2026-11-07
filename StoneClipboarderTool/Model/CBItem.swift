@@ -44,14 +44,25 @@ final class CBItem {
     /// Whether OCR ran on the image: `TextRecognition` values. Kept as an
     /// Int so predicates can test it.
     var textRecognitionState: Int = 0
+    /// `ImageClassifier.visualVersion` of the last visual pass (QR codes,
+    /// faces, transparency); 0 = none. Kept apart from the stamp, so a
+    /// regex change doesn't send every image through Vision again.
+    var visualAnalysisVersion: Int = 0
 
     enum TextRecognition {
         static let notRequested = 0
-        /// Waiting for the background pass (a new image with automatic
-        /// OCR on, or "Recognize Text in All Images").
+        /// Waiting for the background pass: a new image with automatic OCR on.
         static let pending = 1
         static let noText = 2
         static let found = 3
+        /// Waiting for the background pass: queued by "Recognize Text in
+        /// All Images"; Stop puts these back to notRequested.
+        static let queued = 4
+    }
+
+    /// OCR is waiting for the background pass.
+    var wantsTextRecognition: Bool {
+        textRecognitionState == TextRecognition.pending || textRecognitionState == TextRecognition.queued
     }
 
     // Lightweight preview content for UI performance
@@ -389,7 +400,7 @@ final class CBItem {
     ///   its OCR text and barcode payloads, which are stored;
     /// - the stored image text (`recognizedText`), through the same
     ///   detectors as copied text, minus "entire text" keys.
-    /// Without `image`, visual keys are dropped unless `keepingVisualKeys`.
+    /// Visual keys from an earlier pass are dropped unless `keepingVisualKeys`.
     func classify(
         with ruleset: ContentClassifier.Ruleset, image: ImageClassifier.Result? = nil,
         keepingVisualKeys: Bool = false
@@ -403,11 +414,12 @@ final class CBItem {
         }
 
         if hasAnalyzableImage {
+            if keepingVisualKeys {
+                keys.formUnion(categoryKeySet.intersection(ImageClassifier.visualKeys))
+            }
             if let image {
                 keys.formUnion(image.keys)
                 store(image)
-            } else if keepingVisualKeys {
-                keys.formUnion(categoryKeySet.intersection(ImageClassifier.visualKeys))
             }
             if textRecognitionState == TextRecognition.found {
                 keys.insert(ItemCategory.BuiltIn.ocr.rawValue)
