@@ -102,8 +102,11 @@ all pins.
 - [ ] Chips follow the tab: Images/Files show only categories they have
       items for; a chip the new tab lacks is cleared.
 - [ ] ⌥←/⌥→ step through the chips and back to none (also on a Ukrainian
-      layout); the search field doesn't move by a word. ⇧⌥←/→ still
-      selects words. In the ⌥E editor ⌥←/→ move the cursor.
+      layout); the search field doesn't move by a word. ⌥⇧←/→ select a
+      run of chips, ⇧-click adds or removes one; items in any selected
+      chip show. In the ⌥E editor ⌥←/→ move the cursor.
+- [ ] Image chips (Text in Image, QR & Barcode, People, Transparent) show
+      only on the Images tab, first in the row.
 - [ ] Search: is:link, is:email, is:fav, app:safari, app:"Visual Studio
       Code", lang:uk, lang:ukrainian, and tokens with text (is:link
       invoice) on All and Favs.
@@ -117,6 +120,10 @@ all pins.
 - [ ] Add Rule…: an invalid pattern can't be saved; the test field says
       Matches / No match. Saving №\s*\d+/\d{4} gives existing document
       numbers a chip within seconds (background rescan).
+- [ ] OCR: a new screenshot gets its text read right away; older images
+      don't until Settings → Categories → "Recognize Text in All
+      Images…", which shows "N images left" and stops on Stop. "Recognize
+      text in new images" off: new images get no text (QR/faces still).
 - [ ] Images: a screenshot with text gets Text in Image (and Link/Email
       when they're in it, plus a language), a QR code gets QR & Barcode
       (and Link for a URL), a photo of a person gets People, a PNG icon

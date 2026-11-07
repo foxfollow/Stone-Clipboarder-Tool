@@ -157,7 +157,9 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   launch-time `reclassifyIfNeeded` rescans. Toggling, icons and colors
   must not change the stamp. `ImageClassifier` (Vision) is slow: only the
   background pass calls it, off the main thread, reading image bytes
-  through its own `ModelContext`.
+  through its own `ModelContext`. OCR runs once per image (new images by
+  default, older ones only when the user asks); rescans reuse
+  `recognizedText`.
 - Favorites have had no drag-to-reorder UI since Dec 2025. A new favorite
   goes last; the Quick Picker's ⌥E editor moves one (`CBViewModel.moveFavorite`
   renumbers `orderIndex` 0…n-1). ⌃⇧1…0 follow that order.
