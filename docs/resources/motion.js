@@ -16,18 +16,41 @@
     const hero = $('main > section');
 
     // ---------- Quick Picker demo (hero) ----------
-    // Mirrors the app's Quick Picker: search, type filters with counts, two-line
-    // rows, the Return / OCR hints on the selected row and the footer shortcuts.
-    // It shows the app's own English UI on both pages.
+    // Mirrors the app's Quick Picker: search, type tabs and the category chip
+    // row with counts, rows with a title, category icons, language and source
+    // app, the text found in an image, the ⌥E / Return / OCR hints on the
+    // selected row and the footer shortcuts. It shows the app's own English
+    // UI on both pages. All data is made up.
+    const CATS = {
+        link: { name: 'Link', icon: 'fa-link', color: '#0A84FF' },
+        email: { name: 'Email', icon: 'fa-envelope', color: '#5E5CE6' },
+        date: { name: 'Date', icon: 'fa-calendar', color: '#FF9F0A' },
+        code: { name: 'Code', icon: 'fa-code', color: '#BF5AF2' },
+        path: { name: 'Path', icon: 'fa-folder', color: '#AC8E68' },
+        ocr: { name: 'Text in Image', icon: 'fa-expand', color: '#30B0C7' },
+        qr: { name: 'QR & Barcode', icon: 'fa-qrcode', color: '#FF375F' },
+        docs: { name: 'Documents', emoji: '📄', color: '#FFD60A' },
+    };
+    // Source apps as plain glyphs, no app icons.
+    const APPS = {
+        terminal: { name: 'Terminal', icon: 'fa-terminal' },
+        browser: { name: 'Safari', icon: 'fa-compass' },
+        mail: { name: 'Mail', icon: 'fa-envelope-open' },
+        notes: { name: 'Notes', icon: 'fa-note-sticky' },
+        chat: { name: 'Telegram', icon: 'fa-paper-plane' },
+        shot: { name: 'Screenshot', icon: 'fa-crop-simple' },
+    };
     const DEMO_ITEMS = [
-        { type: 'text', title: 'brew install stone-clipboarder-tool' },
-        { type: 'image', title: '[Image - 1470×923]', thumb: 'resources/index/sct-dark-basicwindow.png' },
-        { type: 'text', title: 'git remote add origin https://github.com/foxfollow/Stone-Clipboarder-Tool.git' },
-        { type: 'file', title: '[File - invite.ics (5 KB)]' },
-        { type: 'text', title: '2fe05c3029ae3f5a2d8e9ac3831c6e7dd84e44de' },
-        { type: 'image', title: '[Image - 815×813]', thumb: 'resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png' },
-        { type: 'text', title: 'Never lose what you copy.' },
-        { type: 'text', title: 'https://foxfollow.github.io/Stone-Clipboarder-Tool/' },
+        { type: 'text', text: 'brew install stone-clipboarder-tool', cats: ['code'], app: 'terminal' },
+        { type: 'image', text: '[Image - 1470×923]', ocr: 'Stone Clipboarder Tool · Never lose what you copy.', cats: ['ocr', 'link'], lang: 'EN', app: 'shot', thumb: 'resources/index/sct-dark-basicwindow.png' },
+        { type: 'text', title: 'Reply to the bank', text: 'Dear team, please find the signed contract attached.', lang: 'EN', app: 'mail' },
+        { type: 'text', text: '№ 9351/2026 від 19.05.2026', cats: ['docs', 'date'], lang: 'UK', app: 'chat' },
+        { type: 'file', text: '[File - invite.ics (5 KB)]', app: 'mail' },
+        { type: 'text', text: 'git remote add origin https://github.com/foxfollow/Stone-Clipboarder-Tool.git', cats: ['code', 'link'], app: 'terminal' },
+        { type: 'image', text: '[Image - 815×813]', ocr: 'https://foxfollow.github.io/Stone-Clipboarder-Tool/', cats: ['qr', 'link'], app: 'browser', thumb: 'resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png' },
+        { type: 'text', text: '~/Projects/StoneClipboarderTool/docs', cats: ['path'], app: 'terminal' },
+        { type: 'text', title: 'Address for the courier', text: 'вул. Хрещатик, 22, Київ — завтра о 10:00', cats: ['date'], lang: 'UK', app: 'notes' },
+        { type: 'text', text: 'hello@stone.example', cats: ['email'], app: 'browser' },
     ];
     const TYPE_LABEL = { text: 'Text', image: 'Image', file: 'File' };
     const VISIBLE_ROWS = 4;
@@ -36,16 +59,30 @@
     function initClipDemo() {
         const host = $('.clip-demo');
         if (!host) return;
-        const counts = { all: 2818, favs: 5, text: 2162, image: 602, file: 54 };
-        const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-        const chip = (key, label, active) =>
+        const counts = {
+            all: 2818, favs: 5, text: 2162, image: 602, file: 54,
+            link: 214, code: 96, date: 141, docs: 230, path: 22, email: 38, uk: 512, en: 1040, chat: 88,
+        };
+        const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        const esc = t => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const icon = c => c.emoji ? `<span class="qp-emoji">${c.emoji}</span>`
+            : `<i class="fa-solid ${c.icon}" style="color:${c.color}"></i>`;
+        const tab = (key, label, active) =>
             `<span class="qp-chip${active ? ' on' : ''}" data-k="${key}">${label} <b>${fmt(counts[key])}</b></span>`;
+        const cat = (key, c) =>
+            `<span class="qp-cat" data-k="${key}" style="--c:${c.color}">${icon(c)} ${c.name} <b>${fmt(counts[key])}</b></span>`;
+        const lang = { color: '#8E8E93', icon: 'fa-globe' };
         host.innerHTML =
             '<div class="qp"><div class="qp-grip"></div>' +
-            '<div class="qp-search"><i class="fa-solid fa-magnifying-glass"></i><span class="qp-caret"></span><span class="qp-ph">Search clipboard...</span></div>' +
-            '<div class="qp-chips">' + chip('all', 'All', true) + chip('favs', '<i class="fa-solid fa-heart"></i> Favs') +
-            chip('text', 'Text') + chip('image', 'Images') + chip('file', 'Files') +
+            '<div class="qp-search"><i class="fa-solid fa-magnifying-glass"></i><span class="qp-caret"></span><span class="qp-ph">Search clipboard… (is:link, app:Safari, lang:uk)</span></div>' +
+            '<div class="qp-chips">' + tab('all', 'All', true) + tab('favs', '<i class="fa-solid fa-heart"></i> Favs') +
+            tab('text', 'Text') + tab('image', 'Images') + tab('file', 'Files') +
             '<span class="qp-switch"><kbd>⇥</kbd> switch</span></div>' +
+            '<div class="qp-cats"><div class="qp-cats-row">' +
+            cat('link', CATS.link) + cat('date', CATS.date) + cat('code', CATS.code) + cat('email', CATS.email) +
+            cat('path', CATS.path) + cat('en', { ...lang, name: 'English' }) + cat('uk', { ...lang, name: 'Ukrainian' }) +
+            cat('docs', CATS.docs) + cat('chat', { name: 'Messengers', icon: 'fa-comments', color: '#32ADE6' }) +
+            '</div><span class="qp-switch"><kbd>⌥←→</kbd></span></div>' +
             '<div class="qp-list"></div>' +
             '<div class="qp-foot"><span class="qp-disk"><b></b> + 5 <i class="fa-solid fa-heart"></i> on Disk</span>' +
             '<span class="qp-hints"><span><kbd>⇧↑↓</kbd> Multi-select</span><span><kbd>ESC</kbd> Close</span>' +
@@ -53,7 +90,7 @@
             '<span class="qp-x"><kbd>␣</kbd> Preview</span></span></div></div>';
         const list = $('.qp-list', host);
         const disk = $('.qp-disk b', host);
-        const rowHeight = () => parseFloat(getComputedStyle(host).getPropertyValue('--row')) || 64;
+        const rowHeight = () => parseFloat(getComputedStyle(host).getPropertyValue('--row')) || 70;
 
         const age = s => s < 60 ? `${s} sec` : `${Math.floor(s / 60)} min, ${s % 60} sec`;
         function makeRow(item, seconds) {
@@ -65,10 +102,22 @@
                 ? `<span class="qp-tile thumb"><img src="${item.thumb}" alt=""></span>`
                 : `<span class="qp-tile ${item.type}"><i class="fa-regular ${item.type === 'file' ? 'fa-file' : 'fa-file-lines'}"></i></span>`;
             const hint = item.type === 'image'
-                ? '<span class="qp-hint">OCR: <kbd>⌥↩</kbd> <kbd>↩</kbd></span>'
-                : '<span class="qp-hint"><kbd>↩</kbd></span>';
-            row.innerHTML = tile + '<span class="qp-txt"><span class="qp-title"></span><span class="qp-meta"></span></span>' + hint;
-            $('.qp-title', row).textContent = item.title;
+                ? '<span class="qp-hint">OCR: <kbd>⌥↩</kbd> <kbd>⌥E</kbd> <kbd>↩</kbd></span>'
+                : '<span class="qp-hint"><kbd>⌥E</kbd> <kbd>↩</kbd></span>';
+            let lines;
+            if (item.title) {
+                lines = `<span class="qp-title small"><i class="fa-solid fa-tag qp-tag"></i>${esc(item.title)}</span>` +
+                    `<span class="qp-sub">${esc(item.text)}</span>`;
+            } else if (item.ocr) {
+                lines = `<span class="qp-title small">${esc(item.text)}</span>` +
+                    `<span class="qp-sub"><i class="fa-solid fa-expand"></i> ${esc(item.ocr)}</span>`;
+            } else {
+                lines = `<span class="qp-title">${esc(item.text)}</span>`;
+            }
+            const badges = (item.cats || []).slice(0, 3).map(k => `<span class="qp-badge">${icon(CATS[k])}</span>`).join('') +
+                (item.lang ? `<span class="qp-lang">${item.lang}</span>` : '') +
+                (item.app ? `<span class="qp-app" title="Copied from ${APPS[item.app].name}"><i class="fa-solid ${APPS[item.app].icon}"></i></span>` : '');
+            row.innerHTML = tile + `<span class="qp-txt">${lines}<span class="qp-meta"><span class="qp-age"></span>${badges}</span></span>` + hint;
             return row;
         }
 
@@ -76,11 +125,11 @@
         function refreshMeta() {
             const now = Date.now();
             rows.forEach(row => {
-                $('.qp-meta', row).textContent =
+                $('.qp-age', row).textContent =
                     `${age(Math.max(0, Math.round((now - row._born) / 1000)))} · ${TYPE_LABEL[row._item.type]}`;
             });
             disk.textContent = fmt(counts.all - counts.favs);
-            $$('.qp-chip', host).forEach(c => { c.querySelector('b').textContent = fmt(counts[c.dataset.k]); });
+            $$('[data-k]', host).forEach(c => { c.querySelector('b').textContent = fmt(counts[c.dataset.k]); });
         }
         function layout() {
             const h = rowHeight();
@@ -100,6 +149,12 @@
         refreshMeta();
         if (reduce) return;
 
+        const bump = el => {
+            if (!el) return;
+            el.classList.remove('bump');
+            void el.offsetWidth;
+            el.classList.add('bump');
+        };
         function step() {
             const item = DEMO_ITEMS[next++ % DEMO_ITEMS.length];
             const row = makeRow(item, 0);
@@ -115,15 +170,13 @@
                 old.classList.add('leave');
                 setTimeout(() => { old.remove(); rows.splice(rows.indexOf(old), 1); }, 700);
             }
-            counts.all++;
-            counts[item.type]++;
+            // The tabs and chips the new item lands in count it.
+            const keys = ['all', item.type, ...(item.cats || []).filter(k => k in counts)];
+            if (item.lang) keys.push(item.lang.toLowerCase());
+            if (item.app === 'chat') keys.push('chat');
+            keys.forEach(k => { counts[k]++; });
             refreshMeta();
-            ['all', item.type].forEach(k => {
-                const c = $(`.qp-chip[data-k="${k}"]`, host);
-                c.classList.remove('bump');
-                void c.offsetWidth;
-                c.classList.add('bump');
-            });
+            keys.forEach(k => bump($(`[data-k="${k}"]`, host)));
         }
 
         // Cycle only while the demo is on screen, the tab is visible and the pointer isn't resting on it.
