@@ -123,6 +123,11 @@ all pins.
       with a clear background gets Transparent. A capture doesn't stall
       the picker; badges appear within seconds. "Analyze images" off
       removes them after the rescan; on brings them back.
+- [ ] Searching a word that is only inside a screenshot finds the
+      screenshot; its row shows the text under "[Image - W×H]". After ⌥⏎
+      (or Extract Text) on an image, the image is found by that text too.
+      The three switches (find by text, text in rows, row icons) each
+      take effect on the next Quick Picker open.
 - [ ] Add App Group… (e.g. Telegram + Slack): items copied in those apps
       show under its chip and with app:.
 - [ ] "Remember the source app" off: new copies get no app icon.
