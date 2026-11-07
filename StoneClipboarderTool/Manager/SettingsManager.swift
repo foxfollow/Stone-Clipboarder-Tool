@@ -271,11 +271,30 @@ final class SettingsManager: ObservableObject {
     /// an older version and editing doesn't lose them.
     private var unreadableCategoryJSON: [Any] = []
 
+    /// Each category's saved JSON and how this version re-encodes what it
+    /// read, by id. Values a newer version wrote that this one can't
+    /// represent (an unknown match mode or icon, extra fields) are written
+    /// back unless the user changed that field here.
+    private var categoryJSONAsLoaded: [String: SavedCategoryJSON] = [:]
+
+    struct SavedCategoryJSON {
+        let raw: [String: Any]
+        let reencoded: [String: Any]
+    }
+
     private func saveCategories() {
         var objects: [Any] = []
-        if let ours = try? JSONEncoder().encode(itemCategories),
-           let array = try? JSONSerialization.jsonObject(with: ours) as? [Any] {
-            objects = array
+        for category in itemCategories {
+            guard var object = Self.jsonObject(for: category) else { continue }
+            if let saved = categoryJSONAsLoaded[category.id] {
+                var merged = saved.raw
+                for (key, value) in object {
+                    let unchanged = (saved.reencoded[key] as? NSObject)?.isEqual(value) == true
+                    if !unchanged || merged[key] == nil { merged[key] = value }
+                }
+                object = merged
+            }
+            objects.append(object)
         }
         objects += unreadableCategoryJSON
         if let data = try? JSONSerialization.data(withJSONObject: objects) {
@@ -326,28 +345,38 @@ final class SettingsManager: ObservableObject {
     /// read (an unknown kind or built-in) is set aside as raw JSON instead of
     /// taking the others down with it. Unknown match modes and icons fall
     /// back to defaults inside `ItemCategory`.
-    static func loadCategories(from defaults: UserDefaults) -> (categories: [ItemCategory], unreadable: [Any]) {
+    static func loadCategories(
+        from defaults: UserDefaults
+    ) -> (categories: [ItemCategory], unreadable: [Any], saved: [String: SavedCategoryJSON]) {
         guard let data = defaults.data(forKey: itemCategoriesKey),
               let array = try? JSONSerialization.jsonObject(with: data) as? [Any] else {
-            return (ItemCategory.builtIns, [])
+            return (ItemCategory.builtIns, [], [:])
         }
         var stored: [ItemCategory] = []
         var unreadable: [Any] = []
+        var saved: [String: SavedCategoryJSON] = [:]
         for element in array {
-            if JSONSerialization.isValidJSONObject(element),
-               let elementData = try? JSONSerialization.data(withJSONObject: element),
+            if let object = element as? [String: Any],
+               JSONSerialization.isValidJSONObject(object),
+               let elementData = try? JSONSerialization.data(withJSONObject: object),
                let category = try? JSONDecoder().decode(ItemCategory.self, from: elementData),
                category.kind != .builtIn || category.builtIn != nil {
                 stored.append(category)
+                saved[category.id] = SavedCategoryJSON(raw: object, reencoded: jsonObject(for: category) ?? [:])
             } else {
                 unreadable.append(element)
             }
         }
         if !unreadable.isEmpty {
-            ErrorLogger.shared.log("\(unreadable.count) saved categories are from a newer version; kept as they are",
-                                   category: "Settings")
+            ErrorLogger.shared.debug("\(unreadable.count) saved categories are from a newer version; kept as they are",
+                                     category: "Settings")
         }
-        return (ItemCategory.merged(stored: stored), unreadable)
+        return (ItemCategory.merged(stored: stored), unreadable, saved)
+    }
+
+    private static func jsonObject(for category: ItemCategory) -> [String: Any]? {
+        guard let data = try? JSONEncoder().encode(category) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
     /// Replaces the category with the same id, or appends a new one.
@@ -453,6 +482,7 @@ final class SettingsManager: ObservableObject {
         let loaded = Self.loadCategories(from: defaults)
         self.itemCategories = loaded.categories
         self.unreadableCategoryJSON = loaded.unreadable
+        self.categoryJSONAsLoaded = loaded.saved
         self.showCategoryBar = defaults.object(forKey: "showCategoryBar") as? Bool ?? true
         self.recordSourceApp = defaults.object(forKey: "recordSourceApp") as? Bool ?? true
         self.analyzeImages = defaults.object(forKey: "analyzeImages") as? Bool ?? true

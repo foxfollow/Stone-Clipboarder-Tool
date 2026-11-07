@@ -181,6 +181,25 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertTrue(ids.contains("screenshot"))
         XCTAssertFalse(ids.contains(rule.id))
         XCTAssertTrue(SettingsManager(defaults: defaults).itemCategories.contains { $0.id == "lenient" })
+
+        // What this version couldn't represent survives the round trip...
+        let lenientJSON = try XCTUnwrap(
+            (JSONSerialization.jsonObject(with: saved) as? [[String: Any]])?.first { $0["id"] as? String == "lenient" })
+        XCTAssertEqual(lenientJSON["matchMode"] as? String, "fuzzy")
+        XCTAssertNotNil(lenientJSON["icon"] as? [String: Any])
+
+        // ...until the user changes that field here.
+        let reloaded = SettingsManager(defaults: defaults)
+        var edited = try XCTUnwrap(reloaded.itemCategories.first { $0.id == "lenient" })
+        edited.matchMode = .entireText
+        edited.name = "Renamed"
+        reloaded.saveCategory(edited)
+        let after = try XCTUnwrap(defaults.data(forKey: SettingsManager.itemCategoriesKey))
+        let editedJSON = try XCTUnwrap(
+            (JSONSerialization.jsonObject(with: after) as? [[String: Any]])?.first { $0["id"] as? String == "lenient" })
+        XCTAssertEqual(editedJSON["matchMode"] as? String, "entireText")
+        XCTAssertEqual(editedJSON["name"] as? String, "Renamed")
+        XCTAssertNotNil(editedJSON["icon"] as? [String: Any], "the untouched unknown icon stays")
     }
 
     func testCorruptCategoryDataFallsBackToBuiltIns() {
