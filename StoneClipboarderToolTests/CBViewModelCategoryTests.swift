@@ -84,7 +84,8 @@ final class CBViewModelCategoryTests: XCTestCase {
     func testCombinedItemsMergeTextAndImageResults() {
         let item = CBItem(timestamp: Date(), content: "Call +1 408 555 0123 now", imageData: Data([1]), itemType: .combined)
         let ukrainian = "Лист подяки від адміністрації державної служби за співпрацю"
-        item.classify(with: .empty, image: ImageClassifier.Result(keys: ["face"], recognizedText: ukrainian, foundText: true))
+        item.classify(with: .empty, image: ImageClassifier.Result(
+            keys: ["face"], recognizedText: ukrainian, foundText: true, ranVisual: true))
         XCTAssertTrue(item.hasCategoryKey("phone"))
         XCTAssertTrue(item.hasCategoryKey("face"))
         XCTAssertTrue(item.hasCategoryKey("ocr"))
@@ -116,15 +117,30 @@ final class CBViewModelCategoryTests: XCTestCase {
         XCTAssertTrue(ItemFilter(query: .parse("quarterly")).matches(image))
     }
 
-    func testAnImageWithoutTextKeepsEarlierText() {
+    func testOCRAndBarcodePayloadsDontOverwriteEachOther() {
         let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
-        image.setRecognizedText("from the user's OCR")
-        image.classify(with: .empty, image: ImageClassifier.Result(keys: ["barcode"], payloads: ["https://qr.example.com"]))
-        XCTAssertEqual(image.recognizedText, "from the user's OCR\nhttps://qr.example.com", "a pass without OCR adds payloads")
-        image.classify(with: .empty, image: ImageClassifier.Result(keys: ["barcode"], payloads: ["https://qr.example.com"]))
-        XCTAssertEqual(image.recognizedText, "from the user's OCR\nhttps://qr.example.com", "only once")
+        let visual = ImageClassifier.Result(keys: ["barcode"], payloads: ["https://qr.example.com"], ranVisual: true)
+        image.classify(with: .empty, image: visual)
+        XCTAssertEqual(image.barcodeText, "https://qr.example.com")
+        XCTAssertNil(image.recognizedText)
         XCTAssertTrue(image.hasCategoryKey("link"))
         XCTAssertFalse(image.hasCategoryKey("ocr"), "payloads aren't text in the image")
+        XCTAssertEqual(image.visualAnalysisVersion, ImageClassifier.visualVersion)
+
+        // An OCR-only pass later (visual pass already done) keeps the payload.
+        image.classify(with: .empty, image: ImageClassifier.Result(recognizedText: "Scan to pay", foundText: true))
+        XCTAssertEqual(image.recognizedText, "Scan to pay")
+        XCTAssertEqual(image.barcodeText, "https://qr.example.com")
+        XCTAssertEqual(image.categoryKeySet, ["barcode", "link", "ocr"])
+        XCTAssertTrue(image.matchesSearch("qr.example"))
+        XCTAssertEqual(image.recognizedTextSnippet, "Scan to pay · https://qr.example.com")
+        XCTAssertFalse(image.matchesSearch("qr.example", includingImageText: false))
+
+        // Image analysis off drops the visual keys and the payload.
+        image.classify(with: .init(rules: [], analyzeImages: false))
+        XCTAssertEqual(image.categoryKeySet, ["ocr"])
+        XCTAssertNil(image.barcodeText)
+        XCTAssertEqual(image.visualAnalysisVersion, 0)
 
         image.setRecognizedText(String(repeating: "x", count: CBItem.maxRecognizedTextLength + 50))
         XCTAssertEqual(image.recognizedText?.count, CBItem.maxRecognizedTextLength)
@@ -277,7 +293,74 @@ final class CBViewModelCategoryTests: XCTestCase {
         await viewModel.reclassifyStaleItems()
         XCTAssertTrue(image.hasCategoryKey("barcode"), "the visual pass still ran")
         XCTAssertTrue(image.hasCategoryKey("ocr"))
-        XCTAssertEqual(image.recognizedText, "Scan me\nhttps://stone.example.com/qr", "OCR not redone; payload added")
+        XCTAssertEqual(image.recognizedText, "Scan me", "OCR not redone")
+        XCTAssertEqual(image.barcodeText, "https://stone.example.com/qr")
+        XCTAssertTrue(image.hasCategoryKey("link"))
+
+        // Another OCR of the image keeps the payload and its link.
+        viewModel.rememberRecognizedText("Scan me again", forItemWithID: image.persistentModelID)
+        XCTAssertEqual(image.barcodeText, "https://stone.example.com/qr")
+        XCTAssertTrue(image.hasCategoryKey("link"))
+
+        // Empty OCR text changes nothing and leaves nothing unsaved.
+        viewModel.rememberRecognizedText("  \n", forItemWithID: image.persistentModelID)
+        XCTAssertEqual(image.recognizedText, "Scan me again")
+        XCTAssertFalse(context.hasChanges)
+    }
+
+    func testFailedVisionIsRetriedAtTheNextLaunch() async throws {
+        let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
+        image.textRecognitionState = CBItem.TextRecognition.pending
+        image.classify(with: viewModel.classifierRuleset, image: .failed(analyzeVisual: true, recognizeText: true))
+        context.insert(image)
+        try context.save()
+
+        XCTAssertEqual(image.visualAnalysisVersion, -ImageClassifier.visualVersion)
+        XCTAssertEqual(image.textRecognitionState, CBItem.TextRecognition.notRequested, "can be queued again")
+        let classified = await viewModel.reclassifyStaleItems()
+        XCTAssertEqual(classified, 0, "not retried in the same session")
+
+        viewModel.retryFailedImageAnalysis()
+        XCTAssertEqual(image.visualAnalysisVersion, 0)
+        await viewModel.reclassifyStaleItems()
+        XCTAssertEqual(image.visualAnalysisVersion, ImageClassifier.visualVersion, "undecodable data: done for good")
+    }
+
+    func testANewVisualVersionOrTheSwitchReachesUpToDateItems() async throws {
+        let ruleset = viewModel.classifierRuleset
+        let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
+        image.classificationStamp = ruleset.stamp  // rules are current, the visual pass isn't
+        let text = CBItem(timestamp: Date(), content: "plain", itemType: .text)
+        text.classificationStamp = ruleset.stamp
+        text.categoryKeys = ",marker,"
+        context.insert(image)
+        context.insert(text)
+        try context.save()
+
+        await viewModel.reclassifyStaleItems()
+        XCTAssertEqual(image.visualAnalysisVersion, ImageClassifier.visualVersion)
+        XCTAssertEqual(text.visualAnalysisVersion, ImageClassifier.visualVersion)
+        XCTAssertEqual(text.categoryKeys, ",marker,", "text isn't read again for the image switch")
+
+        viewModel.updateClassifierRules([], analyzeImages: false)
+        await waitUntil { text.visualAnalysisVersion == 0 && image.visualAnalysisVersion == 0 }
+        XCTAssertEqual(text.categoryKeys, ",marker,")
+        XCTAssertEqual(image.visualAnalysisVersion, 0)
+    }
+
+    func testTurningAutomaticOCROffCancelsWhatItQueued() throws {
+        let settings = SettingsManager(defaults: isolated.defaults)
+        viewModel.setSettingsManager(settings)
+        let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
+        image.textRecognitionState = CBItem.TextRecognition.pending
+        context.insert(image)
+        try context.save()
+        XCTAssertEqual(viewModel.imagesWithoutTextRecognition(), 0)
+
+        settings.recognizeTextInNewImages = false
+
+        XCTAssertEqual(image.textRecognitionState, CBItem.TextRecognition.notRequested)
+        XCTAssertEqual(viewModel.imagesWithoutTextRecognition(), 1, "old images without an image size count too")
     }
 
     func testTurningImageAnalysisOffClearsImageKeys() async throws {

@@ -44,12 +44,30 @@ enum ImageClassifier {
         var foundText = false
         /// QR code and barcode contents.
         var payloads: [String] = []
+        /// The visual pass ran (and is final for this image).
+        var ranVisual = false
+        /// A Vision request failed; worth another try later.
+        var failedVisual = false
+        var failedText = false
 
         var didRecognizeText: Bool { recognizedText != nil }
+
+        /// Image bytes that can't be decoded: nothing to find, ever.
+        static func unreadable(analyzeVisual: Bool, recognizeText: Bool) -> Result {
+            Result(recognizedText: recognizeText ? "" : nil, ranVisual: analyzeVisual)
+        }
+
+        /// The image couldn't be loaded or Vision failed: retry later.
+        static func failed(analyzeVisual: Bool, recognizeText: Bool) -> Result {
+            Result(failedVisual: analyzeVisual, failedText: recognizeText)
+        }
     }
 
     static func classify(_ data: Data, analyzeVisual: Bool = true, recognizeText: Bool = true) -> Result {
-        guard analyzeVisual || recognizeText, let image = downscaledImage(from: data) else { return Result() }
+        guard analyzeVisual || recognizeText else { return Result() }
+        guard let image = downscaledImage(from: data) else {
+            return .unreadable(analyzeVisual: analyzeVisual, recognizeText: recognizeText)
+        }
 
         var result = Result()
         if analyzeVisual && hasTransparency(image) { result.keys.insert(ItemCategory.BuiltIn.transparent.rawValue) }
@@ -68,7 +86,7 @@ enum ImageClassifier {
             try VNImageRequestHandler(cgImage: image, options: [:]).perform(requests)
         } catch {
             ErrorLogger.shared.log("Failed to analyze an image", category: "Categories", error: error)
-            return result
+            return .failed(analyzeVisual: analyzeVisual, recognizeText: recognizeText)
         }
 
         if recognizeText {
@@ -83,6 +101,7 @@ enum ImageClassifier {
         }
 
         if analyzeVisual {
+            result.ranVisual = true
             let barcodes = barcodeRequest.results ?? []
             if !barcodes.isEmpty { result.keys.insert(ItemCategory.BuiltIn.barcode.rawValue) }
             result.payloads = barcodes.compactMap(\.payloadStringValue).filter { !$0.isEmpty }

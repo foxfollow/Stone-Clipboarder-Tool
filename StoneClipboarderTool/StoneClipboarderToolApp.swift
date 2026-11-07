@@ -151,6 +151,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             cbViewModel.fetchItems(reset: true)
             // Items from before categories, or from other regex rules.
+            cbViewModel.retryFailedImageAnalysis()
             cbViewModel.reclassifyIfNeeded()
         }
 

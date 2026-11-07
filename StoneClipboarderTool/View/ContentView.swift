@@ -60,7 +60,7 @@ struct ContentView: View {
         if query.isEmpty {
             return cbViewModel.favoriteItems
         }
-        let includingImageText = cbViewModel.searchesImageText
+        let includingImageText = settingsManager.searchImageText
         return cbViewModel.favoriteItems.filter { $0.matchesSearch(query, includingImageText: includingImageText) }
     }
 

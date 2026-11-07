@@ -69,7 +69,10 @@ final class ImageClassifierTests: XCTestCase {
     }
 
     func testNotAnImage() {
-        XCTAssertEqual(ImageClassifier.classify(Data("nope".utf8)), ImageClassifier.Result())
+        XCTAssertEqual(ImageClassifier.classify(Data("nope".utf8)),
+                       .unreadable(analyzeVisual: true, recognizeText: true), "done for good, not a failure")
+        XCTAssertEqual(ImageClassifier.classify(Data("nope".utf8), analyzeVisual: false, recognizeText: false),
+                       ImageClassifier.Result())
         XCTAssertNil(ImageClassifier.downscaledImage(from: Data()))
     }
 

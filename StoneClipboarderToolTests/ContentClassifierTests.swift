@@ -156,6 +156,7 @@ final class ContentClassifierTests: XCTestCase {
         let rule = ContentClassifier.RegexRule(id: "x", pattern: "(?x)invoice # a note", caseSensitive: false)
         XCTAssertTrue(ItemCategory.isValidPattern(rule.pattern))
         XCTAssertEqual(keys("Invoice 7", rules: [rule]), ["x"])
+        XCTAssertEqual(keys("invoice", rules: [rule]), ["x", "x.full"], "entire text checked by the match range")
     }
 
     func testInvalidRegexIsSkipped() {
@@ -182,7 +183,8 @@ final class ContentClassifierTests: XCTestCase {
         let changed = ContentClassifier.RegexRule(id: "a", pattern: "x", caseSensitive: true)
         XCTAssertNotEqual(ContentClassifier.stamp(for: [a]), ContentClassifier.stamp(for: [changed]))
         XCTAssertNotEqual(ContentClassifier.Ruleset.empty.stamp, 0)
-        XCTAssertNotEqual(ContentClassifier.stamp(for: [a], analyzeImages: true),
-                          ContentClassifier.stamp(for: [a], analyzeImages: false))
+        XCTAssertEqual(ContentClassifier.Ruleset(rules: [a], analyzeImages: true).stamp,
+                       ContentClassifier.Ruleset(rules: [a], analyzeImages: false).stamp,
+                       "the image switch doesn't touch text items")
     }
 }
