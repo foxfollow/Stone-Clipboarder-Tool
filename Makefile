@@ -5,7 +5,7 @@ PROJECT := StoneClipboarderTool.xcodeproj
 SCHEME  := StoneClipboarderTool
 XCB     := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination "platform=macOS"
 
-.PHONY: help build test release run install path clean
+.PHONY: help build test release run install path screenshots clean
 
 help:
 	@echo "make build    Debug compile check"
@@ -14,6 +14,7 @@ help:
 	@echo "make run      release, quit the running app, open the built one"
 	@echo "make install  CI-style ad-hoc build into /Applications (INSTALL_DIR=…), then open it"
 	@echo "make path     print the DerivedData Release .app path"
+	@echo "make screenshots  landing screenshots from the real views with made-up data (Screen Recording)"
 	@echo "make clean    remove build/ (install's DerivedData) and clean the Release build"
 
 build:
@@ -24,6 +25,9 @@ test:
 
 release run install path:
 	@scripts/local-build.sh $@
+
+screenshots:
+	@scripts/screenshots.sh
 
 clean:
 	rm -rf build
