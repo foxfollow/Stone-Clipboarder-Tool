@@ -54,7 +54,8 @@ this (`AppEnvironment.isRunningUnitTests`).
 | --- | --- |
 | CBItem | `@Model`, clipboard container. External storage: `content`, `imageData`, `fileData`, `thumbnailData`. Inline: `timestamp`, `itemType`, `fileName`, `fileUTI`, `isFavorite`, `orderIndex`, `title` (user-given, optional), `contentPreview` (first 100 characters), `imageSize` ("W×H"), `fileSize`, `categoryKeys` (",link,link.full,…"), `languageCode`, `classificationStamp`, `sourceAppBundleID` / `sourceAppName`. Also the thumbnail cache (never written during render), `ContentKey` / `hasSameContent` for deduplication, `matchesSearch`, `classify(with:)` |
 | ContentClassifier | Finds links, emails, phones, addresses, dates (NSDataDetector), code, JSON, paths, the language (NaturalLanguage) and regex-rule matches in the first 4000 characters; `key` for a match, `key.full` when it covers the whole text. `Ruleset` compiles the rules once and carries the `stamp` |
-| ItemCategory | A chip: built-in (stable ids `link` … `language`), regex rule or app group, with match mode, SF Symbol or emoji, color. `builtIns`, `merged(stored:)`, `matches(_:)`, `count(in:)`. JSON in UserDefaults, not a `@Model` |
+| ImageClassifier | Vision on a downscaled (2048 px) image: text (`ocr`), QR codes and barcodes (`barcode`), faces (`face`), transparency (`transparent`); recognized text and payloads go through ContentClassifier. Synchronous, off the main thread only |
+| ItemCategory | A chip: built-in (stable ids `link` … `language`, image ones `ocr`, `barcode`, `face`, `transparent`), regex rule or app group, with match mode, SF Symbol or emoji, color. `builtIns`, `merged(stored:)`, `matches(_:)`, `count(in:)`. JSON in UserDefaults, not a `@Model` |
 | ItemFilter | `QPSearchQuery` (is:/app:/lang: tokens + free text), `CategorySelection` (the active chip), `ItemFilter.matches`, `FacetCounts` (per-key / language / app counts) |
 | HotkeyConfig | `@Model` per `HotkeyAction` (23 actions and their default shortcuts), settings container |
 | HotkeyShortcut | Parses and formats shortcut strings; the key table; reserved system shortcuts; Carbon modifier mask |
@@ -73,7 +74,9 @@ by the Quick Picker and search, and opening items in other apps.
 Categories: new items are classified in `insertOrBump`, which also stores
 the source app; `reclassifyIfNeeded` rescans items whose
 `classificationStamp` differs from the current rules (at launch and when a
-regex rule changes) in pages of 100; `facetCounts(ofTypes:)` shares the
+regex rule or "Analyze images" changes) in pages of 100; images go to
+`ImageClassifier` four at a time on a utility thread through a throwaway
+`ModelContext`, and a new image is left unstamped for that pass; `facetCounts(ofTypes:)` shares the
 cached count scan; `searchItems(filter:types:limit:)` applies an
 `ItemFilter`; `clearSourceApps` forgets every source app.
 

@@ -117,14 +117,20 @@ all pins.
 - [ ] Add Rule…: an invalid pattern can't be saved; the test field says
       Matches / No match. Saving №\s*\d+/\d{4} gives existing document
       numbers a chip within seconds (background rescan).
+- [ ] Images: a screenshot with text gets Text in Image (and Link/Email
+      when they're in it, plus a language), a QR code gets QR & Barcode
+      (and Link for a URL), a photo of a person gets People, a PNG icon
+      with a clear background gets Transparent. A capture doesn't stall
+      the picker; badges appear within seconds. "Analyze images" off
+      removes them after the rescan; on brings them back.
 - [ ] Add App Group… (e.g. Telegram + Slack): items copied in those apps
       show under its chip and with app:.
 - [ ] "Remember the source app" off: new copies get no app icon.
       "Forget Recorded Apps…" removes every app icon and empties app
       groups.
 - [ ] "Show the category bar" off hides the row; is:/app:/lang: still work.
-- [ ] Updating from 1.9.0: existing items get categories after launch
-      without a freeze; titles, favorites and their order are unchanged.
+- [ ] Updating from 1.9.0: existing items (hundreds of images too) get
+      categories after launch without a freeze or a memory spike; titles, favorites and their order are unchanged.
 
 ## Pins
 
