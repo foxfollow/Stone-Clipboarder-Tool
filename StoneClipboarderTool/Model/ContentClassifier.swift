@@ -63,8 +63,11 @@ enum ContentClassifier {
                 guard let contains = try? NSRegularExpression(pattern: rule.pattern, options: options) else {
                     return nil
                 }
-                // Without the whole-text form the rule still matches "Contains".
-                let entire = try? NSRegularExpression(pattern: "\\A(?:\(rule.pattern))\\z", options: entireOptions)
+                // The whole-text form. A line break before the closing ")"
+                // ends a (?x) comment that would swallow it; if neither
+                // compiles, the rule still matches "Contains".
+                let entire = (try? NSRegularExpression(pattern: "\\A(?:\(rule.pattern))\\z", options: entireOptions))
+                    ?? (try? NSRegularExpression(pattern: "\\A(?:\(rule.pattern)\n)\\z", options: entireOptions))
                 return (rule.id, contains, entire)
             }
         }

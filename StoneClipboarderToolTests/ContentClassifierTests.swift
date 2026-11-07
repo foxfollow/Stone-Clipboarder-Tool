@@ -156,7 +156,9 @@ final class ContentClassifierTests: XCTestCase {
         let rule = ContentClassifier.RegexRule(id: "x", pattern: "(?x)invoice # a note", caseSensitive: false)
         XCTAssertTrue(ItemCategory.isValidPattern(rule.pattern))
         XCTAssertEqual(keys("Invoice 7", rules: [rule]), ["x"])
-        XCTAssertEqual(keys("invoice", rules: [rule]), ["x", "x.full"], "entire text checked by the match range")
+        XCTAssertEqual(keys("invoice", rules: [rule]), ["x", "x.full"])
+        let alternation = ContentClassifier.RegexRule(id: "y", pattern: "(?x) inv | invoice  # note", caseSensitive: false)
+        XCTAssertEqual(keys("invoice", rules: [alternation]), ["y", "y.full"], "a shorter alternative doesn't hide the whole match")
     }
 
     func testInvalidRegexIsSkipped() {
