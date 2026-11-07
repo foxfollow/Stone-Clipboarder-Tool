@@ -91,6 +91,41 @@ all pins.
       follows, and so do ⌃⇧1…0); ⌥F asks before removing, ⏎ confirms, Esc
       keeps it. On a non-favorite ⌥F adds it at once.
 
+## Categories (Quick Picker chips, Settings → Categories)
+
+- [ ] Copy a bare URL, a sentence with a URL, an email, a phone number, a
+      date, JSON, Swift/shell code, a path (/Users/…, ~/…) and long
+      Ukrainian and English sentences. The chip row under the tabs shows
+      Link, Email, Phone, Date, Code, JSON, Path, Ukrainian, English with
+      the right counts; a chip lists only its items, clicking it again
+      clears it.
+- [ ] Chips follow the tab: Images/Files show only categories they have
+      items for; a chip the new tab lacks is cleared.
+- [ ] ⌥←/⌥→ step through the chips and back to none (also on a Ukrainian
+      layout); the search field doesn't move by a word. ⇧⌥←/→ still
+      selects words. In the ⌥E editor ⌥←/→ move the cursor.
+- [ ] Search: is:link, is:email, is:fav, app:safari, app:"Visual Studio
+      Code", lang:uk, lang:ukrainian, and tokens with text (is:link
+      invoice) on All and Favs.
+- [ ] Rows show up to three category icons, the language code and the
+      source app's icon; hovering names them.
+- [ ] Settings → Categories: turning a built-in off hides its chip and
+      badges at once (no rescan); Edit changes its icon (symbol from the
+      grid, a typed name, or an emoji via "Emoji & Symbols…") and color.
+      Link set to "Entire text" counts only bare URLs. Reset… restores
+      the built-ins and keeps custom ones.
+- [ ] Add Rule…: an invalid pattern can't be saved; the test field says
+      Matches / No match. Saving №\s*\d+/\d{4} gives existing document
+      numbers a chip within seconds (background rescan).
+- [ ] Add App Group… (e.g. Telegram + Slack): items copied in those apps
+      show under its chip and with app:.
+- [ ] "Remember the source app" off: new copies get no app icon.
+      "Forget Recorded Apps…" removes every app icon and empties app
+      groups.
+- [ ] "Show the category bar" off hides the row; is:/app:/lang: still work.
+- [ ] Updating from 1.9.0: existing items get categories after launch
+      without a freeze; titles, favorites and their order are unchanged.
+
 ## Pins
 
 - [ ] ⌃⌥P and "Pin to Screen" open floating pins; they stay on top and

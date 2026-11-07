@@ -65,6 +65,7 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 - **Quick Picker Window**: Spotlight-like floating panel (⌃⌥Space) for fast item selection
 - **Favorites System**: Keep frequently-used items; favorites are never auto-deleted. Reorder them with ⌥E in the Quick Picker
 - **Item Titles**: Name any item (⌥E in the Quick Picker) so items that start the same way are easy to tell apart
+- **Categories**: The Quick Picker sorts items into chips: links, emails, phone numbers, addresses, dates, code, JSON, file paths, languages, your own regex rules and groups of source apps. ⌥←/⌥→ switch chips; `is:link`, `app:Safari` and `lang:uk` work in the search field. Icons, colors and on/off in Settings → Categories; detection runs on your Mac
 - **Pinned Windows**: Pin any item to the screen as a floating, always-on-top window (⌃⌥P pins the latest item)
 - **Type-Out Paste**: ⌘⇧Return in the Quick Picker types text key by key, for fields and remote desktops that block pasting
 - **Menu Bar Integration**: Quick access to your most recent items (5–50, configurable) from the menu bar
@@ -127,6 +128,7 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 - Delete unwanted items by enabling edit mode
 - The app continues monitoring clipboard changes while it's running
 - Exclude sensitive apps like password managers in Settings > Excluded Apps (v1.3.0+)
+- Filter the Quick Picker by what an item is or where it came from: pick a chip (⌥←/⌥→) or type `is:code`, `app:Telegram`, `lang:en` in the search field
 - Pause monitoring temporarily when working with sensitive data (v1.3.0+)
 
 ## Requirements
