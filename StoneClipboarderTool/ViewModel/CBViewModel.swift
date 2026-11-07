@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import Combine
 import Foundation
 import SwiftData
 import SwiftUI
@@ -40,6 +41,12 @@ class CBViewModel: ObservableObject {
     /// False once a page came back short: `items` holds the whole history.
     private var canLoadMore = true
 
+    /// Compiled regex rules and their stamp; rebuilt when the categories
+    /// change. Items whose `classificationStamp` differs get classified again.
+    private(set) var classifierRuleset = ContentClassifier.Ruleset.empty
+    private var categoriesObserver: AnyCancellable?
+    private var reclassifyTask: Task<Void, Never>?
+
     // Memory management
     nonisolated(unsafe) private var memoryCleanupTimer: Timer?
     private var lastAccessTimes: [PersistentIdentifier: Date] = [:]
@@ -63,6 +70,25 @@ class CBViewModel: ObservableObject {
         if manager.enableAutoCleanup {
             performItemCountCleanup()
         }
+
+        // Only a change to the regex rules changes the stamp; toggles, icons
+        // and colors don't trigger a rescan.
+        categoriesObserver = manager.$itemCategories
+            .map { categories in categories.compactMap(\.regexRule) }
+            .removeDuplicates()
+            .sink { [weak self] rules in
+                MainActor.assumeIsolated {
+                    self?.updateClassifierRules(rules)
+                }
+            }
+    }
+
+    /// Swaps the rules and, when the stamp changed, rescans the history.
+    func updateClassifierRules(_ rules: [ContentClassifier.RegexRule]) {
+        let ruleset = ContentClassifier.Ruleset(rules: rules)
+        guard ruleset.stamp != classifierRuleset.stamp else { return }
+        classifierRuleset = ruleset
+        reclassifyIfNeeded()
     }
 
     func getClipboardManager() -> ClipboardManager {
@@ -255,9 +281,9 @@ class CBViewModel: ObservableObject {
     }
 
     private func setupClipboardMonitoring() {
-        clipboardManager.onClipboardChange = { [weak self] content in
+        clipboardManager.onClipboardChange = { [weak self] content, source in
             Task { @MainActor in
-                self?.handleClipboardChange(content)
+                self?.handleClipboardChange(content, source: source)
             }
         }
     }
@@ -266,60 +292,73 @@ class CBViewModel: ObservableObject {
         clipboardManager.startMonitoring()
     }
 
-    private func handleClipboardChange(_ clipboardContent: ClipboardContent) {
+    private func handleClipboardChange(_ clipboardContent: ClipboardContent, source: CaptureSource?) {
         switch clipboardContent {
         case .text(let content):
-            addOrUpdateTextItem(content: content)
+            addOrUpdateTextItem(content: content, source: source)
         case .image(let imageData):
-            addOrUpdateImageItem(imageData: imageData)
+            addOrUpdateImageItem(imageData: imageData, source: source)
         case .file(let url, let uti, let data):
-            addOrUpdateFileItem(url: url, uti: uti, data: data)
+            addOrUpdateFileItem(url: url, uti: uti, data: data, source: source)
         case .combined(let content, let imageData):
-            addOrUpdateCombinedItem(content: content, imageData: imageData)
+            addOrUpdateCombinedItem(content: content, imageData: imageData, source: source)
         }
     }
 
-    func addTextItem(content: String) {
-        addOrUpdateTextItem(content: content)
+    func addTextItem(content: String, source: CaptureSource? = nil) {
+        addOrUpdateTextItem(content: content, source: source)
     }
 
-    private func addOrUpdateTextItem(content: String) {
-        insertOrBump(CBItem.ContentKey(type: .text, content: content), errorMessage: "Failed to save text item") {
+    private func addOrUpdateTextItem(content: String, source: CaptureSource?) {
+        let key = CBItem.ContentKey(type: .text, content: content)
+        insertOrBump(key, source: source, errorMessage: "Failed to save text item") {
             CBItem(timestamp: Date(), content: content, itemType: .text)
         }
     }
 
-    private func addOrUpdateImageItem(imageData: Data) {
-        insertOrBump(CBItem.ContentKey(type: .image, imageData: imageData), errorMessage: "Failed to save image item") {
+    private func addOrUpdateImageItem(imageData: Data, source: CaptureSource?) {
+        let key = CBItem.ContentKey(type: .image, imageData: imageData)
+        insertOrBump(key, source: source, errorMessage: "Failed to save image item") {
             CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
         }
     }
 
-    private func addOrUpdateCombinedItem(content: String, imageData: Data) {
+    private func addOrUpdateCombinedItem(content: String, imageData: Data, source: CaptureSource?) {
         let key = CBItem.ContentKey(type: .combined, content: content, imageData: imageData)
-        insertOrBump(key, errorMessage: "Failed to save combined item") {
+        insertOrBump(key, source: source, errorMessage: "Failed to save combined item") {
             CBItem(timestamp: Date(), content: content, imageData: imageData, itemType: .combined)
         }
     }
 
-    private func addOrUpdateFileItem(url: URL, uti: String?, data: Data?) {
+    private func addOrUpdateFileItem(url: URL, uti: String?, data: Data?, source: CaptureSource?) {
         let name = url.lastPathComponent
         let key = CBItem.ContentKey(type: .file, fileData: data, fileName: name)
-        insertOrBump(key, errorMessage: "Failed to save file item") {
+        insertOrBump(key, source: source, errorMessage: "Failed to save file item") {
             CBItem(timestamp: Date(), fileData: data, fileName: name, fileUTI: uti, itemType: .file)
         }
     }
 
     /// Moves an existing identical item to the top, or inserts a new one.
     /// `makeItem` runs only for new content: building a CBItem decodes the
-    /// image and renders its thumbnail.
-    private func insertOrBump(_ key: CBItem.ContentKey, errorMessage: String, makeItem: () -> CBItem) {
+    /// image and renders its thumbnail. A new item is classified right away;
+    /// either way the item remembers the latest source app.
+    private func insertOrBump(
+        _ key: CBItem.ContentKey, source: CaptureSource?, errorMessage: String, makeItem: () -> CBItem
+    ) {
         guard let modelContext = _modelContext else { return }
 
+        let item: CBItem
         if let existing = existingItem(matching: key) {
             existing.timestamp = Date()
+            item = existing
         } else {
-            modelContext.insert(makeItem())
+            item = makeItem()
+            item.classify(with: classifierRuleset)
+            modelContext.insert(item)
+        }
+        if let source {
+            item.sourceAppBundleID = source.bundleID
+            item.sourceAppName = source.name
         }
 
         do {
@@ -576,14 +615,28 @@ class CBViewModel: ObservableObject {
     /// the calling task is cancelled.
     func searchItems(matching query: String, types: Set<CBItemType>? = nil, limit: Int = 300) async -> [CBItem] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty, limit > 0 else { return [] }
+        guard !query.isEmpty else { return [] }
+        return await searchItems(types: types, limit: limit) { $0.matchesSearch(query) }
+    }
+
+    /// Items passing `filter` (chip, `is:`/`app:`/`lang:` tokens, free text)
+    /// anywhere in the history, newest first, at most `limit`.
+    func searchItems(filter: ItemFilter, types: Set<CBItemType>? = nil, limit: Int = 300) async -> [CBItem] {
+        guard !filter.isEmpty else { return [] }
+        return await searchItems(types: types, limit: limit, where: filter.matches)
+    }
+
+    private func searchItems(
+        types: Set<CBItemType>?, limit: Int, where isMatch: @escaping (CBItem) -> Bool
+    ) async -> [CBItem] {
+        guard limit > 0 else { return [] }
 
         while true {
             // A deletion announced earlier has its context deletion queued
             // already; the pause lets it run before the scan.
             guard await pauseBetweenPages() else { return [] }
             let generation = deletionGeneration
-            guard let results = await scanHistory(for: query, types: types, limit: limit) else { return [] }
+            guard let results = await scanHistory(types: types, limit: limit, where: isMatch) else { return [] }
             if generation == deletionGeneration { return results }
             // An item was announced deleted during a pause and may be among
             // the matches: scan again once its deletion has run.
@@ -591,7 +644,9 @@ class CBViewModel: ObservableObject {
     }
 
     /// nil when cancelled.
-    private func scanHistory(for query: String, types: Set<CBItemType>?, limit: Int) async -> [CBItem]? {
+    private func scanHistory(
+        types: Set<CBItemType>?, limit: Int, where isMatch: (CBItem) -> Bool
+    ) async -> [CBItem]? {
         let pageSize = Self.searchPageSize
         var results: [CBItem] = []
         // Items inserted during a pause shift the offsets; skip repeats.
@@ -601,7 +656,7 @@ class CBViewModel: ObservableObject {
             let page = historyPage(offset: offset, limit: pageSize)
             for item in page where types?.contains(item.itemType) ?? true {
                 guard seen.insert(item.persistentModelID).inserted else { continue }
-                if item.matchesSearch(query) {
+                if isMatch(item) {
                     results.append(item)
                     if results.count == limit { break }
                 }
@@ -641,8 +696,10 @@ class CBViewModel: ObservableObject {
         guard let modelContext = _modelContext else { return ItemTypeCounts() }
 
         var counts = ItemTypeCounts()
+        var facets: [CBItemType: FacetCounts] = [:]
         do {
             for item in try modelContext.fetch(FetchDescriptor<CBItem>()) {
+                facets[item.itemType, default: FacetCounts()].add(item)
                 switch item.itemType {
                 case .text: counts.text += 1
                 case .image: counts.images += 1
@@ -657,13 +714,99 @@ class CBViewModel: ObservableObject {
             return counts
         }
         cachedTypeCounts = counts
+        cachedFacets = facets
         return counts
+    }
+
+    private var cachedFacets: [CBItemType: FacetCounts]?
+
+    /// Category, language and source-app counts over the given types (nil =
+    /// all), for the Quick Picker's chips. Shares the cached full scan with
+    /// `itemTypeCounts()`.
+    func facetCounts(ofTypes types: Set<CBItemType>?) -> FacetCounts {
+        if cachedFacets == nil { cachedTypeCounts = nil; _ = itemTypeCounts() }
+        guard let cachedFacets else { return FacetCounts() }
+        return cachedFacets
+            .filter { types?.contains($0.key) ?? true }
+            .values
+            .reduce(FacetCounts(), +)
+    }
+
+    // MARK: - Classification
+
+    /// Classifies, in the background, every item stamped with other rules
+    /// (or none: items from before categories). Restarts when called again.
+    func reclassifyIfNeeded() {
+        reclassifyTask?.cancel()
+        reclassifyTask = Task { [weak self] in
+            await self?.reclassifyStaleItems()
+        }
+    }
+
+    /// Pages of 100 with a run-loop turn between them, like the search.
+    /// Returns how many items were classified.
+    @discardableResult
+    func reclassifyStaleItems() async -> Int {
+        guard let modelContext = _modelContext else { return 0 }
+        let ruleset = classifierRuleset
+        let stamp = ruleset.stamp
+        var classified = 0
+
+        while !Task.isCancelled {
+            var descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.classificationStamp != stamp })
+            descriptor.fetchLimit = Self.reclassifyPageSize
+            let page: [CBItem]
+            do {
+                page = try modelContext.fetch(descriptor)
+            } catch {
+                ErrorLogger.shared.log("Failed to fetch items to classify", category: "SwiftData", error: error)
+                break
+            }
+            guard !page.isEmpty else { break }
+
+            page.forEach { $0.classify(with: ruleset) }
+            do {
+                try modelContext.save()
+            } catch {
+                modelContext.rollback()
+                ErrorLogger.shared.log("Failed to save item categories", category: "SwiftData", error: error)
+                break
+            }
+            classified += page.count
+            guard await pauseBetweenPages() else { break }
+        }
+
+        if classified > 0 {
+            refreshItemCounts()
+            objectWillChange.send()
+        }
+        return classified
+    }
+
+    private static let reclassifyPageSize = 100
+
+    /// "Forget recorded apps": clears the source app of every item.
+    func clearSourceApps() {
+        guard let modelContext = _modelContext else { return }
+        do {
+            let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.sourceAppBundleID != nil })
+            for item in try modelContext.fetch(descriptor) {
+                item.sourceAppBundleID = nil
+                item.sourceAppName = nil
+            }
+            try modelContext.save()
+            fetchItems(reset: true)
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to clear source apps", category: "SwiftData", error: error)
+        }
     }
 
     /// Recounts favorites and non-favorites (cheap fetchCounts) and drops the
     /// cached per-type counts. Every change to the history ends up here.
     func refreshItemCounts() {
         cachedTypeCounts = nil
+        cachedFacets = nil
         guard let modelContext = _modelContext else { return }
         do {
             let nonFavDescriptor = FetchDescriptor<CBItem>(

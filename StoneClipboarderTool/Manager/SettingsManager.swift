@@ -258,6 +258,59 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(pinQuickPickerDismissesPins, forKey: "pinQuickPickerDismissesPins") }
     }
 
+    // MARK: - Categories
+
+    /// Built-in, regex and app-group categories, in display order. JSON in
+    /// `itemCategories`; built-ins missing from it are added on load.
+    @Published var itemCategories: [ItemCategory] {
+        didSet {
+            if let data = try? JSONEncoder().encode(itemCategories) {
+                defaults.set(data, forKey: Self.itemCategoriesKey)
+            }
+        }
+    }
+
+    /// The chip row under the Quick Picker's tabs.
+    @Published var showCategoryBar: Bool {
+        didSet { defaults.set(showCategoryBar, forKey: "showCategoryBar") }
+    }
+
+    /// Store the frontmost app's name and bundle id with each capture.
+    @Published var recordSourceApp: Bool {
+        didSet { defaults.set(recordSourceApp, forKey: "recordSourceApp") }
+    }
+
+    static let itemCategoriesKey = "itemCategories"
+
+    static func loadCategories(from defaults: UserDefaults) -> [ItemCategory] {
+        guard let data = defaults.data(forKey: itemCategoriesKey),
+              let stored = try? JSONDecoder().decode([ItemCategory].self, from: data) else {
+            return ItemCategory.builtIns
+        }
+        return ItemCategory.merged(stored: stored)
+    }
+
+    /// Replaces the category with the same id, or appends a new one.
+    func saveCategory(_ category: ItemCategory) {
+        if let index = itemCategories.firstIndex(where: { $0.id == category.id }) {
+            itemCategories[index] = category
+        } else {
+            itemCategories.append(category)
+        }
+    }
+
+    /// Built-ins can only be disabled, not deleted.
+    func deleteCategory(id: String) {
+        itemCategories.removeAll { $0.id == id && $0.kind != .builtIn }
+    }
+
+    /// Restores the built-ins' state, icons and colors; custom ones stay.
+    func resetBuiltInCategories() {
+        var result = ItemCategory.builtIns
+        result.append(contentsOf: itemCategories.filter { $0.kind != .builtIn })
+        itemCategories = result
+    }
+
     func updateLoginItem() {
         do {
             if startAtLogin {
@@ -336,6 +389,10 @@ final class SettingsManager: ObservableObject {
         self.pinAllowTextEdit = defaults.object(forKey: "pinAllowTextEdit") as? Bool ?? false
         self.pinDismissAllConfirm = defaults.object(forKey: "pinDismissAllConfirm") as? Bool ?? false
         self.pinQuickPickerDismissesPins = defaults.object(forKey: "pinQuickPickerDismissesPins") as? Bool ?? false
+
+        self.itemCategories = Self.loadCategories(from: defaults)
+        self.showCategoryBar = defaults.object(forKey: "showCategoryBar") as? Bool ?? true
+        self.recordSourceApp = defaults.object(forKey: "recordSourceApp") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = defaults.string(forKey: "clipboardCaptureMode"),

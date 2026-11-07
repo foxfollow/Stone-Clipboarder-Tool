@@ -76,8 +76,8 @@ final class CBViewModelDedupeTests: XCTestCase {
 
     func testCapturedImageIsDeduplicatedEndToEnd() async throws {
         let red = try pngData(red: true)
-        viewModel.getClipboardManager().onClipboardChange?(.image(red))
-        viewModel.getClipboardManager().onClipboardChange?(.image(red))
+        viewModel.getClipboardManager().onClipboardChange?(.image(red), nil)
+        viewModel.getClipboardManager().onClipboardChange?(.image(red), nil)
         await waitUntil { (try? self.context.fetchCount(FetchDescriptor<CBItem>())) == 1 && self.viewModel.items.count == 1 }
 
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CBItem>()), 1)

@@ -89,4 +89,58 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: "QuickPickerWindowY"))
         XCTAssertNil(defaults.object(forKey: "QuickPickerHasValidPosition"))
     }
+
+    // MARK: - Categories
+
+    func testCategoryDefaults() {
+        let settings = SettingsManager(defaults: defaults)
+        XCTAssertEqual(settings.itemCategories, ItemCategory.builtIns)
+        XCTAssertTrue(settings.showCategoryBar)
+        XCTAssertTrue(settings.recordSourceApp)
+    }
+
+    func testCategoriesPersist() {
+        let settings = SettingsManager(defaults: defaults)
+        var rule = ItemCategory.newRegex()
+        rule.name = "Documents"
+        rule.pattern = "№"
+        rule.icon = .emoji("📄")
+        settings.saveCategory(rule)
+        var link = settings.itemCategories[0]
+        link.isEnabled = false
+        settings.saveCategory(link)
+        settings.showCategoryBar = false
+        settings.recordSourceApp = false
+
+        let reloaded = SettingsManager(defaults: defaults)
+        XCTAssertEqual(reloaded.itemCategories.last, rule)
+        XCTAssertFalse(reloaded.itemCategories[0].isEnabled)
+        XCTAssertFalse(reloaded.showCategoryBar)
+        XCTAssertFalse(reloaded.recordSourceApp)
+    }
+
+    func testBuiltInsCannotBeDeletedButCanBeReset() {
+        let settings = SettingsManager(defaults: defaults)
+        var rule = ItemCategory.newAppGroup()
+        rule.name = "Messengers"
+        settings.saveCategory(rule)
+        var link = settings.itemCategories[0]
+        link.colorHex = "#000000"
+        settings.saveCategory(link)
+
+        settings.deleteCategory(id: "link")
+        XCTAssertTrue(settings.itemCategories.contains { $0.id == "link" })
+
+        settings.resetBuiltInCategories()
+        XCTAssertEqual(Array(settings.itemCategories.prefix(ItemCategory.builtIns.count)), ItemCategory.builtIns)
+        XCTAssertEqual(settings.itemCategories.last?.name, "Messengers")
+
+        settings.deleteCategory(id: rule.id)
+        XCTAssertEqual(settings.itemCategories, ItemCategory.builtIns)
+    }
+
+    func testCorruptCategoryDataFallsBackToBuiltIns() {
+        defaults.set(Data("nonsense".utf8), forKey: SettingsManager.itemCategoriesKey)
+        XCTAssertEqual(SettingsManager(defaults: defaults).itemCategories, ItemCategory.builtIns)
+    }
 }
