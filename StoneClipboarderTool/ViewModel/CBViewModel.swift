@@ -450,6 +450,52 @@ class CBViewModel: ObservableObject {
         }
     }
 
+    /// Sets or clears (`nil`, empty or whitespace) the item's title. Doesn't
+    /// touch the timestamp: naming an item isn't using it.
+    func setTitle(_ item: CBItem, to title: String?) {
+        guard let modelContext = _modelContext else { return }
+
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newTitle = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        guard item.title != newTitle else { return }
+        item.title = newTitle
+
+        do {
+            try modelContext.save()
+            fetchItems(reset: true)
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update item title", category: "SwiftData", error: error)
+        }
+    }
+
+    /// Moves a favorite `offset` places in the favorites order (clamped to
+    /// the ends), then numbers every favorite 0…n-1 so `orderIndex` stays
+    /// gap-free. ⌃⇧1…0 and the Favorites lists follow this order.
+    func moveFavorite(_ item: CBItem, by offset: Int) {
+        guard let modelContext = _modelContext, item.isFavorite, offset != 0 else { return }
+
+        var ordered = favoriteItems
+        guard let from = ordered.firstIndex(where: { $0.persistentModelID == item.persistentModelID })
+        else { return }
+        let to = min(max(from + offset, 0), ordered.count - 1)
+        guard to != from else { return }
+
+        ordered.remove(at: from)
+        ordered.insert(item, at: to)
+        for (index, favorite) in ordered.enumerated() where favorite.orderIndex != index {
+            favorite.orderIndex = index
+        }
+
+        do {
+            try modelContext.save()
+            fetchItems(reset: true)
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to reorder favorites", category: "SwiftData", error: error)
+        }
+    }
+
     /// Newest first. `items` is kept in that order by every fetch and change.
     var recentItems: [CBItem] {
         items
@@ -797,11 +843,11 @@ class CBViewModel: ObservableObject {
     func openInPreview(_ item: CBItem) {
         switch item.itemType {
         case .image, .combined:
-            if let data = item.imageData { ExternalOpener.openImage(data) }
+            if let data = item.imageData { ExternalOpener.openImage(data, fileName: item.imageExportFileName) }
         case .file:
             // The file itself, under its name. This used to render the file's
             // *icon* to a PNG for any non-image file (e.g. a PDF).
-            if let data = item.fileData { ExternalOpener.openFile(data, fileName: item.fileName ?? "Clipboard File") }
+            if let data = item.fileData { ExternalOpener.openFile(data, fileName: item.fileExportFileName) }
         case .text:
             break
         }
@@ -809,7 +855,7 @@ class CBViewModel: ObservableObject {
 
     func openInTextEdit(_ item: CBItem) {
         guard let text = item.content else { return }
-        ExternalOpener.openTextInTextEdit(text)
+        ExternalOpener.openTextInTextEdit(text, fileName: item.textExportFileName)
     }
 
     deinit {

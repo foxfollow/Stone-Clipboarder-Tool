@@ -154,4 +154,65 @@ final class CBItemTests: XCTestCase {
         XCTAssertTrue(item.isFavorite)
         XCTAssertEqual(item.orderIndex, 7)
     }
+
+    // MARK: - Title
+
+    func testDisplayTitleIsTrimmedAndNilWhenBlank() {
+        let item = CBItem(timestamp: Date(), content: "Dear Sir", itemType: .text)
+        XCTAssertNil(item.displayTitle)
+        item.title = "   "
+        XCTAssertNil(item.displayTitle)
+        item.title = "  Reply to bank \n"
+        XCTAssertEqual(item.displayTitle, "Reply to bank")
+    }
+
+    func testSearchMatchesTheTitle() {
+        let image = CBItem(timestamp: Date(), imageData: Data([1, 2, 3]), itemType: .image)
+        XCTAssertFalse(image.matchesSearch("passport"))
+        image.title = "Passport scan"
+        XCTAssertTrue(image.matchesSearch("passport"))
+    }
+
+    func testExportFileNameUsesTheTitleWithTheFallbackExtension() {
+        let item = CBItem(timestamp: Date(), content: "https://example.com", itemType: .text)
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "Clipboard Text.txt")
+
+        item.title = "my-title"
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "my-title.txt")
+        item.title = "Звіт"
+        XCTAssertEqual(item.exportFileName(fallback: "scan.PDF"), "Звіт.PDF")
+        XCTAssertEqual(item.exportFileName(fallback: "Makefile"), "Makefile", "no extension: keep the original name")
+        item.title = "x.command"
+        XCTAssertEqual(
+            item.exportFileName(fallback: "script"), "script",
+            "a title must not give an extension-less file one that changes how it opens")
+        XCTAssertEqual(item.exportFileName(fallback: "notes.txt"), "x.command.txt")
+    }
+
+    func testExportFileNameIsAPlainName() {
+        let item = CBItem(timestamp: Date(), content: "x", itemType: .text)
+        item.title = "a/b: c"
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "a-b- c.txt")
+        item.title = "notes.txt"
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "notes.txt", "extension not doubled")
+        item.title = ".env"
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt"), "_.env.txt", "not a hidden file")
+        item.title = String(repeating: "я", count: 300)
+        XCTAssertEqual(item.exportFileName(fallback: "Clipboard Text.txt").count, CBItem.exportTitleLength + 4)
+    }
+
+    func testExportFileNamesPerContentKind() {
+        let file = CBItem(timestamp: Date(), fileData: Data([1]), fileName: "scan.pdf", itemType: .file)
+        XCTAssertEqual(file.textExportFileName, "Clipboard Text.txt")
+        XCTAssertEqual(file.imageExportFileName, "Clipboard Image.png")
+        XCTAssertEqual(file.fileExportFileName, "scan.pdf")
+
+        file.title = "Passport"
+        XCTAssertEqual(file.textExportFileName, "Passport.txt")
+        XCTAssertEqual(file.imageExportFileName, "Passport.png")
+        XCTAssertEqual(file.fileExportFileName, "Passport.pdf")
+
+        let unnamed = CBItem(timestamp: Date(), fileData: Data([1]), itemType: .file)
+        XCTAssertEqual(unnamed.fileExportFileName, "Clipboard File")
+    }
 }

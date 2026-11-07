@@ -112,6 +112,65 @@ final class CBViewModelListTests: XCTestCase {
         XCTAssertTrue(viewModel.favoriteItems.isEmpty, "views must not keep a row whose backing data is going away")
     }
 
+    func testMovingAFavoriteReordersAndRenumbersThem() throws {
+        try insertTextItems(count: 3)
+        viewModel.fetchItems(reset: true)
+        for content in ["item 0", "item 1", "item 2"] {
+            viewModel.toggleFavorite(try XCTUnwrap(viewModel.items.first { $0.content == content }))
+        }
+        let last = try XCTUnwrap(viewModel.favoriteItems.last)
+
+        viewModel.moveFavorite(last, by: -1)
+        XCTAssertEqual(viewModel.favoriteItems.map(\.content), ["item 0", "item 2", "item 1"])
+        XCTAssertEqual(viewModel.favoriteItems.map(\.orderIndex), [0, 1, 2])
+
+        viewModel.moveFavorite(last, by: -10)
+        XCTAssertEqual(viewModel.favoriteItems.map(\.content), ["item 2", "item 0", "item 1"], "clamped to the top")
+
+        viewModel.moveFavorite(last, by: 10)
+        XCTAssertEqual(viewModel.favoriteItems.map(\.content), ["item 0", "item 1", "item 2"], "clamped to the bottom")
+    }
+
+    func testMovingANonFavoriteDoesNothing() throws {
+        try insertTextItems(count: 2)
+        viewModel.fetchItems(reset: true)
+        let favorite = try XCTUnwrap(viewModel.items.first { $0.content == "item 0" })
+        viewModel.toggleFavorite(favorite)
+        let other = try XCTUnwrap(viewModel.items.first { $0.content == "item 1" })
+
+        viewModel.moveFavorite(other, by: -1)
+
+        XCTAssertFalse(other.isFavorite)
+        XCTAssertEqual(viewModel.favoriteItems.map(\.content), ["item 0"])
+    }
+
+    // MARK: - Titles
+
+    func testTitleIsTrimmedAndClearedWhenBlank() throws {
+        try insertTextItems(count: 1)
+        viewModel.fetchItems(reset: true)
+        let item = try XCTUnwrap(viewModel.items.first)
+        let timestamp = item.timestamp
+
+        viewModel.setTitle(item, to: "  Greeting  ")
+        XCTAssertEqual(item.title, "Greeting")
+        XCTAssertEqual(item.timestamp, timestamp, "naming an item must not move it to the top")
+
+        viewModel.setTitle(item, to: " ")
+        XCTAssertNil(item.title)
+    }
+
+    func testTitleSurvivesCopyingTheSameContentAgain() throws {
+        try insertTextItems(count: 1)
+        viewModel.fetchItems(reset: true)
+        viewModel.setTitle(try XCTUnwrap(viewModel.items.first), to: "Named")
+
+        viewModel.addTextItem(content: "item 0")
+
+        XCTAssertEqual(viewModel.items.count, 1)
+        XCTAssertEqual(viewModel.items.first?.title, "Named")
+    }
+
     // MARK: - Memory cleanup
 
     func testMemoryCleanupDropsScrolledRowsOnceInactive() async throws {

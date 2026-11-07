@@ -21,6 +21,10 @@ final class CBItem {
     var itemType: CBItemType
     var isFavorite: Bool = false
     var orderIndex: Int = 0
+    /// Optional name the user gives an item (⌥E in the Quick Picker), shown
+    /// above its content so similar items are told apart at a glance. Added
+    /// in 1.9.0; optional, so existing stores migrate without a version bump.
+    var title: String?
 
     // Lightweight preview content for UI performance
     var contentPreview: String?
@@ -90,6 +94,50 @@ final class CBItem {
             return "\(textPart)\n[Image - \(imagePart)]"
         }
     }
+
+    /// The user's title, trimmed; nil when there is none.
+    var displayTitle: String? {
+        guard let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !trimmed.isEmpty
+        else { return nil }
+        return trimmed
+    }
+
+    /// Name for a temp copy shown in Quick Look or opened in another app:
+    /// the title when there is one, with `fallback`'s extension, otherwise
+    /// `fallback` ("Clipboard Text.txt", the original file name, …).
+    ///
+    /// The extension always comes from `fallback`, never from the title: the
+    /// extension picks the app that opens the file, and a title such as
+    /// "x.command" must not turn a copied file into something Terminal runs.
+    /// A fallback without an extension is therefore kept as it is.
+    func exportFileName(fallback: String) -> String {
+        guard let title = displayTitle else { return fallback }
+        let ext = (fallback as NSString).pathExtension
+        guard !ext.isEmpty else { return fallback }
+
+        // "/" and ":" would split or rename the path; keep the name readable.
+        var base = title
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        base = String(base.prefix(Self.exportTitleLength))
+            .trimmingCharacters(in: .whitespaces)
+        if base.hasPrefix(".") { base = "_" + base }  // not a hidden file
+
+        if (base as NSString).pathExtension.caseInsensitiveCompare(ext) == .orderedSame {
+            return base
+        }
+        return base + "." + ext
+    }
+
+    /// Temp file names for the item's text, image and file content.
+    var textExportFileName: String { exportFileName(fallback: "Clipboard Text.txt") }
+    var imageExportFileName: String { exportFileName(fallback: "Clipboard Image.png") }
+    var fileExportFileName: String { exportFileName(fallback: fileName ?? "Clipboard File") }
+
+    /// Room for the extension within the 255-byte name limit, even for
+    /// Cyrillic titles (2 bytes per letter in UTF-8).
+    static let exportTitleLength = 100
 
     var image: NSImage? {
         guard (itemType == .image || itemType == .combined), let imageData = imageData else { return nil }
@@ -260,10 +308,13 @@ final class CBItem {
 
     // MARK: - Search
 
-    /// The one matching rule behind every search box: text of text-like
-    /// items, the name of files, the "[Image - W×H]" label of images.
-    /// Case-insensitive. `query` is expected trimmed and non-empty.
+    /// The one matching rule behind every search box: the item's title, the
+    /// text of text-like items, the name of files, the "[Image - W×H]" label
+    /// of images. Case-insensitive. `query` is expected trimmed and non-empty.
     func matchesSearch(_ query: String) -> Bool {
+        if title?.localizedCaseInsensitiveContains(query) == true {
+            return true
+        }
         switch itemType {
         case .text, .combined:
             return content?.localizedCaseInsensitiveContains(query) ?? false

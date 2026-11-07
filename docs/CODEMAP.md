@@ -52,7 +52,7 @@ this (`AppEnvironment.isRunningUnitTests`).
 
 | File | What |
 | --- | --- |
-| CBItem | `@Model`, clipboard container. External storage: `content`, `imageData`, `fileData`, `thumbnailData`. Inline: `timestamp`, `itemType`, `fileName`, `fileUTI`, `isFavorite`, `orderIndex`, `contentPreview` (first 100 characters), `imageSize` ("W×H"), `fileSize`. Also the thumbnail cache (never written during render), `ContentKey` / `hasSameContent` for deduplication, `matchesSearch` |
+| CBItem | `@Model`, clipboard container. External storage: `content`, `imageData`, `fileData`, `thumbnailData`. Inline: `timestamp`, `itemType`, `fileName`, `fileUTI`, `isFavorite`, `orderIndex`, `title` (user-given, optional), `contentPreview` (first 100 characters), `imageSize` ("W×H"), `fileSize`. Also the thumbnail cache (never written during render), `ContentKey` / `hasSameContent` for deduplication, `matchesSearch` |
 | HotkeyConfig | `@Model` per `HotkeyAction` (23 actions and their default shortcuts), settings container |
 | HotkeyShortcut | Parses and formats shortcut strings; the key table; reserved system shortcuts; Carbon modifier mask |
 | PinnedItemConfig | `@Model` pin: content snapshot plus layout and flags, settings container; `contentKey` |
@@ -87,7 +87,7 @@ by the Quick Picker and search, and opening items in other apps.
 | ContentView | Main window: Recent / Favorites, whole-history search, `DetailedCardView` rows, `ClipboardHeader` |
 | ZoomView/, Small/ActionsBottomButtonView | Detail pane: text/image/file preview, zoom, copy, edit, open, OCR, delete |
 | Menu/ | MenuBarView (popover list of `SwipeableRow`s), MenuBarItemView, PauseTimerView |
-| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel, also used over full-screen apps) |
+| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order; renders from a snapshot), QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel, also used over full-screen apps) |
 | Pins/ | PinContentView, PinChromeView (+ PinDragArea to move the pin), PinImageView; all render from `PinViewState` |
 | Settings/ | Sidebar + General, Hotkeys, Quick Picker, Pins, Excluded Apps (`@Query` is fine here), Accessibility, About |
 | Components/, Small/, Cells/ | Shared pieces: search bar, swipeable row, alerts, buttons, list cell |
@@ -145,7 +145,7 @@ app's container for sandboxed Debug builds).
 | ⌘Q down / up (local) | AppDelegate | app lifetime / while ⌘Q is held |
 | Esc cancels type-out (global + local) | TypePaster | while typing |
 | Click outside, Esc (global); key re-routing (local) | QuickPickerWindowManager | while the picker is open |
-| Tab, ⇧Tab, ⌥P (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
+| Tab, ⇧Tab, ⌥P, ⌥⏎, ⌥E; in the ⌥E editor ⏎, Esc, ⌥F, ⌥↑/⌥↓ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
 | ⌘C / ⌘W in a pin (local) | PinContentView `CommandKeyHandler` | while the pin is in a window |
 | Pinch zoom (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |

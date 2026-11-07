@@ -25,6 +25,8 @@ struct QPItemList: View {
     let performAction: () -> Void
     var onOpenPreview: ((CBItem) -> Void)?
     var onOpenTextEdit: ((CBItem) -> Void)?
+    /// Opens the ⌥E editor (title, favorite, favorite order).
+    var onEdit: ((CBItem) -> Void)?
 
     var body: some View {
         if filteredItems.isEmpty {
@@ -90,6 +92,12 @@ struct QPItemList: View {
                                 }
 
                                 Divider()
+
+                                if let onEdit {
+                                    Button("Edit Title & Favorite…  ⌥E") {
+                                        onEdit(item)
+                                    }
+                                }
 
                                 Button(isItemPinned(item) ? "Unpin from Screen" : "Pin to Screen") {
                                     onTogglePin(item)

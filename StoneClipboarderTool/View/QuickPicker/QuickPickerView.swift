@@ -57,6 +57,8 @@ struct QuickPickerView: View {
     @State private var hasMoreItems = true
     @State private var searchTask: Task<Void, Never>?
     @State private var typeCounts = CBViewModel.ItemTypeCounts()
+    /// The open ⌥E editor, nil when closed.
+    @State private var itemEditor: QPItemEditorModel?
     @FocusState private var isSearchFocused: Bool
 
     let onClose: () -> Void
@@ -110,6 +112,29 @@ struct QuickPickerView: View {
     }
 
     var body: some View {
+        // The editor is a sibling of the list, not a child: the list's key
+        // handlers below (Space, arrows, ⏎) must not fire while typing a title.
+        ZStack {
+            pickerContent
+            if let itemEditor {
+                QPItemEditorView(
+                    model: itemEditor,
+                    onSave: { closeItemEditor(saving: true) },
+                    onCancel: { closeItemEditor(saving: false) }
+                )
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .clipboardItemDeleted)) { note in
+            // The item is about to leave the context: close without saving.
+            guard let editor = itemEditor else { return }
+            let deletedID = note.object as? PersistentIdentifier
+            if deletedID == nil || deletedID == editor.itemID {
+                closeItemEditor(saving: false)
+            }
+        }
+    }
+
+    private var pickerContent: some View {
         mainContent
             .onKeyPress(.escape) {
                 if isPreviewVisible() {
@@ -237,6 +262,9 @@ struct QuickPickerView: View {
                 },
                 onOpenTextEdit: { item in
                     viewModel.openInTextEdit(item)
+                },
+                onEdit: { item in
+                    openItemEditor(for: item)
                 }
             )
             footerBar
@@ -283,6 +311,10 @@ struct QuickPickerView: View {
             // submits the field and onSubmit pastes the image instead of OCR.
             tabInterceptor.onOptionReturn = {
                 performOptionReturn()
+            }
+            tabInterceptor.onOptionE = {
+                guard let item = filteredItems[safe: selectedIndex] else { return }
+                openItemEditor(for: item)
             }
             tabInterceptor.start()
 
@@ -615,6 +647,78 @@ struct QuickPickerView: View {
             if selectedIndex >= newCount {
                 selectedIndex = max(0, newCount - 1)
             }
+        }
+    }
+
+    // MARK: - ⌥E item editor
+
+    private func openItemEditor(for item: CBItem) {
+        guard itemEditor == nil else { return }
+        if isPreviewVisible() {
+            onPreviewToggle(item)
+        }
+        if let index = filteredItems.firstIndex(where: { $0.persistentModelID == item.persistentModelID }) {
+            selectedIndex = index
+        }
+        selectionAnchor = nil
+
+        let editor = QPItemEditorModel(item: item, viewModel: viewModel) { [self] in
+            favoritesChangedInEditor()
+        }
+        tabInterceptor.onEditorKey = { [weak editor] key in
+            guard let editor else { return }
+            switch key {
+            case .save:
+                if editor.isConfirmingUnfavorite {
+                    editor.confirmUnfavorite()
+                } else {
+                    closeItemEditor(saving: true)
+                }
+            case .cancel:
+                if editor.isConfirmingUnfavorite {
+                    editor.isConfirmingUnfavorite = false
+                } else {
+                    closeItemEditor(saving: false)
+                }
+            case .moveUp:
+                editor.moveFavorite(by: -1)
+            case .moveDown:
+                editor.moveFavorite(by: 1)
+            case .toggleFavorite:
+                if editor.isConfirmingUnfavorite {
+                    editor.confirmUnfavorite()
+                } else {
+                    editor.requestFavoriteToggle()
+                }
+            }
+        }
+        isSearchFocused = false
+        itemEditor = editor
+    }
+
+    private func closeItemEditor(saving: Bool) {
+        guard let editor = itemEditor else { return }
+        if saving {
+            editor.saveTitle()
+        }
+        tabInterceptor.onEditorKey = nil
+        itemEditor = nil
+        // Same false→true toggle as the tab switch: AppKit's responder may
+        // still point at the editor's (now gone) field.
+        DispatchQueue.main.async {
+            isSearchFocused = true
+        }
+    }
+
+    /// The Favorites tab lists a copy of `favoriteItems`; re-read it so a
+    /// move or (un)favorite shows behind the editor, and keep the cursor on
+    /// the edited item.
+    private func favoritesChangedInEditor() {
+        loadTabCounts()
+        guard activeTab == .favorites, let editor = itemEditor else { return }
+        quickPickerItems = viewModel.favoriteItems
+        if let index = filteredItems.firstIndex(where: { $0.persistentModelID == editor.itemID }) {
+            selectedIndex = index
         }
     }
 
@@ -1024,10 +1128,27 @@ final class TabKeyInterceptor: ObservableObject {
     // ⌥⏎ OCR paste. The search field's editor would otherwise turn it into a
     // submit (plain paste) before SwiftUI's .onKeyPress sees it.
     var onOptionReturn: (() -> Void)?
+    // ⌥E opens the item editor. By key code: ⌥E is a dead key (´) on the US
+    // layout and would start a composed character in the search field.
+    var onOptionE: (() -> Void)?
+
+    enum EditorKey {
+        case save, cancel, moveUp, moveDown, toggleFavorite
+    }
+
+    /// Set while the ⌥E editor is open. The picker's own shortcuts stand
+    /// down; ⏎, Esc, ⌥E, ⌥↑, ⌥↓ and ⌥F go here instead, and the rest of the
+    /// typing reaches the title field.
+    var onEditorKey: ((EditorKey) -> Void)?
 
     private var monitor: Any?
     private static let tabKeyCode: UInt16 = 48
     private static let pKeyCode: UInt16 = 35
+    private static let eKeyCode: UInt16 = 14
+    private static let fKeyCode: UInt16 = 3
+    private static let escapeKeyCode: UInt16 = 53
+    private static let upArrowKeyCode: UInt16 = 126
+    private static let downArrowKeyCode: UInt16 = 125
     private static let returnKeyCodes: Set<UInt16> = [36, 76]  // Return, keypad Enter
 
     func start() {
@@ -1050,10 +1171,27 @@ final class TabKeyInterceptor: ObservableObject {
         onShiftTab = nil
         onOptionP = nil
         onOptionReturn = nil
+        onOptionE = nil
+        onEditorKey = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
         let flags = event.modifierFlags
+
+        if let onEditorKey {
+            return interceptForEditor(event, flags: flags, handler: onEditorKey)
+        }
+
+        // ⌥E (no Control/Command).
+        if event.keyCode == Self.eKeyCode,
+           flags.contains(.option),
+           !flags.contains(.control),
+           !flags.contains(.command) {
+            DispatchQueue.main.async { [weak self] in
+                self?.onOptionE?()
+            }
+            return nil
+        }
 
         // ⌥P (Option held, no Control/Command — the latter is the global pin
         // hotkey handled elsewhere). Key code is layout-independent.
@@ -1091,6 +1229,36 @@ final class TabKeyInterceptor: ObservableObject {
             }
         }
         return nil  // swallow so the field editor doesn't move focus
+    }
+
+    private func interceptForEditor(
+        _ event: NSEvent, flags: NSEvent.ModifierFlags, handler: @escaping (EditorKey) -> Void
+    ) -> NSEvent? {
+        let option = flags.contains(.option)
+        let commandOrControl = flags.contains(.command) || flags.contains(.control)
+
+        let key: EditorKey?
+        switch event.keyCode {
+        case Self.escapeKeyCode:
+            key = .cancel
+        case _ where Self.returnKeyCodes.contains(event.keyCode) && !commandOrControl:
+            key = .save
+        case Self.eKeyCode where option && !commandOrControl:
+            key = .save
+        case Self.fKeyCode where option && !commandOrControl:
+            key = .toggleFavorite
+        case Self.upArrowKeyCode where option && !commandOrControl:
+            key = .moveUp
+        case Self.downArrowKeyCode where option && !commandOrControl:
+            key = .moveDown
+        case Self.tabKeyCode:
+            return nil  // the title field is the only field; keep focus in it
+        default:
+            key = nil
+        }
+        guard let key else { return event }
+        DispatchQueue.main.async { handler(key) }
+        return nil
     }
 
     deinit {

@@ -16,12 +16,12 @@ enum ExternalOpener {
 
     /// Opens image data in the default image viewer (Preview), as PNG.
     @discardableResult
-    static func openImage(_ data: Data) -> Bool {
+    static func openImage(_ data: Data, fileName: String = "Clipboard Image.png") -> Bool {
         guard let png = pngData(from: data) else {
             ErrorLogger.shared.log("Failed to convert image to PNG", category: "ExternalOpen")
             return false
         }
-        guard let url = writeTempFile(png, fileName: "Clipboard Image.png") else { return false }
+        guard let url = writeTempFile(png, fileName: fileName) else { return false }
         NSWorkspace.shared.open(url)
         return true
     }
@@ -36,8 +36,8 @@ enum ExternalOpener {
 
     /// Opens text in TextEdit, or the default app for .txt without it.
     @discardableResult
-    static func openTextInTextEdit(_ text: String) -> Bool {
-        guard !text.isEmpty, let url = writeTempFile(Data(text.utf8), fileName: "Clipboard Text.txt") else {
+    static func openTextInTextEdit(_ text: String, fileName: String = "Clipboard Text.txt") -> Bool {
+        guard !text.isEmpty, let url = writeTempFile(Data(text.utf8), fileName: fileName) else {
             return false
         }
         if let textEdit = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") {
@@ -57,7 +57,8 @@ enum ExternalOpener {
     }
 
     /// Each file gets its own folder, so the name the other app shows stays
-    /// readable (the original file name, "Clipboard Image.png") without
+    /// readable (the item's title, the original file name, "Clipboard
+    /// Image.png") without
     /// collisions. The folder is removed after `tempFileLifetime`.
     private static func writeTempFile(_ data: Data, fileName: String) -> URL? {
         let folder = FileManager.default.temporaryDirectory

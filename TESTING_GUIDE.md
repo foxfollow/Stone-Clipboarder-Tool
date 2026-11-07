@@ -50,8 +50,8 @@ hand with this list.
 
 ## Global hotkeys
 
-Defaults: ⌃⌥1…0 last items, ⌃⇧1…0 favorites (in the order they were
-favorited), ⌃⌥Space Quick Picker, ⌃⌥P pin the latest item, ⌃⌥⇧P dismiss
+Defaults: ⌃⌥1…0 last items, ⌃⇧1…0 favorites (in Favorites order: as
+favorited, or as moved with ⌥E), ⌃⌥Space Quick Picker, ⌃⌥P pin the latest item, ⌃⌥⇧P dismiss
 all pins.
 
 - [ ] Each hotkey pastes into TextEdit, Notes and a browser field, and the
@@ -82,6 +82,14 @@ all pins.
 - [ ] Space (or →, per settings) toggles Quick Look / the custom preview;
       "Open with…" from Quick Look works.
 - [ ] ⌥Space toggles favorite, ⌥P pins the selection.
+- [ ] ⌥E (also on a Ukrainian layout, and from the row's context menu)
+      opens the editor over the list: type a title with spaces and arrows
+      (the list and preview don't react), ⏎ saves, Esc discards. The title
+      shows above the content in the picker, menu bar and main window, and
+      search finds it. Clearing it removes it.
+- [ ] In the editor on a favorite, ⌥↑/⌥↓ move it (the Favs list behind
+      follows, and so do ⌃⇧1…0); ⌥F asks before removing, ⏎ confirms, Esc
+      keeps it. On a non-favorite ⌥F adds it at once.
 
 ## Pins
 
