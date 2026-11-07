@@ -49,10 +49,14 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.9.0
-- **🪟 Item Titles**: Name any clipboard item: press ⌥E in the Quick Picker to give it a title. The title shows above the content, marked with a tag, in the Quick Picker, the menu bar and the main window, and search finds it
-- **✨ Favorites Editor**: The ⌥E editor also adds an item to Favorites or removes it (removing asks first) and moves a favorite up or down with ⌥↑ / ⌥↓. Favorites can be reordered again, and ⌃⇧1…0 follow the new order
-- **✨ Named Previews**: Quick Look, "Open with TextEdit" and "Open in Preview" name the file after the item's title instead of "Clipboard Text.txt"
+### 🆕 New in Version 1.10.0
+- **🪟 Categories**: A row of chips in the Quick Picker under the tabs groups items by what they contain — links, emails, phone numbers, addresses, dates, code, JSON, file paths and languages. ⌥← / ⌥→ switch between chips; ⇧-click or ⌥⇧← / ⌥⇧→ select several
+- **🪟 Image Categories**: On the Images tab, Apple Vision finds text, QR codes and barcodes, faces and transparent areas, in the background and on your Mac. Text read from a screenshot counts for links, emails, languages and your own rules too
+- **🪟 Searchable Image Text**: New screenshots and copied images are read once right after the copy, older ones when you choose "Recognize Text in All Images" in Settings, and your own OCR (⌥⏎, Extract Text) is kept too. Searching a word finds the picture, and the Quick Picker shows its text under the image
+- **✨ Custom Categories**: Regular-expression rules (with a live test) and groups of source apps. Settings → Categories gives any category an SF Symbol or an emoji and a color, switches built-ins off, and sets Contains or Entire text matching
+- **✨ Source App**: The app you copied from is remembered and shown as a small icon on the row. Turn it off or forget recorded apps in Settings → Categories
+- **⌨️ Search Filters**: The Quick Picker's search takes is:link, is:fav, app:Safari, lang:uk — on their own or together with text
+- **🎨 Row Badges**: Quick Picker rows show the icons of their categories, the language and the source app; Settings → Categories turns the icons and the image text off
 
 **📖 [See the full changelog →](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)**
 
@@ -65,7 +69,7 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 - **Quick Picker Window**: Spotlight-like floating panel (⌃⌥Space) for fast item selection
 - **Favorites System**: Keep frequently-used items; favorites are never auto-deleted. Reorder them with ⌥E in the Quick Picker
 - **Item Titles**: Name any item (⌥E in the Quick Picker) so items that start the same way are easy to tell apart
-- **Categories**: The Quick Picker sorts items into chips: links, emails, phone numbers, addresses, dates, code, JSON, file paths, languages, your own regex rules and groups of source apps. ⌥←/⌥→ switch chips; `is:link`, `app:Safari` and `lang:uk` work in the search field. Icons, colors and on/off in Settings → Categories; detection runs on your Mac
+- **Categories**: The Quick Picker sorts items into chips: links, emails, phone numbers, addresses, dates, code, JSON, file paths, languages, text/QR codes/faces/transparency in images (Apple Vision, and the text in images is searchable), your own regex rules and groups of source apps. ⌥←/⌥→ switch chips (⇧ for several); `is:link`, `app:Safari` and `lang:uk` work in the search field. Icons, colors and on/off in Settings → Categories; detection runs on your Mac
 - **Pinned Windows**: Pin any item to the screen as a floating, always-on-top window (⌃⌥P pins the latest item)
 - **Type-Out Paste**: ⌘⇧Return in the Quick Picker types text key by key, for fields and remote desktops that block pasting
 - **Menu Bar Integration**: Quick access to your most recent items (5–50, configurable) from the menu bar
