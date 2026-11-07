@@ -156,6 +156,7 @@ struct ActionsBottomButtonView: View {
             return
         }
 
+        let itemID = item.persistentModelID
         DispatchQueue.global(qos: .userInitiated).async {
             let recognizedText = TextRecognizer.recognizeText(in: cgImage)
             DispatchQueue.main.async {
@@ -163,6 +164,7 @@ struct ActionsBottomButtonView: View {
                     ErrorLogger.shared.debug("No text found in image", category: "OCR")
                     return
                 }
+                cbViewModel.rememberRecognizedText(recognizedText, forItemWithID: itemID)
                 cbViewModel.addTextItem(content: recognizedText)
                 ErrorLogger.shared.debug("Extracted \(recognizedText.count) characters from image", category: "OCR")
             }

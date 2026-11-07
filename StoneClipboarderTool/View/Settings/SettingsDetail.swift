@@ -23,6 +23,7 @@ struct SettingsDetail: View {
         case .general:       GeneralSettingsView()
         case .hotkeys:       HotkeySettingsView()
         case .quickPicker:   QuickPickerSettingsView()
+        case .categories:    CategoriesSettingsView()
         case .pins:          PinSettingsView()
         case .excludedApps:  ExcludedAppsSettingsView()
         case .accessibility: AccessibilitySettingsView(accessibilityGranted: $accessibilityGranted)

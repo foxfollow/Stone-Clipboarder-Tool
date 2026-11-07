@@ -258,6 +258,86 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(pinQuickPickerDismissesPins, forKey: "pinQuickPickerDismissesPins") }
     }
 
+    // MARK: - Categories
+
+    /// Built-in, regex and app-group categories, in display order. JSON in
+    /// `itemCategories`; built-ins missing from it are added on load.
+    @Published var itemCategories: [ItemCategory] {
+        didSet {
+            if let data = try? JSONEncoder().encode(itemCategories) {
+                defaults.set(data, forKey: Self.itemCategoriesKey)
+            }
+        }
+    }
+
+    /// The chip row under the Quick Picker's tabs.
+    @Published var showCategoryBar: Bool {
+        didSet { defaults.set(showCategoryBar, forKey: "showCategoryBar") }
+    }
+
+    /// Look for text, codes, faces and transparency in images (Vision, in
+    /// the background).
+    @Published var analyzeImages: Bool {
+        didSet { defaults.set(analyzeImages, forKey: "analyzeImages") }
+    }
+
+    /// OCR each new image once, right after it's copied. Off by default
+    /// for the existing history: "Recognize Text in All Images" does that.
+    @Published var recognizeTextInNewImages: Bool {
+        didSet { defaults.set(recognizeTextInNewImages, forKey: "recognizeTextInNewImages") }
+    }
+
+    /// Search matches the text recognized in images.
+    @Published var searchImageText: Bool {
+        didSet { defaults.set(searchImageText, forKey: "searchImageText") }
+    }
+
+    /// Quick Picker rows of images show their recognized text.
+    @Published var showImageTextInRows: Bool {
+        didSet { defaults.set(showImageTextInRows, forKey: "showImageTextInRows") }
+    }
+
+    /// Quick Picker rows show category icons, the language and the app.
+    @Published var showRowBadges: Bool {
+        didSet { defaults.set(showRowBadges, forKey: "showRowBadges") }
+    }
+
+    /// Store the frontmost app's name and bundle id with each capture.
+    @Published var recordSourceApp: Bool {
+        didSet { defaults.set(recordSourceApp, forKey: "recordSourceApp") }
+    }
+
+    static let itemCategoriesKey = "itemCategories"
+
+    static func loadCategories(from defaults: UserDefaults) -> [ItemCategory] {
+        guard let data = defaults.data(forKey: itemCategoriesKey),
+              let stored = try? JSONDecoder().decode([ItemCategory].self, from: data) else {
+            return ItemCategory.builtIns
+        }
+        return ItemCategory.merged(stored: stored)
+    }
+
+    /// Replaces the category with the same id, or appends a new one.
+    func saveCategory(_ category: ItemCategory) {
+        if let index = itemCategories.firstIndex(where: { $0.id == category.id }) {
+            itemCategories[index] = category
+        } else {
+            itemCategories.append(category)
+        }
+    }
+
+    /// Built-ins can only be disabled, not deleted.
+    func deleteCategory(id: String) {
+        itemCategories.removeAll { $0.id == id && $0.kind != .builtIn }
+    }
+
+    /// Restores the built-ins' state, icons and colors; custom ones stay.
+    func resetBuiltInCategories() {
+        var result = ItemCategory.builtIns
+        result.append(contentsOf: itemCategories.filter { $0.kind != .builtIn })
+        itemCategories = result
+    }
+
     func updateLoginItem() {
         do {
             if startAtLogin {
@@ -336,6 +416,15 @@ final class SettingsManager: ObservableObject {
         self.pinAllowTextEdit = defaults.object(forKey: "pinAllowTextEdit") as? Bool ?? false
         self.pinDismissAllConfirm = defaults.object(forKey: "pinDismissAllConfirm") as? Bool ?? false
         self.pinQuickPickerDismissesPins = defaults.object(forKey: "pinQuickPickerDismissesPins") as? Bool ?? false
+
+        self.itemCategories = Self.loadCategories(from: defaults)
+        self.showCategoryBar = defaults.object(forKey: "showCategoryBar") as? Bool ?? true
+        self.recordSourceApp = defaults.object(forKey: "recordSourceApp") as? Bool ?? true
+        self.analyzeImages = defaults.object(forKey: "analyzeImages") as? Bool ?? true
+        self.searchImageText = defaults.object(forKey: "searchImageText") as? Bool ?? true
+        self.recognizeTextInNewImages = defaults.object(forKey: "recognizeTextInNewImages") as? Bool ?? true
+        self.showImageTextInRows = defaults.object(forKey: "showImageTextInRows") as? Bool ?? true
+        self.showRowBadges = defaults.object(forKey: "showRowBadges") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = defaults.string(forKey: "clipboardCaptureMode"),

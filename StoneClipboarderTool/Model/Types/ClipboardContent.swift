@@ -14,3 +14,9 @@ enum ClipboardContent: Sendable {
     case file(URL, String, Data)   // URL, UTI, Data
     case combined(String, Data)    // Text + image bytes together
 }
+
+/// The app in front when something was copied.
+struct CaptureSource: Equatable, Sendable {
+    let bundleID: String
+    let name: String
+}

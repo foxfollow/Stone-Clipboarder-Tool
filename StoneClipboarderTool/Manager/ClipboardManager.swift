@@ -16,7 +16,9 @@ final class ClipboardManager: ObservableObject {
     private var lastChangeCount: Int = 0
     private let pasteboard = NSPasteboard.general
 
-    var onClipboardChange: ((ClipboardContent) -> Void)?
+    /// A new capture and, when "Remember the source app" is on, the app in
+    /// front at the time.
+    var onClipboardChange: ((ClipboardContent, CaptureSource?) -> Void)?
     weak var settingsManager: SettingsManager?
     var modelContext: ModelContext?
     /// Separate context for ExcludedApp queries — lives in the settings container
@@ -39,11 +41,12 @@ final class ClipboardManager: ObservableObject {
         self.settingsModelContext = context
     }
 
-    private func getActiveAppBundleIdentifier() -> String? {
-        guard let activeApp = NSWorkspace.shared.frontmostApplication else {
-            return nil
-        }
-        return activeApp.bundleIdentifier
+    /// The frontmost app, recorded only when the setting allows it.
+    private func captureSource(of app: NSRunningApplication?) -> CaptureSource? {
+        guard settingsManager?.recordSourceApp ?? true,
+              let app, let bundleID = app.bundleIdentifier else { return nil }
+        let name = app.localizedName ?? app.bundleURL?.deletingPathExtension().lastPathComponent ?? bundleID
+        return CaptureSource(bundleID: bundleID, name: name)
     }
 
     private func isAppExcluded(_ bundleIdentifier: String) -> Bool {
@@ -118,15 +121,17 @@ final class ClipboardManager: ObservableObject {
         }
 
         // Check if the active app is excluded
-        if let bundleId = getActiveAppBundleIdentifier(), isAppExcluded(bundleId) {
+        let activeApp = NSWorkspace.shared.frontmostApplication
+        if let bundleId = activeApp?.bundleIdentifier, isAppExcluded(bundleId) {
             return
         }
+        let source = captureSource(of: activeApp)
 
         // Files first, so a copied file isn't also captured as its path text.
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL],
            let fileURL = urls.first,
            fileURL.isFileURL {
-            captureFile(at: fileURL)
+            captureFile(at: fileURL, source: source)
             return
         }
 
@@ -138,14 +143,14 @@ final class ClipboardManager: ObservableObject {
         for kind in Self.captureKinds(for: captureMode, hasText: text != nil, hasImage: hasImage) {
             switch kind {
             case .text:
-                if let text { onClipboardChange?(.text(text)) }
+                if let text { onClipboardChange?(.text(text), source) }
             case .image:
-                if let data = pasteboardImageData() { onClipboardChange?(.image(data)) }
+                if let data = pasteboardImageData() { onClipboardChange?(.image(data), source) }
             case .combined:
                 if let text, let data = pasteboardImageData() {
-                    onClipboardChange?(.combined(text, data))
+                    onClipboardChange?(.combined(text, data), source)
                 } else if let text {
-                    onClipboardChange?(.text(text))
+                    onClipboardChange?(.text(text), source)
                 }
             }
         }
@@ -162,7 +167,7 @@ final class ClipboardManager: ObservableObject {
         return NSImage(pasteboard: pasteboard)?.tiffRepresentation
     }
 
-    private func captureFile(at url: URL) {
+    private func captureFile(at url: URL, source: CaptureSource?) {
         let fileURL = url.resolvingSymlinksInPath()
         let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
         // Folders, packages (.app) and unreachable URLs have no single blob to store.
@@ -178,15 +183,15 @@ final class ClipboardManager: ObservableObject {
         Task.detached(priority: .userInitiated) { [weak self] in
             do {
                 let data = try Data(contentsOf: fileURL)
-                await self?.deliver(.file(url, uti, data))
+                await self?.deliver(.file(url, uti, data), source: source)
             } catch {
                 ErrorLogger.shared.log("Failed to read copied file", category: "Clipboard", error: error)
             }
         }
     }
 
-    private func deliver(_ content: ClipboardContent) {
-        onClipboardChange?(content)
+    private func deliver(_ content: ClipboardContent, source: CaptureSource?) {
+        onClipboardChange?(content, source)
     }
 
     func copyToClipboard(_ text: String) {

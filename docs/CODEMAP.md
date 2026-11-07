@@ -38,7 +38,7 @@ this (`AppEnvironment.isRunningUnitTests`).
 
 | File | Owns / does | Talks to |
 | --- | --- | --- |
-| ClipboardManager | 0.5 s pasteboard poll; capture rules (`captureKinds`); size check and background read of copied files; writes items back to the pasteboard, recording `changeCount` so its own writes aren't captured; pause timer; Save to File | CBViewModel via `onClipboardChange`; SettingsManager; `ExcludedApp` |
+| ClipboardManager | 0.5 s pasteboard poll; capture rules (`captureKinds`); the frontmost app as `CaptureSource` (when `recordSourceApp`); size check and background read of copied files; writes items back to the pasteboard, recording `changeCount` so its own writes aren't captured; pause timer; Save to File | CBViewModel via `onClipboardChange`; SettingsManager; `ExcludedApp` |
 | HotkeyManager | Loads `HotkeyConfig`, registers Carbon hotkeys through `HotkeyShortcut`, runs the actions | CBViewModel (`copyAndUpdateItem`), PasteSimulator, QuickPickerDelegate, PinManager |
 | QuickPickerWindowManager | The non-activating `KeyCapturingPanel` hosting QuickPickerView; focus and key routing; click-outside/Esc; Quick Look vs custom preview; session-only position | CBViewModel, SettingsManager, PinManager, TypePaster |
 | TypePaster | ⌘⇧⏎ type-out: `KeyboardLayoutTables` maps characters to real key codes (active layout plus ASCII fallback, no keypad keys) and presses modifiers as real keys; Esc cancels | CGEvent |
@@ -52,7 +52,11 @@ this (`AppEnvironment.isRunningUnitTests`).
 
 | File | What |
 | --- | --- |
-| CBItem | `@Model`, clipboard container. External storage: `content`, `imageData`, `fileData`, `thumbnailData`. Inline: `timestamp`, `itemType`, `fileName`, `fileUTI`, `isFavorite`, `orderIndex`, `title` (user-given, optional), `contentPreview` (first 100 characters), `imageSize` ("W×H"), `fileSize`. Also the thumbnail cache (never written during render), `ContentKey` / `hasSameContent` for deduplication, `matchesSearch` |
+| CBItem | `@Model`, clipboard container. External storage: `content`, `imageData`, `fileData`, `thumbnailData`. Inline: `timestamp`, `itemType`, `fileName`, `fileUTI`, `isFavorite`, `orderIndex`, `title` (user-given, optional), `contentPreview` (first 100 characters), `imageSize` ("W×H"), `fileSize`, `categoryKeys` (",link,link.full,…"), `languageCode`, `classificationStamp`, `sourceAppBundleID` / `sourceAppName`, `recognizedText` (what Vision read in an image, ≤10,000 characters; searched by `matchesSearch`), `textRecognitionState` (OCR not requested / pending / no text / found). Also the thumbnail cache (never written during render), `ContentKey` / `hasSameContent` for deduplication, `matchesSearch`, `classify(with:)` |
+| ContentClassifier | Finds links, emails, phones, addresses, dates (NSDataDetector), code, JSON, paths, the language (NaturalLanguage) and regex-rule matches in the first 4000 characters; `key` for a match, `key.full` when it covers the whole text. `Ruleset` compiles the rules once and carries the `stamp` |
+| ImageClassifier | Vision on a downscaled (2048 px) image, two independent parts: the visual pass (QR codes and barcodes with payloads, faces, transparency) and OCR. `CBItem.classify(with:image:)` stores the text and runs it through ContentClassifier. Synchronous, off the main thread only |
+| ItemCategory | A chip: built-in (stable ids `link` … `language`, image ones `ocr`, `barcode`, `face`, `transparent`), regex rule or app group, with match mode, SF Symbol or emoji, color. `builtIns`, `merged(stored:)`, `matches(_:)`, `count(in:)`. JSON in UserDefaults, not a `@Model` |
+| ItemFilter | `QPSearchQuery` (is:/app:/lang: tokens + free text), `CategorySelection` (the active chip), `ItemFilter.matches`, `FacetCounts` (per-key / language / app counts) |
 | HotkeyConfig | `@Model` per `HotkeyAction` (23 actions and their default shortcuts), settings container |
 | HotkeyShortcut | Parses and formats shortcut strings; the key table; reserved system shortcuts; Carbon modifier mask |
 | PinnedItemConfig | `@Model` pin: content snapshot plus layout and flags, settings container; `contentKey` |
@@ -67,12 +71,24 @@ counts are published too. Inserts go through `insertOrBump`, which finds
 duplicates anywhere in the store. It also handles edits, favorites,
 two-step deletes, cleanup (item cap and memory), the read-only queries used
 by the Quick Picker and search, and opening items in other apps.
+Categories: new items are classified in `insertOrBump`, which also stores
+the source app; `reclassifyIfNeeded` rescans items whose
+`classificationStamp` differs from the current rules (at launch and when a
+regex rule or "Analyze images" changes) in pages of 100; images go to
+`ImageClassifier` four at a time on a utility thread through a throwaway
+`ModelContext`, and a new image is left unstamped for that pass; `facetCounts(ofTypes:)` shares the
+cached count scan; `searchItems(filter:types:limit:)` applies an
+`ItemFilter`; `recognizeTextInAllImages` / `stopTextRecognition` queue or drop OCR for
+older images (`pendingTextRecognitionCount` for the progress);
+`clearSourceApps` forgets every source app; `rememberRecognizedText` keeps the
+user's OCR result (⌥⏎, Extract Text) on the image.
 
 ### Helper/
 
 | File | What |
 | --- | --- |
 | AppEnvironment | `isRunningUnitTests` |
+| AppIconCache | App icons by bundle id for source-app badges |
 | AppNotifications | Every `Notification.Name` the app posts |
 | ExternalOpener | Temp file + open in Preview / TextEdit / the default app |
 | MainWindow | Find and bring forward the "Clipboard History" window |
@@ -87,10 +103,10 @@ by the Quick Picker and search, and opening items in other apps.
 | ContentView | Main window: Recent / Favorites, whole-history search, `DetailedCardView` rows, `ClipboardHeader` |
 | ZoomView/, Small/ActionsBottomButtonView | Detail pane: text/image/file preview, zoom, copy, edit, open, OCR, delete |
 | Menu/ | MenuBarView (popover list of `SwipeableRow`s), MenuBarItemView, PauseTimerView |
-| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order; renders from a snapshot), QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel, also used over full-screen apps) |
+| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order; renders from a snapshot), QPCategoryBar + `QPCategoryChip.chips` (category chips of the active tab), QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel, also used over full-screen apps) |
 | Pins/ | PinContentView, PinChromeView (+ PinDragArea to move the pin), PinImageView; all render from `PinViewState` |
-| Settings/ | Sidebar + General, Hotkeys, Quick Picker, Pins, Excluded Apps (`@Query` is fine here), Accessibility, About |
-| Components/, Small/, Cells/ | Shared pieces: search bar, swipeable row, alerts, buttons, list cell |
+| Settings/ | Sidebar + General, Hotkeys, Quick Picker, Categories (CategoriesSettingsView, CategorySettingsRow, CategoryEditorView sheet, CategoryIconPicker), Pins, Excluded Apps (`@Query` is fine here), Accessibility, About. AppPickerView is shared by Excluded Apps and app groups |
+| Components/, Small/, Cells/ | Shared pieces: search bar, swipeable row, alerts, buttons, list cell, CategoryIconView, CategoryChipView |
 
 ## Cross-cutting
 
@@ -115,7 +131,7 @@ app's container for sandboxed Debug builds).
 | --- | --- |
 | Clipboard history | `ClipboardHistory.store`, blobs in `.ClipboardHistory_SUPPORT/` |
 | Hotkeys, excluded apps, pins | `Settings.store` |
-| Settings | UserDefaults through SettingsManager; keys are the property names. `enableErrorFileLogging` is also read by ErrorLogger |
+| Settings | UserDefaults through SettingsManager; keys are the property names. `enableErrorFileLogging` is also read by ErrorLogger; `itemCategories` is a JSON array of `ItemCategory` |
 | Error log | `StoneClipboarder_errors.log` (+ `.old.log`) |
 
 ### Temp files
@@ -145,7 +161,7 @@ app's container for sandboxed Debug builds).
 | ⌘Q down / up (local) | AppDelegate | app lifetime / while ⌘Q is held |
 | Esc cancels type-out (global + local) | TypePaster | while typing |
 | Click outside, Esc (global); key re-routing (local) | QuickPickerWindowManager | while the picker is open |
-| Tab, ⇧Tab, ⌥P, ⌥⏎, ⌥E; in the ⌥E editor ⏎, Esc, ⌥F, ⌥↑/⌥↓ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
+| Tab, ⇧Tab, ⌥P, ⌥⏎, ⌥E, ⌥←/⌥→ (category chips); in the ⌥E editor ⏎, Esc, ⌥F, ⌥↑/⌥↓ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
 | ⌘C / ⌘W in a pin (local) | PinContentView `CommandKeyHandler` | while the pin is in a window |
 | Pinch zoom (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
@@ -169,6 +185,11 @@ app's container for sandboxed Debug builds).
 - **A Quick Picker tab.** `QPTab` case (`itemTypes`, title, count) →
   `QuickPickerView.reloadForActiveTab` → a CBViewModel query if the tab
   needs one.
+- **A built-in category.** `ItemCategory.BuiltIn` case and an entry in
+  `builtIns` (new installs and old ones get it via `merged(stored:)`) →
+  detection in `ContentClassifier.classify` → bump
+  `ContentClassifier.version` so stored items are rescanned →
+  `CategorySettingsRow.builtInDescription`.
 - **A pin option.** Default in SettingsManager (`pin…`) → per-pin field in
   `PinnedItemConfig` → `PinViewState` → PinChromeView / PinWindowController →
   PinSettingsView.

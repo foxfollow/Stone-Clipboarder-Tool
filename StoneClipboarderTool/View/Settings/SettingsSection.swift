@@ -9,6 +9,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case hotkeys
     case quickPicker
+    case categories
     case pins
     case excludedApps
     case accessibility
@@ -21,6 +22,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: return "General"
         case .hotkeys: return "Hotkeys"
         case .quickPicker: return "Quick Picker"
+        case .categories: return "Categories"
         case .pins: return "Pins"
         case .excludedApps: return "Excluded Apps"
         case .accessibility: return "Accessibility"
@@ -33,6 +35,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: return "Behavior, capture, and history retention."
         case .hotkeys: return "Global shortcuts for items, favorites, and the Quick Picker."
         case .quickPicker: return "Quick Look preview and type-out paste in the Quick Picker."
+        case .categories: return "Group items by what they contain, their language or the app they came from."
         case .pins: return "Floating clipboard windows that stay on top of every Space."
         case .excludedApps: return "Apps whose clipboard content is never saved."
         case .accessibility: return "Login behavior and macOS accessibility permission."
@@ -45,6 +48,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: return "gearshape"
         case .hotkeys: return "keyboard"
         case .quickPicker: return "text.magnifyingglass"
+        case .categories: return "square.grid.2x2"
         case .pins: return "pin.fill"
         case .excludedApps: return "lock.app.dashed"
         case .accessibility: return "checkmark.shield"

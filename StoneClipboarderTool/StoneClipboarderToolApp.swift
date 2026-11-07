@@ -150,6 +150,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // SwiftUI evaluates App.body, where publishing `items` isn't allowed.
         DispatchQueue.main.async {
             cbViewModel.fetchItems(reset: true)
+            // Items from before categories, or from other regex rules.
+            cbViewModel.reclassifyIfNeeded()
         }
 
         cbViewModel.startClipboardMonitoring()

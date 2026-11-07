@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import Combine
 import Foundation
 import SwiftData
 import SwiftUI
@@ -40,6 +41,13 @@ class CBViewModel: ObservableObject {
     /// False once a page came back short: `items` holds the whole history.
     private var canLoadMore = true
 
+    /// Compiled regex rules and their stamp; rebuilt when the categories
+    /// change. Items whose `classificationStamp` differs get classified again.
+    private(set) var classifierRuleset = ContentClassifier.Ruleset.empty
+    private var categoriesObserver: AnyCancellable?
+    private var reclassifyTask: Task<Void, Never>?
+    private var reclassifyGeneration = 0
+
     // Memory management
     nonisolated(unsafe) private var memoryCleanupTimer: Timer?
     private var lastAccessTimes: [PersistentIdentifier: Date] = [:]
@@ -63,6 +71,26 @@ class CBViewModel: ObservableObject {
         if manager.enableAutoCleanup {
             performItemCountCleanup()
         }
+
+        // Only a change to the regex rules changes the stamp; toggles, icons
+        // and colors don't trigger a rescan.
+        categoriesObserver = manager.$itemCategories
+            .map { categories in categories.compactMap(\.regexRule) }
+            .removeDuplicates()
+            .combineLatest(manager.$analyzeImages.removeDuplicates())
+            .sink { [weak self] rules, analyzeImages in
+                MainActor.assumeIsolated {
+                    self?.updateClassifierRules(rules, analyzeImages: analyzeImages)
+                }
+            }
+    }
+
+    /// Swaps the rules and, when the stamp changed, rescans the history.
+    func updateClassifierRules(_ rules: [ContentClassifier.RegexRule], analyzeImages: Bool = true) {
+        let ruleset = ContentClassifier.Ruleset(rules: rules, analyzeImages: analyzeImages)
+        guard ruleset.stamp != classifierRuleset.stamp else { return }
+        classifierRuleset = ruleset
+        reclassifyIfNeeded()
     }
 
     func getClipboardManager() -> ClipboardManager {
@@ -255,9 +283,9 @@ class CBViewModel: ObservableObject {
     }
 
     private func setupClipboardMonitoring() {
-        clipboardManager.onClipboardChange = { [weak self] content in
+        clipboardManager.onClipboardChange = { [weak self] content, source in
             Task { @MainActor in
-                self?.handleClipboardChange(content)
+                self?.handleClipboardChange(content, source: source)
             }
         }
     }
@@ -266,66 +294,92 @@ class CBViewModel: ObservableObject {
         clipboardManager.startMonitoring()
     }
 
-    private func handleClipboardChange(_ clipboardContent: ClipboardContent) {
+    private func handleClipboardChange(_ clipboardContent: ClipboardContent, source: CaptureSource?) {
         switch clipboardContent {
         case .text(let content):
-            addOrUpdateTextItem(content: content)
+            addOrUpdateTextItem(content: content, source: source)
         case .image(let imageData):
-            addOrUpdateImageItem(imageData: imageData)
+            addOrUpdateImageItem(imageData: imageData, source: source)
         case .file(let url, let uti, let data):
-            addOrUpdateFileItem(url: url, uti: uti, data: data)
+            addOrUpdateFileItem(url: url, uti: uti, data: data, source: source)
         case .combined(let content, let imageData):
-            addOrUpdateCombinedItem(content: content, imageData: imageData)
+            addOrUpdateCombinedItem(content: content, imageData: imageData, source: source)
         }
     }
 
-    func addTextItem(content: String) {
-        addOrUpdateTextItem(content: content)
+    func addTextItem(content: String, source: CaptureSource? = nil) {
+        addOrUpdateTextItem(content: content, source: source)
     }
 
-    private func addOrUpdateTextItem(content: String) {
-        insertOrBump(CBItem.ContentKey(type: .text, content: content), errorMessage: "Failed to save text item") {
+    private func addOrUpdateTextItem(content: String, source: CaptureSource?) {
+        let key = CBItem.ContentKey(type: .text, content: content)
+        insertOrBump(key, source: source, errorMessage: "Failed to save text item") {
             CBItem(timestamp: Date(), content: content, itemType: .text)
         }
     }
 
-    private func addOrUpdateImageItem(imageData: Data) {
-        insertOrBump(CBItem.ContentKey(type: .image, imageData: imageData), errorMessage: "Failed to save image item") {
+    private func addOrUpdateImageItem(imageData: Data, source: CaptureSource?) {
+        let key = CBItem.ContentKey(type: .image, imageData: imageData)
+        insertOrBump(key, source: source, errorMessage: "Failed to save image item") {
             CBItem(timestamp: Date(), imageData: imageData, itemType: .image)
         }
     }
 
-    private func addOrUpdateCombinedItem(content: String, imageData: Data) {
+    private func addOrUpdateCombinedItem(content: String, imageData: Data, source: CaptureSource?) {
         let key = CBItem.ContentKey(type: .combined, content: content, imageData: imageData)
-        insertOrBump(key, errorMessage: "Failed to save combined item") {
+        insertOrBump(key, source: source, errorMessage: "Failed to save combined item") {
             CBItem(timestamp: Date(), content: content, imageData: imageData, itemType: .combined)
         }
     }
 
-    private func addOrUpdateFileItem(url: URL, uti: String?, data: Data?) {
+    private func addOrUpdateFileItem(url: URL, uti: String?, data: Data?, source: CaptureSource?) {
         let name = url.lastPathComponent
         let key = CBItem.ContentKey(type: .file, fileData: data, fileName: name)
-        insertOrBump(key, errorMessage: "Failed to save file item") {
+        insertOrBump(key, source: source, errorMessage: "Failed to save file item") {
             CBItem(timestamp: Date(), fileData: data, fileName: name, fileUTI: uti, itemType: .file)
         }
     }
 
     /// Moves an existing identical item to the top, or inserts a new one.
     /// `makeItem` runs only for new content: building a CBItem decodes the
-    /// image and renders its thumbnail.
-    private func insertOrBump(_ key: CBItem.ContentKey, errorMessage: String, makeItem: () -> CBItem) {
+    /// image and renders its thumbnail. A new item is classified right away;
+    /// either way the item remembers the latest source app.
+    private func insertOrBump(
+        _ key: CBItem.ContentKey, source: CaptureSource?, errorMessage: String, makeItem: () -> CBItem
+    ) {
         guard let modelContext = _modelContext else { return }
 
+        let item: CBItem
         if let existing = existingItem(matching: key) {
             existing.timestamp = Date()
+            item = existing
         } else {
-            modelContext.insert(makeItem())
+            item = makeItem()
+            item.classify(with: classifierRuleset)
+            if item.hasAnalyzableImage {
+                // OCR runs once, for new images only (unless asked for all).
+                if settingsManager?.recognizeTextInNewImages ?? true {
+                    item.textRecognitionState = CBItem.TextRecognition.pending
+                }
+                if classifierRuleset.analyzeImages || item.textRecognitionState == CBItem.TextRecognition.pending {
+                    // Text is classified; the image waits for the background pass.
+                    item.classificationStamp = 0
+                }
+            }
+            modelContext.insert(item)
+        }
+        if let source {
+            item.sourceAppBundleID = source.bundleID
+            item.sourceAppName = source.name
         }
 
         do {
             try modelContext.save()
             fetchItems(reset: true)
             performCleanupIfNeeded()
+            if item.classificationStamp != classifierRuleset.stamp && reclassifyTask == nil {
+                reclassifyIfNeeded()
+            }
         } catch {
             modelContext.rollback()
             ErrorLogger.shared.log(errorMessage, category: "SwiftData", error: error)
@@ -576,14 +630,31 @@ class CBViewModel: ObservableObject {
     /// the calling task is cancelled.
     func searchItems(matching query: String, types: Set<CBItemType>? = nil, limit: Int = 300) async -> [CBItem] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty, limit > 0 else { return [] }
+        guard !query.isEmpty else { return [] }
+        let includingImageText = settingsManager?.searchImageText ?? true
+        return await searchItems(types: types, limit: limit) {
+            $0.matchesSearch(query, includingImageText: includingImageText)
+        }
+    }
+
+    /// Items passing `filter` (chip, `is:`/`app:`/`lang:` tokens, free text)
+    /// anywhere in the history, newest first, at most `limit`.
+    func searchItems(filter: ItemFilter, types: Set<CBItemType>? = nil, limit: Int = 300) async -> [CBItem] {
+        guard !filter.isEmpty else { return [] }
+        return await searchItems(types: types, limit: limit, where: filter.matches)
+    }
+
+    private func searchItems(
+        types: Set<CBItemType>?, limit: Int, where isMatch: @escaping (CBItem) -> Bool
+    ) async -> [CBItem] {
+        guard limit > 0 else { return [] }
 
         while true {
             // A deletion announced earlier has its context deletion queued
             // already; the pause lets it run before the scan.
             guard await pauseBetweenPages() else { return [] }
             let generation = deletionGeneration
-            guard let results = await scanHistory(for: query, types: types, limit: limit) else { return [] }
+            guard let results = await scanHistory(types: types, limit: limit, where: isMatch) else { return [] }
             if generation == deletionGeneration { return results }
             // An item was announced deleted during a pause and may be among
             // the matches: scan again once its deletion has run.
@@ -591,7 +662,9 @@ class CBViewModel: ObservableObject {
     }
 
     /// nil when cancelled.
-    private func scanHistory(for query: String, types: Set<CBItemType>?, limit: Int) async -> [CBItem]? {
+    private func scanHistory(
+        types: Set<CBItemType>?, limit: Int, where isMatch: (CBItem) -> Bool
+    ) async -> [CBItem]? {
         let pageSize = Self.searchPageSize
         var results: [CBItem] = []
         // Items inserted during a pause shift the offsets; skip repeats.
@@ -601,7 +674,7 @@ class CBViewModel: ObservableObject {
             let page = historyPage(offset: offset, limit: pageSize)
             for item in page where types?.contains(item.itemType) ?? true {
                 guard seen.insert(item.persistentModelID).inserted else { continue }
-                if item.matchesSearch(query) {
+                if isMatch(item) {
                     results.append(item)
                     if results.count == limit { break }
                 }
@@ -641,8 +714,10 @@ class CBViewModel: ObservableObject {
         guard let modelContext = _modelContext else { return ItemTypeCounts() }
 
         var counts = ItemTypeCounts()
+        var facets: [CBItemType: FacetCounts] = [:]
         do {
             for item in try modelContext.fetch(FetchDescriptor<CBItem>()) {
+                facets[item.itemType, default: FacetCounts()].add(item)
                 switch item.itemType {
                 case .text: counts.text += 1
                 case .image: counts.images += 1
@@ -657,13 +732,254 @@ class CBViewModel: ObservableObject {
             return counts
         }
         cachedTypeCounts = counts
+        cachedFacets = facets
         return counts
+    }
+
+    private var cachedFacets: [CBItemType: FacetCounts]?
+
+    /// Category, language and source-app counts over the given types (nil =
+    /// all), for the Quick Picker's chips. Shares the cached full scan with
+    /// `itemTypeCounts()`.
+    func facetCounts(ofTypes types: Set<CBItemType>?) -> FacetCounts {
+        if cachedFacets == nil { cachedTypeCounts = nil; _ = itemTypeCounts() }
+        guard let cachedFacets else { return FacetCounts() }
+        return cachedFacets
+            .filter { types?.contains($0.key) ?? true }
+            .values
+            .reduce(FacetCounts(), +)
+    }
+
+    // MARK: - Classification
+
+    /// Classifies, in the background, every item stamped with other rules
+    /// (or none: items from before categories). Restarts when called again.
+    func reclassifyIfNeeded() {
+        reclassifyTask?.cancel()
+        reclassifyGeneration += 1
+        let generation = reclassifyGeneration
+        reclassifyTask = Task { [weak self] in
+            await self?.reclassifyStaleItems()
+            // A newer pass may have replaced this one meanwhile.
+            if self?.reclassifyGeneration == generation {
+                self?.reclassifyTask = nil
+            }
+        }
+    }
+
+    /// Pages of 100 with a run-loop turn between them, like the search:
+    /// items stamped with other rules, and images waiting for OCR.
+    /// Text is classified here; images that need Vision (the visual pass
+    /// when "Analyze images" is on, OCR when pending) go to
+    /// `ImageClassifier` off the main thread, a few at a time, read through
+    /// a throwaway background context so their bytes don't stay loaded in
+    /// the main one. Returns how many items were classified.
+    @discardableResult
+    func reclassifyStaleItems() async -> Int {
+        guard let modelContext = _modelContext else { return 0 }
+        let ruleset = classifierRuleset
+        let stamp = ruleset.stamp
+        let pending = CBItem.TextRecognition.pending
+        var classified = 0
+        updatePendingTextRecognitionCount()
+        defer { updatePendingTextRecognitionCount() }
+
+        pages: while !Task.isCancelled {
+            var descriptor = FetchDescriptor<CBItem>(predicate: #Predicate {
+                $0.classificationStamp != stamp || $0.textRecognitionState == pending
+            })
+            descriptor.fetchLimit = Self.reclassifyPageSize
+            let page: [CBItem]
+            do {
+                page = try modelContext.fetch(descriptor)
+            } catch {
+                ErrorLogger.shared.log("Failed to fetch items to classify", category: "SwiftData", error: error)
+                break
+            }
+            guard !page.isEmpty else { break }
+
+            func needsVision(_ item: CBItem) -> Bool {
+                item.hasAnalyzableImage && (ruleset.analyzeImages || item.textRecognitionState == pending)
+            }
+            let images = page.filter(needsVision)
+            for item in page where !needsVision(item) {
+                item.classify(with: ruleset)
+            }
+            guard saveCategories(in: modelContext) else { break }
+            classified += page.count - images.count
+
+            var start = 0
+            while start < images.count {
+                let chunk = Array(images[start..<min(start + Self.imageChunkSize, images.count)])
+                start += chunk.count
+                let requests = chunk.map {
+                    ImageRequest(id: $0.persistentModelID, recognizeText: $0.textRecognitionState == pending)
+                }
+                let results = await Self.analyzeImages(
+                    requests, container: modelContext.container, analyzeVisual: ruleset.analyzeImages)
+                guard !Task.isCancelled else { break pages }
+                // Deleted meanwhile: nothing to write.
+                for item in chunk where !item.isDeleted {
+                    item.classify(with: ruleset, image: results[item.persistentModelID] ?? ImageClassifier.Result())
+                }
+                guard saveCategories(in: modelContext) else { break pages }
+                classified += chunk.count
+                updatePendingTextRecognitionCount()
+            }
+            guard await pauseBetweenPages() else { break }
+        }
+
+        if classified > 0 {
+            refreshItemCounts()
+            objectWillChange.send()
+        }
+        return classified
+    }
+
+    private static let reclassifyPageSize = 100
+    private static let imageChunkSize = 4
+
+    private func saveCategories(in modelContext: ModelContext) -> Bool {
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save item categories", category: "SwiftData", error: error)
+            return false
+        }
+    }
+
+    private struct ImageRequest {
+        let id: PersistentIdentifier
+        let recognizeText: Bool
+    }
+
+    /// Runs `ImageClassifier` on a utility-priority thread with its own
+    /// context, so the image bytes are released when it ends.
+    nonisolated private static func analyzeImages(
+        _ requests: [ImageRequest], container: ModelContainer, analyzeVisual: Bool
+    ) async -> [PersistentIdentifier: ImageClassifier.Result] {
+        await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            var results: [PersistentIdentifier: ImageClassifier.Result] = [:]
+            for request in requests {
+                let id = request.id
+                let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.persistentModelID == id })
+                guard let item = try? context.fetch(descriptor).first,
+                      let data = item.analyzableImageData else { continue }
+                results[id] = ImageClassifier.classify(
+                    data, analyzeVisual: analyzeVisual, recognizeText: request.recognizeText)
+            }
+            return results
+        }.value
+    }
+
+    // MARK: - Text recognition
+
+    /// Images waiting for OCR; drives the progress in Settings.
+    @Published private(set) var pendingTextRecognitionCount = 0
+
+    private func updatePendingTextRecognitionCount() {
+        guard let modelContext = _modelContext else { return }
+        let pending = CBItem.TextRecognition.pending
+        let count = (try? modelContext.fetchCount(
+            FetchDescriptor<CBItem>(predicate: #Predicate { $0.textRecognitionState == pending }))) ?? 0
+        if count != pendingTextRecognitionCount { pendingTextRecognitionCount = count }
+    }
+
+    /// Images OCR never ran on, for "Recognize Text in All Images…".
+    func imagesWithoutTextRecognition() -> Int {
+        unrecognizedImages().count
+    }
+
+    private func unrecognizedImages() -> [CBItem] {
+        guard let modelContext = _modelContext else { return [] }
+        let notRequested = CBItem.TextRecognition.notRequested
+        let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.textRecognitionState == notRequested })
+        do {
+            return try modelContext.fetch(descriptor).filter(\.hasAnalyzableImage)
+        } catch {
+            ErrorLogger.shared.log("Failed to count images for OCR", category: "SwiftData", error: error)
+            return []
+        }
+    }
+
+    /// Queues OCR for every image it never ran on; the background pass does
+    /// the work, a few images at a time.
+    func recognizeTextInAllImages() {
+        guard let modelContext = _modelContext else { return }
+        let images = unrecognizedImages()
+        guard !images.isEmpty else { return }
+        images.forEach { $0.textRecognitionState = CBItem.TextRecognition.pending }
+        guard saveCategories(in: modelContext) else { return }
+        updatePendingTextRecognitionCount()
+        if reclassifyTask == nil { reclassifyIfNeeded() }
+    }
+
+    /// Stops a "Recognize Text in All Images" run: what's left goes back
+    /// to not requested.
+    func stopTextRecognition() {
+        guard let modelContext = _modelContext else { return }
+        let pending = CBItem.TextRecognition.pending
+        do {
+            let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.textRecognitionState == pending })
+            for item in try modelContext.fetch(descriptor) {
+                item.textRecognitionState = CBItem.TextRecognition.notRequested
+            }
+        } catch {
+            ErrorLogger.shared.log("Failed to stop text recognition", category: "SwiftData", error: error)
+        }
+        _ = saveCategories(in: modelContext)
+        updatePendingTextRecognitionCount()
+    }
+
+    /// Keeps text the user's OCR (⌥⏎, "Extract Text") found in an image on
+    /// that image, so search finds it, and adds the categories the text
+    /// brings (Text in Image, Link, …). Ignores items deleted meanwhile.
+    func rememberRecognizedText(_ text: String, forItemWithID id: PersistentIdentifier) {
+        guard let modelContext = _modelContext else { return }
+        var descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.persistentModelID == id })
+        descriptor.fetchLimit = 1
+        do {
+            guard let item = try modelContext.fetch(descriptor).first, !item.isDeleted,
+                  item.hasAnalyzableImage else { return }
+            item.setRecognizedText(text)
+            guard item.recognizedText != nil else { return }
+            item.textRecognitionState = CBItem.TextRecognition.found
+            item.classify(with: classifierRuleset, keepingVisualKeys: true)
+
+            try modelContext.save()
+            refreshItemCounts()
+            objectWillChange.send()
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save recognized text", category: "SwiftData", error: error)
+        }
+    }
+
+    /// "Forget recorded apps": clears the source app of every item.
+    func clearSourceApps() {
+        guard let modelContext = _modelContext else { return }
+        do {
+            let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.sourceAppBundleID != nil })
+            for item in try modelContext.fetch(descriptor) {
+                item.sourceAppBundleID = nil
+                item.sourceAppName = nil
+            }
+            try modelContext.save()
+            fetchItems(reset: true)
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to clear source apps", category: "SwiftData", error: error)
+        }
     }
 
     /// Recounts favorites and non-favorites (cheap fetchCounts) and drops the
     /// cached per-type counts. Every change to the history ends up here.
     func refreshItemCounts() {
         cachedTypeCounts = nil
+        cachedFacets = nil
         guard let modelContext = _modelContext else { return }
         do {
             let nonFavDescriptor = FetchDescriptor<CBItem>(
