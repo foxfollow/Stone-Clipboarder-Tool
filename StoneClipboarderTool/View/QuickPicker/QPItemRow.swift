@@ -16,6 +16,17 @@ struct QPItemRow: View {
     var isInMultiSelection: Bool = false
     var showOCRHint: Bool = false
     var isPinned: Bool = false
+    /// Enabled content and regex categories; the row shows up to three
+    /// that the item belongs to.
+    var badgeCategories: [ItemCategory] = []
+    /// Show the detected language's code (the Languages category is on).
+    var showLanguage: Bool = false
+
+    private static let maxBadges = 3
+
+    private var badges: [ItemCategory] {
+        Array(badgeCategories.lazy.filter { $0.matches(item) }.prefix(Self.maxBadges))
+    }
 
     private var typeLabel: String {
         switch item.itemType {
@@ -83,6 +94,8 @@ struct QPItemRow: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
+                    categoryBadges
+
                     Spacer()
 
                     if item.isFavorite {
@@ -126,6 +139,40 @@ struct QPItemRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(borderStroke, lineWidth: 1)
         )
+    }
+
+    /// Category icons, the language code and the source app's icon.
+    @ViewBuilder
+    private var categoryBadges: some View {
+        ForEach(badges) { category in
+            CategoryIconView(icon: category.icon, color: category.color, size: 9)
+                .help(category.name)
+        }
+        if showLanguage, let language = item.languageCode {
+            Text(language.uppercased())
+                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(Color.secondary.opacity(0.4), lineWidth: 0.5)
+                )
+                .help(ItemCategory.languageName(language))
+        }
+        if let bundleID = item.sourceAppBundleID {
+            Group {
+                if let icon = AppIconCache.icon(for: bundleID) {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .frame(width: 12, height: 12)
+                } else {
+                    Image(systemName: "app")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .help("Copied from \(item.sourceAppName ?? bundleID)")
+        }
     }
 
     private var backgroundFill: Color {

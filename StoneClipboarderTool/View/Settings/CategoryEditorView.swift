@@ -163,7 +163,7 @@ struct CategoryEditorView: View {
             }
             ForEach(Array(draft.appBundleIDs.enumerated()), id: \.element) { index, bundleID in
                 HStack {
-                    if let icon = Self.appIcon(bundleID) {
+                    if let icon = AppIconCache.icon(for: bundleID) {
                         Image(nsImage: icon)
                             .resizable()
                             .frame(width: 20, height: 20)
@@ -198,11 +198,6 @@ struct CategoryEditorView: View {
         if draft.appNames.indices.contains(index) {
             draft.appNames.remove(at: index)
         }
-    }
-
-    static func appIcon(_ bundleID: String) -> NSImage? {
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
-        return NSWorkspace.shared.icon(forFile: url.path)
     }
 }
 

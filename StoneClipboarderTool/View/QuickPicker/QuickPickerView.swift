@@ -57,6 +57,10 @@ struct QuickPickerView: View {
     @State private var hasMoreItems = true
     @State private var searchTask: Task<Void, Never>?
     @State private var typeCounts = CBViewModel.ItemTypeCounts()
+    /// The chip picked in the category bar; nil = no category filter.
+    @State private var activeCategory: CategorySelection?
+    /// Category, language and app counts for the active tab's chips.
+    @State private var facets = FacetCounts()
     /// The open ⌥E editor, nil when closed.
     @State private var itemEditor: QPItemEditorModel?
     @FocusState private var isSearchFocused: Bool
@@ -104,11 +108,47 @@ struct QuickPickerView: View {
             base = quickPickerItems
         }
 
-        let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedSearch.isEmpty {
-            return base
-        }
-        return base.filter { $0.matchesSearch(trimmedSearch) }
+        let filter = itemFilter
+        return filter.isEmpty ? base : base.filter(filter.matches)
+    }
+
+    // MARK: - Categories
+
+    private var categories: [ItemCategory] {
+        settingsManager?.itemCategories ?? ItemCategory.builtIns
+    }
+
+    /// The chip plus the search field (is:/app:/lang: tokens and text).
+    private var itemFilter: ItemFilter {
+        ItemFilter(categories: categories, selection: activeCategory, query: .parse(searchText))
+    }
+
+    private var categoryChips: [QPCategoryChip] {
+        guard settingsManager?.showCategoryBar ?? true else { return [] }
+        return QPCategoryChip.chips(for: categories, facets: facets)
+    }
+
+    /// Content and regex categories shown as row badges.
+    private var badgeCategories: [ItemCategory] {
+        categories.filter { $0.isEnabled && $0.kind != .apps && $0.builtIn != .language }
+    }
+
+    private var showsLanguageBadge: Bool {
+        categories.contains { $0.builtIn == .language && $0.isEnabled }
+    }
+
+    /// ⌥← / ⌥→: step through "no chip", then each chip, wrapping around.
+    private func cycleCategory(by step: Int) {
+        let options: [CategorySelection?] = [nil] + categoryChips.map(\.selection)
+        guard options.count > 1 else { return }
+        let current = options.firstIndex(of: activeCategory) ?? 0
+        activeCategory = options[(current + step + options.count) % options.count]
+    }
+
+    /// Drops a chip the active tab doesn't show (no items of its types).
+    private func dropUnavailableCategory() {
+        guard let activeCategory, !categoryChips.contains(where: { $0.selection == activeCategory }) else { return }
+        self.activeCategory = nil
     }
 
     var body: some View {
@@ -205,7 +245,7 @@ struct QuickPickerView: View {
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
                         if !Task.isCancelled {
-                            await performSearch(newValue)
+                            await performSearch()
                         }
                     }
                 } else {
@@ -217,8 +257,16 @@ struct QuickPickerView: View {
                 selectedIndex = 0
                 selectionAnchor = nil
                 searchTask?.cancel()
+                loadTabCounts()
+                dropUnavailableCategory()
                 reloadForActiveTab()
                 isSearchFocused = true
+            }
+            .onChange(of: activeCategory) { _, _ in
+                selectedIndex = 0
+                selectionAnchor = nil
+                searchTask?.cancel()
+                reloadForActiveTab()
             }
             .onChange(of: filteredItems.count) { _, newCount in
                 if selectedIndex >= newCount {
@@ -237,6 +285,16 @@ struct QuickPickerView: View {
             dragHandle
             searchBar
             tabBar
+            if !categoryChips.isEmpty {
+                QPCategoryBar(chips: categoryChips, selection: activeCategory) { selection in
+                    activeCategory = selection
+                    // Same focus re-grab as the tab pills.
+                    isSearchFocused = false
+                    DispatchQueue.main.async {
+                        isSearchFocused = true
+                    }
+                }
+            }
             Divider()
             QPItemList(
                 filteredItems: filteredItems,
@@ -265,7 +323,9 @@ struct QuickPickerView: View {
                 },
                 onEdit: { item in
                     openItemEditor(for: item)
-                }
+                },
+                badgeCategories: badgeCategories,
+                showLanguage: showsLanguageBadge
             )
             footerBar
         }
@@ -312,6 +372,12 @@ struct QuickPickerView: View {
             tabInterceptor.onOptionReturn = {
                 performOptionReturn()
             }
+            tabInterceptor.onOptionLeft = {
+                cycleCategory(by: -1)
+            }
+            tabInterceptor.onOptionRight = {
+                cycleCategory(by: 1)
+            }
             tabInterceptor.onOptionE = {
                 guard let item = filteredItems[safe: selectedIndex] else { return }
                 openItemEditor(for: item)
@@ -349,7 +415,9 @@ struct QuickPickerView: View {
                 .font(.system(size: 14, weight: .medium))
 
             TextField(
-                activeTab == .favorites ? "Search favorites..." : "Search clipboard...",
+                activeTab == .favorites
+                    ? "Search favorites… (is:link, app:Safari, lang:uk)"
+                    : "Search clipboard… (is:link, app:Safari, lang:uk)",
                 text: $searchText
             )
                 .textFieldStyle(.plain)
@@ -619,6 +687,9 @@ struct QuickPickerView: View {
     /// a full scan, which the view model caches until the history changes.
     private func loadTabCounts() {
         typeCounts = viewModel.itemTypeCounts()
+        facets = activeTab == .favorites
+            ? FacetCounts(items: viewModel.favoriteItems)
+            : viewModel.facetCounts(ofTypes: activeTab.itemTypes)
     }
 
     private func togglePinForSelection() {
@@ -723,12 +794,11 @@ struct QuickPickerView: View {
     }
 
     private func reloadForActiveTab() {
-        // Switching tabs keeps an active search instead of listing the tab's
-        // newest rows and filtering only those.
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !query.isEmpty && activeTab != .favorites {
+        // Switching tabs keeps an active search (or chip) instead of listing
+        // the tab's newest rows and filtering only those.
+        if !itemFilter.isEmpty && activeTab != .favorites {
             searchTask?.cancel()
-            searchTask = Task { await performSearch(query) }
+            searchTask = Task { await performSearch() }
             return
         }
 
@@ -1093,10 +1163,13 @@ struct QuickPickerView: View {
     }
 
     /// Searches the whole history (limited to the tab's types), not just the
-    /// newest 300 rows as before. Runs inside `searchTask`; a newer search or
-    /// tab switch cancels it.
-    private func performSearch(_ searchTerm: String) async {
-        let found = await viewModel.searchItems(matching: searchTerm, types: activeTab.itemTypes)
+    /// newest 300 rows as before. Runs inside `searchTask`; a newer search,
+    /// chip or tab switch cancels it. A chip or tokens alone check only
+    /// inline columns, so they list every match; free text stops at 300.
+    private func performSearch() async {
+        let filter = itemFilter
+        let limit = filter.isCheap ? Int.max : 300
+        let found = await viewModel.searchItems(filter: filter, types: activeTab.itemTypes, limit: limit)
         guard !Task.isCancelled else { return }
         quickPickerItems = found
         hasMoreItems = false
@@ -1131,6 +1204,10 @@ final class TabKeyInterceptor: ObservableObject {
     // ⌥E opens the item editor. By key code: ⌥E is a dead key (´) on the US
     // layout and would start a composed character in the search field.
     var onOptionE: (() -> Void)?
+    // ⌥← / ⌥→ step through the category chips. Swallowed, so the search
+    // field doesn't jump a word; ⇧⌥← / ⇧⌥→ still select words.
+    var onOptionLeft: (() -> Void)?
+    var onOptionRight: (() -> Void)?
 
     enum EditorKey {
         case save, cancel, moveUp, moveDown, toggleFavorite
@@ -1149,6 +1226,8 @@ final class TabKeyInterceptor: ObservableObject {
     private static let escapeKeyCode: UInt16 = 53
     private static let upArrowKeyCode: UInt16 = 126
     private static let downArrowKeyCode: UInt16 = 125
+    private static let leftArrowKeyCode: UInt16 = 123
+    private static let rightArrowKeyCode: UInt16 = 124
     private static let returnKeyCodes: Set<UInt16> = [36, 76]  // Return, keypad Enter
 
     func start() {
@@ -1172,6 +1251,8 @@ final class TabKeyInterceptor: ObservableObject {
         onOptionP = nil
         onOptionReturn = nil
         onOptionE = nil
+        onOptionLeft = nil
+        onOptionRight = nil
         onEditorKey = nil
     }
 
@@ -1180,6 +1261,19 @@ final class TabKeyInterceptor: ObservableObject {
 
         if let onEditorKey {
             return interceptForEditor(event, flags: flags, handler: onEditorKey)
+        }
+
+        // ⌥← / ⌥→ (no Shift/Control/Command).
+        if event.keyCode == Self.leftArrowKeyCode || event.keyCode == Self.rightArrowKeyCode,
+           flags.contains(.option),
+           !flags.contains(.shift),
+           !flags.contains(.control),
+           !flags.contains(.command) {
+            let isLeft = event.keyCode == Self.leftArrowKeyCode
+            DispatchQueue.main.async { [weak self] in
+                if isLeft { self?.onOptionLeft?() } else { self?.onOptionRight?() }
+            }
+            return nil
         }
 
         // ⌥E (no Control/Command).
