@@ -61,6 +61,7 @@ struct QuickPickerView: View {
     @State private var chipSelection = ChipSelection()
     /// Category, language and app counts for the active tab's chips.
     @State private var facets = FacetCounts()
+    @State private var countsReloadTask: Task<Void, Never>?
     /// The open ⌥E editor, nil when closed.
     @State private var itemEditor: QPItemEditorModel?
     @FocusState private var isSearchFocused: Bool
@@ -267,8 +268,15 @@ struct QuickPickerView: View {
             }
             .onChange(of: viewModel.countsRevision) { _, _ in
                 // A capture or a background rescan while the picker is open.
-                loadTabCounts()
-                dropUnavailableCategory()
+                // Counting scans the whole history, so a burst of changes
+                // (a rescan, favorites toggled in a row) recounts once.
+                countsReloadTask?.cancel()
+                countsReloadTask = Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard !Task.isCancelled else { return }
+                    loadTabCounts()
+                    dropUnavailableCategory()
+                }
             }
             .onChange(of: chipSelection.selected) { _, _ in
                 selectedIndex = 0
@@ -399,6 +407,7 @@ struct QuickPickerView: View {
         }
         .onDisappear {
             tabInterceptor.stop()
+            countsReloadTask?.cancel()
         }
     }
 
