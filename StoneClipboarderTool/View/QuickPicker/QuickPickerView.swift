@@ -219,8 +219,11 @@ struct QuickPickerView: View {
                 guard triggerKey == .space else { return .ignored }
                 return handlePreviewTrigger()
             }
-            .onKeyPress(.rightArrow) {
-                guard triggerKey == .arrowRight else { return .ignored }
+            .onKeyPress(keys: [.rightArrow]) { keyPress in
+                // ⌥→ / ⌘→ move the cursor (by word, to the end); only a
+                // plain → opens the preview.
+                guard triggerKey == .arrowRight, keyPress.modifiers.isDisjoint(with: [.option, .command, .control])
+                else { return .ignored }
                 // Only open QL when cursor is at the end of search text
                 if isSearchFocused && !searchText.isEmpty,
                    let fieldEditor = NSApp.keyWindow?.firstResponder as? NSTextView {
