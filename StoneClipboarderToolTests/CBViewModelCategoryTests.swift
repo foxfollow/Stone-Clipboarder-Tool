@@ -287,7 +287,7 @@ final class CBViewModelCategoryTests: XCTestCase {
         try context.save()
 
         viewModel.rememberRecognizedText("Scan me", forItemWithID: image.persistentModelID)
-        XCTAssertEqual(image.classificationStamp, 0, "still due")
+        XCTAssertTrue(image.needsVisualPass(viewModel.classifierRuleset), "still due for its visual pass")
         XCTAssertEqual(image.textRecognitionState, CBItem.TextRecognition.found)
 
         await viewModel.reclassifyStaleItems()
@@ -308,7 +308,7 @@ final class CBViewModelCategoryTests: XCTestCase {
         XCTAssertFalse(context.hasChanges)
     }
 
-    func testFailedVisionIsRetriedAtTheNextLaunch() async throws {
+    func testFailedVisionIsRetriedAtTheNextLaunchesAFewTimes() async throws {
         let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
         image.textRecognitionState = CBItem.TextRecognition.pending
         image.classify(with: viewModel.classifierRuleset, image: .failed(analyzeVisual: true, recognizeText: true))
@@ -316,36 +316,54 @@ final class CBViewModelCategoryTests: XCTestCase {
         try context.save()
 
         XCTAssertEqual(image.visualAnalysisVersion, -ImageClassifier.visualVersion)
-        XCTAssertEqual(image.textRecognitionState, CBItem.TextRecognition.notRequested, "can be queued again")
+        XCTAssertEqual(image.textRecognitionState, CBItem.TextRecognition.failed)
+        XCTAssertEqual(image.imageAnalysisFailures, 1)
+        XCTAssertEqual(viewModel.imagesWithoutTextRecognition(), 1, "can be queued by hand")
         let classified = await viewModel.reclassifyStaleItems()
         XCTAssertEqual(classified, 0, "not retried in the same session")
 
         viewModel.retryFailedImageAnalysis()
         XCTAssertEqual(image.visualAnalysisVersion, 0)
+        XCTAssertEqual(image.textRecognitionState, CBItem.TextRecognition.pending, "OCR is retried too")
         await viewModel.reclassifyStaleItems()
         XCTAssertEqual(image.visualAnalysisVersion, ImageClassifier.visualVersion, "undecodable data: done for good")
+        XCTAssertEqual(image.textRecognitionState, CBItem.TextRecognition.noText)
+
+        // Failing every time: the launch retry gives up after maxRetries.
+        let stubborn = CBItem(timestamp: Date(), imageData: Data([2]), itemType: .image)
+        context.insert(stubborn)
+        for _ in 0..<ImageClassifier.maxRetries {
+            stubborn.classify(with: viewModel.classifierRuleset, image: .failed(analyzeVisual: true, recognizeText: false))
+        }
+        try context.save()
+        viewModel.retryFailedImageAnalysis()
+        XCTAssertEqual(stubborn.visualAnalysisVersion, -ImageClassifier.visualVersion)
     }
 
-    func testANewVisualVersionOrTheSwitchReachesUpToDateItems() async throws {
+    func testTheImageSwitchAndVersionsOnlyReachImages() async throws {
         let ruleset = viewModel.classifierRuleset
         let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
         image.classificationStamp = ruleset.stamp  // rules are current, the visual pass isn't
         let text = CBItem(timestamp: Date(), content: "plain", itemType: .text)
-        text.classificationStamp = ruleset.stamp
+        text.classify(with: ruleset)
         text.categoryKeys = ",marker,"
-        context.insert(image)
-        context.insert(text)
+        let fromNewerBuild = CBItem(timestamp: Date(), imageData: Data([3]), itemType: .image)
+        fromNewerBuild.classificationStamp = ruleset.stamp
+        fromNewerBuild.visualAnalysisVersion = ImageClassifier.visualVersion + 1
+        [image, text, fromNewerBuild].forEach(context.insert)
         try context.save()
+        XCTAssertEqual(text.visualAnalysisVersion, CBItem.visualNotApplicable)
 
-        await viewModel.reclassifyStaleItems()
+        let classified = await viewModel.reclassifyStaleItems()
+        XCTAssertEqual(classified, 1, "only the image that's due")
         XCTAssertEqual(image.visualAnalysisVersion, ImageClassifier.visualVersion)
-        XCTAssertEqual(text.visualAnalysisVersion, ImageClassifier.visualVersion)
-        XCTAssertEqual(text.categoryKeys, ",marker,", "text isn't read again for the image switch")
+        XCTAssertEqual(fromNewerBuild.visualAnalysisVersion, ImageClassifier.visualVersion + 1, "a newer result is kept")
 
         viewModel.updateClassifierRules([], analyzeImages: false)
-        await waitUntil { text.visualAnalysisVersion == 0 && image.visualAnalysisVersion == 0 }
-        XCTAssertEqual(text.categoryKeys, ",marker,")
+        await waitUntil { image.visualAnalysisVersion == 0 }
         XCTAssertEqual(image.visualAnalysisVersion, 0)
+        XCTAssertEqual(text.categoryKeys, ",marker,", "text isn't read for the image switch")
+        XCTAssertEqual(text.visualAnalysisVersion, CBItem.visualNotApplicable)
     }
 
     func testTurningAutomaticOCROffCancelsWhatItQueued() throws {

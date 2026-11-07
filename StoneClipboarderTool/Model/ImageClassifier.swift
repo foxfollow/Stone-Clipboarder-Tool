@@ -28,6 +28,8 @@ enum ImageClassifier {
 
     /// Bump when the visual pass changes, so images get it again.
     static let visualVersion = 1
+    /// Launches that retry a failed image before giving up on it.
+    static let maxRetries = 3
 
     /// Keys only the visual pass produces.
     static let visualKeys: Set<String> = [

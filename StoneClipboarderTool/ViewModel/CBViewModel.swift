@@ -375,10 +375,6 @@ class CBViewModel: ObservableObject {
                 if settingsManager?.recognizeTextInNewImages ?? true {
                     item.textRecognitionState = CBItem.TextRecognition.pending
                 }
-                if item.needsVisualPass(classifierRuleset) || item.wantsTextRecognition {
-                    // Text is classified; the image waits for the background pass.
-                    item.classificationStamp = 0
-                }
             }
             modelContext.insert(item)
         }
@@ -391,7 +387,8 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
             performCleanupIfNeeded()
-            if item.classificationStamp != classifierRuleset.stamp && reclassifyTask == nil {
+            // The image's Vision work happens in the background pass.
+            if (item.needsVisualPass(classifierRuleset) || item.wantsTextRecognition) && reclassifyTask == nil {
                 reclassifyIfNeeded()
             }
         } catch {
@@ -789,26 +786,19 @@ class CBViewModel: ObservableObject {
     }
 
     /// Pages of 100 items that are out of date: stamped with other rules,
-    /// waiting for OCR, or not at `CBItem.visualTarget` (the visual pass
-    /// switched on, off, or changed version). Text-like items are
-    /// classified on the main actor in small batches with a run-loop turn
-    /// between them. Images that need Vision go to `ImageClassifier` off
-    /// the main thread, a few at a time, read through a throwaway
-    /// background context so their bytes don't stay loaded in the main
-    /// one. Every item leaves the pass up to date (failed Vision requests
-    /// are marked for the next launch), so the pass always ends. Returns
-    /// how many items were classified.
+    /// waiting for OCR, or due for the visual pass (switched on with an
+    /// older or no result) or for clearing it (switched off). Text-like
+    /// items are classified on the main actor in small batches with a
+    /// run-loop turn between them. Images that need Vision go to
+    /// `ImageClassifier` off the main thread, a few at a time, read through
+    /// a throwaway background context so their bytes don't stay loaded in
+    /// the main one. Every item leaves the pass up to date (failed Vision
+    /// requests are marked for the next launch), so the pass always ends.
+    /// Returns how many items were classified.
     @discardableResult
     func reclassifyStaleItems() async -> Int {
         guard let modelContext = _modelContext else { return 0 }
         let ruleset = classifierRuleset
-        let stamp = ruleset.stamp
-        let pending = CBItem.TextRecognition.pending
-        let queued = CBItem.TextRecognition.queued
-        let visualTarget = CBItem.visualTarget(for: ruleset)
-        // Failed images wait for the next launch while the pass is on; when
-        // it's off they're cleared like the rest.
-        let failedVisual = ruleset.analyzeImages ? -ImageClassifier.visualVersion : Int.min
         var classified = 0
         updatePendingTextRecognitionCount()
         defer { updatePendingTextRecognitionCount() }
@@ -816,37 +806,33 @@ class CBViewModel: ObservableObject {
         func needsVision(_ item: CBItem) -> Bool {
             item.needsVisualPass(ruleset) || (item.hasAnalyzableImage && item.wantsTextRecognition)
         }
-        /// Not deleted, here or (saved) in another turn.
-        func isAlive(_ item: CBItem) -> Bool { item.modelContext != nil && !item.isDeleted }
 
         pages: while !Task.isCancelled {
-            var descriptor = FetchDescriptor<CBItem>(predicate: #Predicate {
-                $0.classificationStamp != stamp || $0.textRecognitionState == pending
-                    || $0.textRecognitionState == queued
-                    || ($0.visualAnalysisVersion != visualTarget && $0.visualAnalysisVersion != failedVisual)
-            })
-            descriptor.fetchLimit = Self.reclassifyPageSize
             let page: [CBItem]
             do {
-                page = try modelContext.fetch(descriptor)
+                page = try modelContext.fetch(Self.staleItemsDescriptor(for: ruleset))
             } catch {
                 ErrorLogger.shared.log("Failed to fetch items to classify", category: "SwiftData", error: error)
                 break
             }
             guard !page.isEmpty else { break }
 
-            if await !classifyWithoutVision(page.filter { !needsVision($0) }, ruleset: ruleset, in: modelContext) {
+            // Split before any await: after a pause an item may be deleted.
+            let images = page.filter(needsVision)
+            let others = page.filter { !needsVision($0) }
+            if await !classifyWithoutVision(others, ruleset: ruleset, in: modelContext) {
                 break
             }
             classified += page.count
 
-            var images = page.filter(needsVision)
-            while !images.isEmpty {
-                let chunk = Array(images.prefix(Self.imageChunkSize))
-                images.removeFirst(chunk.count)
-                // State may have changed during a pause (Stop, the user's OCR).
-                let live = chunk.filter { isAlive($0) && needsVision($0) }
-                let settled = chunk.filter { isAlive($0) && !needsVision($0) }
+            var remaining = images
+            while !remaining.isEmpty {
+                let chunk = Array(remaining.prefix(Self.imageChunkSize))
+                remaining.removeFirst(chunk.count)
+                // State may have changed during a pause (deleted, Stop, the
+                // user's OCR); `isAlive` is checked before anything else.
+                let live = chunk.filter { $0.isAlive && needsVision($0) }
+                let settled = chunk.filter { $0.isAlive && !needsVision($0) }
                 settled.forEach { $0.classify(with: ruleset) }
                 let requests = live.map {
                     ImageRequest(
@@ -856,7 +842,7 @@ class CBViewModel: ObservableObject {
                 let results = requests.isEmpty
                     ? [:] : await Self.analyzeImages(requests, container: modelContext.container)
                 guard !Task.isCancelled else { break pages }
-                for (item, request) in zip(live, requests) where isAlive(item) {
+                for (item, request) in zip(live, requests) where item.isAlive {
                     var result = results[request.id]
                         ?? .failed(analyzeVisual: request.analyzeVisual, recognizeText: request.recognizeText)
                     if request.recognizeText && !item.wantsTextRecognition {
@@ -879,6 +865,36 @@ class CBViewModel: ObservableObject {
         return classified
     }
 
+    /// Items `reclassifyStaleItems` has to look at, 100 at a time. Items
+    /// without an image are `CBItem.visualNotApplicable`, so the image
+    /// switch and visual version only reach images.
+    private static func staleItemsDescriptor(for ruleset: ContentClassifier.Ruleset) -> FetchDescriptor<CBItem> {
+        let stamp = ruleset.stamp
+        let pending = CBItem.TextRecognition.pending
+        let queued = CBItem.TextRecognition.queued
+        let current = ImageClassifier.visualVersion
+        let failedCurrent = -ImageClassifier.visualVersion
+        let notApplicable = CBItem.visualNotApplicable
+        var descriptor: FetchDescriptor<CBItem>
+        if ruleset.analyzeImages {
+            // Due: 0 or an older version, not done or failed (here or newer).
+            descriptor = FetchDescriptor(predicate: #Predicate {
+                $0.classificationStamp != stamp || $0.textRecognitionState == pending
+                    || $0.textRecognitionState == queued
+                    || ($0.visualAnalysisVersion < current && $0.visualAnalysisVersion > failedCurrent)
+            })
+        } else {
+            // Switched off: images with visual results get them cleared.
+            descriptor = FetchDescriptor(predicate: #Predicate {
+                $0.classificationStamp != stamp || $0.textRecognitionState == pending
+                    || $0.textRecognitionState == queued
+                    || ($0.visualAnalysisVersion != 0 && $0.visualAnalysisVersion != notApplicable)
+            })
+        }
+        descriptor.fetchLimit = reclassifyPageSize
+        return descriptor
+    }
+
     /// Classifies `items` 20 at a time with a run-loop turn between
     /// batches. False when saving failed or the task was cancelled.
     private func classifyWithoutVision(
@@ -888,10 +904,10 @@ class CBViewModel: ObservableObject {
         while start < items.count {
             let batch = items[start..<min(start + Self.textBatchSize, items.count)]
             start += batch.count
-            for item in batch where item.modelContext != nil && !item.isDeleted {
+            for item in batch where item.isAlive {
                 if item.classificationStamp == ruleset.stamp && !item.hasAnalyzableImage && !item.wantsTextRecognition {
-                    // Only the image switch changed: no need to read the text again.
-                    item.visualAnalysisVersion = CBItem.visualTarget(for: ruleset)
+                    // A row from before `visualNotApplicable`: no need to read the text again.
+                    item.visualAnalysisVersion = CBItem.visualNotApplicable
                 } else {
                     item.classify(with: ruleset)
                 }
@@ -972,10 +988,14 @@ class CBViewModel: ObservableObject {
     private func unrecognizedImages() -> [CBItem] {
         guard let modelContext = _modelContext else { return [] }
         let notRequested = CBItem.TextRecognition.notRequested
+        let failed = CBItem.TextRecognition.failed
         // Filtered in memory: `itemType` can't be tested in a predicate, and
         // `imageSize` is nil on old or undecodable images. Only inline
-        // columns are read, no content.
-        let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.textRecognitionState == notRequested })
+        // columns are read, no content. Images whose OCR failed for good
+        // can be tried again from here.
+        let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate {
+            $0.textRecognitionState == notRequested || $0.textRecognitionState == failed
+        })
         do {
             return try modelContext.fetch(descriptor).filter(\.hasAnalyzableImage)
         } catch {
@@ -1009,7 +1029,9 @@ class CBViewModel: ObservableObject {
         guard let modelContext = _modelContext else { return }
         do {
             let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.textRecognitionState == state })
-            for item in try modelContext.fetch(descriptor) {
+            let items = try modelContext.fetch(descriptor)
+            guard !items.isEmpty else { return }
+            for item in items {
                 item.textRecognitionState = CBItem.TextRecognition.notRequested
             }
             try modelContext.save()
@@ -1022,16 +1044,29 @@ class CBViewModel: ObservableObject {
     }
 
     /// Failed Vision requests get another try: called once at launch,
-    /// before the first rescan.
+    /// before the first rescan. An image that failed
+    /// `ImageClassifier.maxRetries` times is left alone ("Recognize Text in
+    /// All Images" can still queue its OCR).
     func retryFailedImageAnalysis() {
         guard let modelContext = _modelContext else { return }
-        let failed = -ImageClassifier.visualVersion
+        let failedVisual = -ImageClassifier.visualVersion
+        let failedText = CBItem.TextRecognition.failed
+        let maxRetries = ImageClassifier.maxRetries
         do {
-            let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.visualAnalysisVersion == failed })
+            let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate {
+                ($0.visualAnalysisVersion == failedVisual || $0.textRecognitionState == failedText)
+                    && $0.imageAnalysisFailures < maxRetries
+            })
             let items = try modelContext.fetch(descriptor)
             guard !items.isEmpty else { return }
-            items.forEach { $0.visualAnalysisVersion = 0 }
+            for item in items {
+                if item.visualAnalysisVersion == failedVisual { item.visualAnalysisVersion = 0 }
+                if item.textRecognitionState == failedText {
+                    item.textRecognitionState = CBItem.TextRecognition.pending
+                }
+            }
             try modelContext.save()
+            fetchItems(reset: true)
         } catch {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to reset image analysis", category: "SwiftData", error: error)
@@ -1052,13 +1087,8 @@ class CBViewModel: ObservableObject {
             // Only the OCR text: barcode payloads live in `barcodeText`.
             item.setRecognizedText(text)
             item.textRecognitionState = CBItem.TextRecognition.found
-            let previousStamp = item.classificationStamp
+            // A visual pass still due is picked up by visualAnalysisVersion.
             item.classify(with: classifierRuleset)
-            // Still due for the background pass (a new capture's visual
-            // pass, or other rules): keep it due.
-            if previousStamp != classifierRuleset.stamp {
-                item.classificationStamp = previousStamp
-            }
 
             try modelContext.save()
             fetchItems(reset: true)
