@@ -356,9 +356,15 @@ class CBViewModel: ObservableObject {
         } else {
             item = makeItem()
             item.classify(with: classifierRuleset)
-            if classifierRuleset.analyzeImages && item.hasAnalyzableImage {
-                // Text is classified; the image waits for the background pass.
-                item.classificationStamp = 0
+            if item.hasAnalyzableImage {
+                // OCR runs once, for new images only (unless asked for all).
+                if settingsManager?.recognizeTextInNewImages ?? true {
+                    item.textRecognitionState = CBItem.TextRecognition.pending
+                }
+                if classifierRuleset.analyzeImages || item.textRecognitionState == CBItem.TextRecognition.pending {
+                    // Text is classified; the image waits for the background pass.
+                    item.classificationStamp = 0
+                }
             }
             modelContext.insert(item)
         }
@@ -761,20 +767,27 @@ class CBViewModel: ObservableObject {
         }
     }
 
-    /// Pages of 100 with a run-loop turn between them, like the search.
-    /// Text is classified here; images go to `ImageClassifier` off the main
-    /// thread, a few at a time, read through a throwaway background context
-    /// so their bytes don't stay loaded in the main one. Returns how many
-    /// items were classified.
+    /// Pages of 100 with a run-loop turn between them, like the search:
+    /// items stamped with other rules, and images waiting for OCR.
+    /// Text is classified here; images that need Vision (the visual pass
+    /// when "Analyze images" is on, OCR when pending) go to
+    /// `ImageClassifier` off the main thread, a few at a time, read through
+    /// a throwaway background context so their bytes don't stay loaded in
+    /// the main one. Returns how many items were classified.
     @discardableResult
     func reclassifyStaleItems() async -> Int {
         guard let modelContext = _modelContext else { return 0 }
         let ruleset = classifierRuleset
         let stamp = ruleset.stamp
+        let pending = CBItem.TextRecognition.pending
         var classified = 0
+        updatePendingTextRecognitionCount()
+        defer { updatePendingTextRecognitionCount() }
 
         pages: while !Task.isCancelled {
-            var descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.classificationStamp != stamp })
+            var descriptor = FetchDescriptor<CBItem>(predicate: #Predicate {
+                $0.classificationStamp != stamp || $0.textRecognitionState == pending
+            })
             descriptor.fetchLimit = Self.reclassifyPageSize
             let page: [CBItem]
             do {
@@ -785,8 +798,11 @@ class CBViewModel: ObservableObject {
             }
             guard !page.isEmpty else { break }
 
-            let images = ruleset.analyzeImages ? page.filter(\.hasAnalyzableImage) : []
-            for item in page where !(ruleset.analyzeImages && item.hasAnalyzableImage) {
+            func needsVision(_ item: CBItem) -> Bool {
+                item.hasAnalyzableImage && (ruleset.analyzeImages || item.textRecognitionState == pending)
+            }
+            let images = page.filter(needsVision)
+            for item in page where !needsVision(item) {
                 item.classify(with: ruleset)
             }
             guard saveCategories(in: modelContext) else { break }
@@ -796,8 +812,11 @@ class CBViewModel: ObservableObject {
             while start < images.count {
                 let chunk = Array(images[start..<min(start + Self.imageChunkSize, images.count)])
                 start += chunk.count
+                let requests = chunk.map {
+                    ImageRequest(id: $0.persistentModelID, recognizeText: $0.textRecognitionState == pending)
+                }
                 let results = await Self.analyzeImages(
-                    chunk.map(\.persistentModelID), container: modelContext.container, ruleset: ruleset)
+                    requests, container: modelContext.container, analyzeVisual: ruleset.analyzeImages)
                 guard !Task.isCancelled else { break pages }
                 // Deleted meanwhile: nothing to write.
                 for item in chunk where !item.isDeleted {
@@ -805,6 +824,7 @@ class CBViewModel: ObservableObject {
                 }
                 guard saveCategories(in: modelContext) else { break pages }
                 classified += chunk.count
+                updatePendingTextRecognitionCount()
             }
             guard await pauseBetweenPages() else { break }
         }
@@ -830,22 +850,88 @@ class CBViewModel: ObservableObject {
         }
     }
 
+    private struct ImageRequest {
+        let id: PersistentIdentifier
+        let recognizeText: Bool
+    }
+
     /// Runs `ImageClassifier` on a utility-priority thread with its own
     /// context, so the image bytes are released when it ends.
     nonisolated private static func analyzeImages(
-        _ ids: [PersistentIdentifier], container: ModelContainer, ruleset: ContentClassifier.Ruleset
+        _ requests: [ImageRequest], container: ModelContainer, analyzeVisual: Bool
     ) async -> [PersistentIdentifier: ImageClassifier.Result] {
         await Task.detached(priority: .utility) {
             let context = ModelContext(container)
             var results: [PersistentIdentifier: ImageClassifier.Result] = [:]
-            for id in ids {
+            for request in requests {
+                let id = request.id
                 let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.persistentModelID == id })
                 guard let item = try? context.fetch(descriptor).first,
                       let data = item.analyzableImageData else { continue }
-                results[id] = ImageClassifier.classify(data, ruleset: ruleset)
+                results[id] = ImageClassifier.classify(
+                    data, analyzeVisual: analyzeVisual, recognizeText: request.recognizeText)
             }
             return results
         }.value
+    }
+
+    // MARK: - Text recognition
+
+    /// Images waiting for OCR; drives the progress in Settings.
+    @Published private(set) var pendingTextRecognitionCount = 0
+
+    private func updatePendingTextRecognitionCount() {
+        guard let modelContext = _modelContext else { return }
+        let pending = CBItem.TextRecognition.pending
+        let count = (try? modelContext.fetchCount(
+            FetchDescriptor<CBItem>(predicate: #Predicate { $0.textRecognitionState == pending }))) ?? 0
+        if count != pendingTextRecognitionCount { pendingTextRecognitionCount = count }
+    }
+
+    /// Images OCR never ran on, for "Recognize Text in All Images…".
+    func imagesWithoutTextRecognition() -> Int {
+        unrecognizedImages().count
+    }
+
+    private func unrecognizedImages() -> [CBItem] {
+        guard let modelContext = _modelContext else { return [] }
+        let notRequested = CBItem.TextRecognition.notRequested
+        let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.textRecognitionState == notRequested })
+        do {
+            return try modelContext.fetch(descriptor).filter(\.hasAnalyzableImage)
+        } catch {
+            ErrorLogger.shared.log("Failed to count images for OCR", category: "SwiftData", error: error)
+            return []
+        }
+    }
+
+    /// Queues OCR for every image it never ran on; the background pass does
+    /// the work, a few images at a time.
+    func recognizeTextInAllImages() {
+        guard let modelContext = _modelContext else { return }
+        let images = unrecognizedImages()
+        guard !images.isEmpty else { return }
+        images.forEach { $0.textRecognitionState = CBItem.TextRecognition.pending }
+        guard saveCategories(in: modelContext) else { return }
+        updatePendingTextRecognitionCount()
+        if reclassifyTask == nil { reclassifyIfNeeded() }
+    }
+
+    /// Stops a "Recognize Text in All Images" run: what's left goes back
+    /// to not requested.
+    func stopTextRecognition() {
+        guard let modelContext = _modelContext else { return }
+        let pending = CBItem.TextRecognition.pending
+        do {
+            let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.textRecognitionState == pending })
+            for item in try modelContext.fetch(descriptor) {
+                item.textRecognitionState = CBItem.TextRecognition.notRequested
+            }
+        } catch {
+            ErrorLogger.shared.log("Failed to stop text recognition", category: "SwiftData", error: error)
+        }
+        _ = saveCategories(in: modelContext)
+        updatePendingTextRecognitionCount()
     }
 
     /// Keeps text the user's OCR (⌥⏎, "Extract Text") found in an image on
@@ -859,14 +945,9 @@ class CBViewModel: ObservableObject {
             guard let item = try modelContext.fetch(descriptor).first, !item.isDeleted,
                   item.hasAnalyzableImage else { return }
             item.setRecognizedText(text)
-            guard let stored = item.recognizedText else { return }
-
-            let found = ContentClassifier.classify(stored, ruleset: classifierRuleset)
-            var keys = item.categoryKeySet
-            keys.formUnion(found.keys.filter { !$0.hasSuffix(".full") })
-            keys.insert(ItemCategory.BuiltIn.ocr.rawValue)
-            item.categoryKeys = CBItem.encodeKeys(keys)
-            if item.languageCode == nil { item.languageCode = found.language }
+            guard item.recognizedText != nil else { return }
+            item.textRecognitionState = CBItem.TextRecognition.found
+            item.classify(with: classifierRuleset, keepingVisualKeys: true)
 
             try modelContext.save()
             refreshItemCounts()

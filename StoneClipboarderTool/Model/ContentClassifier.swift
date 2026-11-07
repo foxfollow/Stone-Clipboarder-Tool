@@ -16,7 +16,7 @@ import NaturalLanguage
 /// match covers the whole (trimmed) text.
 enum ContentClassifier {
     /// Bump when detection changes, so stored results are recomputed.
-    static let version = 3
+    static let version = 4
     /// Only this many leading characters are examined: keeps a capture
     /// fast and bounds what a user regex has to scan.
     static let maxLength = 4000

@@ -6,46 +6,52 @@ import XCTest
 /// Vision runs on the device, so these use generated images.
 final class ImageClassifierTests: XCTestCase {
 
-    func testTextInImageFeedsTheTextCategories() throws {
-        let png = try Self.render(width: 1200, height: 260) {
+    private func textImage() throws -> Data {
+        try Self.render(width: 1200, height: 260) {
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 48), .foregroundColor: NSColor.black,
             ]
             ("Visit https://stone.example.com" as NSString).draw(at: NSPoint(x: 40, y: 150), withAttributes: attributes)
             ("Write to hello@example.com" as NSString).draw(at: NSPoint(x: 40, y: 50), withAttributes: attributes)
         }
-
-        let result = ImageClassifier.classify(png)
-
-        XCTAssertTrue(result.keys.contains("ocr"), "\(result.keys)")
-        XCTAssertTrue(result.keys.contains("link"), "\(result.keys)")
-        XCTAssertTrue(result.keys.contains("email"), "\(result.keys)")
-        XCTAssertFalse(result.keys.contains { $0.hasSuffix(".full") }, "no entire-text keys for images")
-        XCTAssertFalse(result.keys.contains("transparent"))
-        XCTAssertTrue(result.text?.contains("stone.example.com") == true, "the text is kept for search")
     }
 
-    func testRegexRulesSeeTheRecognizedText() throws {
-        let png = try Self.render(width: 900, height: 160) {
-            ("Invoice 2026-0042" as NSString).draw(
-                at: NSPoint(x: 40, y: 50),
-                withAttributes: [.font: NSFont.systemFont(ofSize: 56), .foregroundColor: NSColor.black])
+    func testTextRecognition() throws {
+        let result = ImageClassifier.classify(try textImage(), analyzeVisual: false)
+
+        XCTAssertTrue(result.didRecognizeText)
+        XCTAssertTrue(result.foundText)
+        XCTAssertTrue(result.recognizedText?.contains("stone.example.com") == true)
+        XCTAssertTrue(result.keys.isEmpty, "the visual pass didn't run")
+    }
+
+    func testRecognizedTextFeedsTheTextCategories() throws {
+        let item = CBItem(timestamp: Date(), imageData: try textImage(), itemType: .image)
+        let rule = ContentClassifier.RegexRule(id: "visit", pattern: #"visit\s+https"#, caseSensitive: false)
+
+        item.classify(with: .init(rules: [rule]), image: ImageClassifier.classify(item.imageData!))
+
+        XCTAssertEqual(item.textRecognitionState, CBItem.TextRecognition.found)
+        for key in ["ocr", "link", "email", "visit"] {
+            XCTAssertTrue(item.hasCategoryKey(key), "\(key) in \(item.categoryKeySet)")
         }
-        let rule = ContentClassifier.RegexRule(id: "invoice", pattern: #"invoice\s+\d{4}"#, caseSensitive: false)
+        XCTAssertFalse(item.categoryKeySet.contains { $0.hasSuffix(".full") }, "no entire-text keys for images")
+        XCTAssertFalse(item.hasCategoryKey("transparent"))
+    }
 
-        let result = ImageClassifier.classify(png, ruleset: .init(rules: [rule]))
-
-        XCTAssertTrue(result.keys.contains("invoice"), "\(result.keys)")
+    func testVisualPassOnlySkipsOCR() throws {
+        let result = ImageClassifier.classify(try textImage(), recognizeText: false)
+        XCTAssertFalse(result.didRecognizeText)
+        XCTAssertFalse(result.foundText)
+        XCTAssertEqual(ImageClassifier.classify(try textImage(), analyzeVisual: false, recognizeText: false),
+                       ImageClassifier.Result(), "nothing asked, nothing done")
     }
 
     func testQRCode() throws {
-        let png = try Self.qrCode("https://stone.example.com/qr")
+        let result = ImageClassifier.classify(try Self.qrCode("https://stone.example.com/qr"), recognizeText: false)
 
-        let result = ImageClassifier.classify(png)
-
-        XCTAssertTrue(result.keys.contains("barcode"), "\(result.keys)")
-        XCTAssertTrue(result.keys.contains("link"), "the payload is a link")
-        XCTAssertTrue(result.text?.contains("https://stone.example.com/qr") == true)
+        XCTAssertEqual(result.keys, ["barcode"])
+        XCTAssertEqual(result.payloads, ["https://stone.example.com/qr"])
     }
 
     func testTransparency() throws {
@@ -56,7 +62,10 @@ final class ImageClassifierTests: XCTestCase {
         XCTAssertTrue(ImageClassifier.classify(cutOut).keys.contains("transparent"))
 
         let blank = try Self.render(width: 200, height: 200) {}
-        XCTAssertEqual(ImageClassifier.classify(blank), ImageClassifier.Result(), "a blank opaque image has nothing")
+        let nothing = ImageClassifier.classify(blank)
+        XCTAssertTrue(nothing.keys.isEmpty, "a blank opaque image has nothing")
+        XCTAssertFalse(nothing.foundText)
+        XCTAssertEqual(nothing.recognizedText, "", "OCR ran and read nothing")
     }
 
     func testNotAnImage() {

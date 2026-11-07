@@ -83,9 +83,11 @@ final class CBViewModelCategoryTests: XCTestCase {
 
     func testCombinedItemsMergeTextAndImageResults() {
         let item = CBItem(timestamp: Date(), content: "Call +1 408 555 0123 now", imageData: Data([1]), itemType: .combined)
-        item.classify(with: .empty, image: ImageClassifier.Result(keys: ["ocr", "face"], language: "uk"))
+        let ukrainian = "Лист подяки від адміністрації державної служби за співпрацю"
+        item.classify(with: .empty, image: ImageClassifier.Result(keys: ["face"], recognizedText: ukrainian, foundText: true))
         XCTAssertTrue(item.hasCategoryKey("phone"))
         XCTAssertTrue(item.hasCategoryKey("face"))
+        XCTAssertTrue(item.hasCategoryKey("ocr"))
         XCTAssertEqual(item.languageCode, "uk", "the image's language when the text has none")
         XCTAssertTrue(item.hasAnalyzableImage)
         XCTAssertEqual(item.analyzableImageData, Data([1]))
@@ -93,7 +95,7 @@ final class CBViewModelCategoryTests: XCTestCase {
 
     func testImageTextIsKeptAndSearchable() async throws {
         let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
-        image.classify(with: .empty, image: ImageClassifier.Result(keys: ["ocr"], text: "  Quarterly report\nQ3 2026 \n"))
+        image.classify(with: .empty, image: ImageClassifier.Result(recognizedText: "  Quarterly report\nQ3 2026 \n", foundText: true))
         context.insert(image)
         try context.save()
 
@@ -117,8 +119,12 @@ final class CBViewModelCategoryTests: XCTestCase {
     func testAnImageWithoutTextKeepsEarlierText() {
         let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
         image.setRecognizedText("from the user's OCR")
-        image.classify(with: .empty, image: ImageClassifier.Result())
-        XCTAssertEqual(image.recognizedText, "from the user's OCR")
+        image.classify(with: .empty, image: ImageClassifier.Result(keys: ["barcode"], payloads: ["https://qr.example.com"]))
+        XCTAssertEqual(image.recognizedText, "from the user's OCR\nhttps://qr.example.com", "a pass without OCR adds payloads")
+        image.classify(with: .empty, image: ImageClassifier.Result(keys: ["barcode"], payloads: ["https://qr.example.com"]))
+        XCTAssertEqual(image.recognizedText, "from the user's OCR\nhttps://qr.example.com", "only once")
+        XCTAssertTrue(image.hasCategoryKey("link"))
+        XCTAssertFalse(image.hasCategoryKey("ocr"), "payloads aren't text in the image")
 
         image.setRecognizedText(String(repeating: "x", count: CBItem.maxRecognizedTextLength + 50))
         XCTAssertEqual(image.recognizedText?.count, CBItem.maxRecognizedTextLength)
@@ -129,7 +135,7 @@ final class CBViewModelCategoryTests: XCTestCase {
 
     func testTheUsersOCRStaysWithTheImage() throws {
         let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
-        image.languageCode = nil
+        image.categoryKeys = ",face,"
         let text = CBItem(timestamp: Date(), content: "plain", itemType: .text)
         context.insert(image)
         context.insert(text)
@@ -142,6 +148,8 @@ final class CBViewModelCategoryTests: XCTestCase {
         XCTAssertTrue(image.hasCategoryKey("ocr"))
         XCTAssertTrue(image.hasCategoryKey("link"))
         XCTAssertFalse(image.hasCategoryKey("link.full"))
+        XCTAssertTrue(image.hasCategoryKey("face"), "visual keys survive")
+        XCTAssertEqual(image.textRecognitionState, CBItem.TextRecognition.found)
         XCTAssertNil(text.recognizedText, "only images keep recognized text")
     }
 
@@ -158,6 +166,9 @@ final class CBViewModelCategoryTests: XCTestCase {
     func testCapturedImagesAreAnalyzedInTheBackground() async throws {
         let qr = try ImageClassifierTests.qrCode("https://stone.example.com/qr")
         viewModel.getClipboardManager().onClipboardChange?(.image(qr), safari)
+        await waitUntil { (try? self.context.fetchCount(FetchDescriptor<CBItem>())) == 1 }
+        XCTAssertEqual(try allItems().first?.textRecognitionState, CBItem.TextRecognition.pending,
+                       "new images get OCR by default")
 
         // The first Vision request of a run loads its models: allow a cold start.
         await waitUntil(timeout: 60) {
@@ -167,6 +178,35 @@ final class CBViewModelCategoryTests: XCTestCase {
         XCTAssertTrue(item.hasCategoryKey("barcode"))
         XCTAssertTrue(item.hasCategoryKey("link"))
         XCTAssertEqual(item.classificationStamp, viewModel.classifierRuleset.stamp)
+        XCTAssertNotEqual(item.textRecognitionState, CBItem.TextRecognition.pending)
+        XCTAssertEqual(viewModel.pendingTextRecognitionCount, 0)
+    }
+
+    func testOldImagesGetNoOCRUntilAsked() async throws {
+        let settings = SettingsManager(defaults: isolated.defaults)
+        settings.recognizeTextInNewImages = false
+        viewModel.setSettingsManager(settings)
+        let qr = try ImageClassifierTests.qrCode("https://stone.example.com/qr")
+        viewModel.getClipboardManager().onClipboardChange?(.image(qr), nil)
+        await waitUntil { (try? self.allItems().first?.hasCategoryKey("barcode")) == true }
+
+        let item = try XCTUnwrap(try allItems().first)
+        XCTAssertEqual(item.textRecognitionState, CBItem.TextRecognition.notRequested)
+        XCTAssertEqual(viewModel.imagesWithoutTextRecognition(), 1)
+
+        viewModel.recognizeTextInAllImages()
+        XCTAssertEqual(item.textRecognitionState, CBItem.TextRecognition.pending)
+        XCTAssertEqual(viewModel.pendingTextRecognitionCount, 1)
+        viewModel.stopTextRecognition()
+        XCTAssertEqual(item.textRecognitionState, CBItem.TextRecognition.notRequested)
+        XCTAssertEqual(viewModel.pendingTextRecognitionCount, 0)
+
+        viewModel.recognizeTextInAllImages()
+        await waitUntil(timeout: 60) { item.textRecognitionState != CBItem.TextRecognition.pending }
+        XCTAssertNotEqual(item.textRecognitionState, CBItem.TextRecognition.pending)
+        XCTAssertEqual(viewModel.imagesWithoutTextRecognition(), 0)
+        viewModel.recognizeTextInAllImages()  // nothing left: no-op
+        XCTAssertEqual(viewModel.pendingTextRecognitionCount, 0)
     }
 
     func testTurningImageAnalysisOffClearsImageKeys() async throws {

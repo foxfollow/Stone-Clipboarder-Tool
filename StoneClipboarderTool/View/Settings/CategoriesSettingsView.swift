@@ -22,6 +22,9 @@ struct CategoriesSettingsView: View {
     @State private var pendingDelete: ItemCategory?
     @State private var confirmingForgetApps = false
     @State private var confirmingReset = false
+    @State private var confirmingRecognizeAll = false
+    /// Images OCR never ran on; counted when the page opens.
+    @State private var unrecognizedImageCount = 0
 
     private func categories(_ kind: ItemCategory.Kind) -> [ItemCategory] {
         settingsManager.itemCategories.filter { $0.kind == kind }
@@ -59,21 +62,31 @@ struct CategoriesSettingsView: View {
             }
 
             Section {
-                Toggle("Analyze images", isOn: $settingsManager.analyzeImages)
-                Text("Apple Vision looks for text, QR codes, faces and transparency in images, in the background and on this Mac. Text it reads also counts for Link, Email, Phone, the language and your rules.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Toggle("Find images by the text in them", isOn: $settingsManager.searchImageText)
-                Toggle("Show the text of images in Quick Picker rows", isOn: $settingsManager.showImageTextInRows)
-                Text("Text read in the background, or by your own OCR (⌥⏎, Extract Text), stays with the image.")
+                Toggle("Find QR codes, faces and transparency", isOn: $settingsManager.analyzeImages)
+                Text("Apple Vision checks each image once, in the background and on this Mac.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ForEach(categories(.builtIn).filter { $0.builtIn?.isImageCategory == true }) { category in
                     row(for: category, deletable: false)
+                        .disabled(category.builtIn != .ocr && !settingsManager.analyzeImages)
                 }
-                .disabled(!settingsManager.analyzeImages)
             } header: {
                 Text("Built-in: images")
+            }
+
+            Section {
+                Toggle("Recognize text in new images", isOn: $settingsManager.recognizeTextInNewImages)
+                Text("Reads the text of each image you copy or screenshot from now on, once, right after the copy. Text recognition uses more CPU than the other checks, so older images are left alone unless you start it below.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                textRecognitionControls
+                Toggle("Find images by the text in them", isOn: $settingsManager.searchImageText)
+                Toggle("Show the text of images in Quick Picker rows", isOn: $settingsManager.showImageTextInRows)
+                Text("Text from this, or from your own OCR (⌥⏎, Extract Text), stays with the image and counts for Link, Email, the language and your rules.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Text in images (OCR)")
             }
 
             Section {
@@ -124,11 +137,50 @@ struct CategoriesSettingsView: View {
         } message: {
             Text("Removes the source app from every item in the history. App groups and app: search will only find items copied from now on.")
         }
+        .onAppear { unrecognizedImageCount = cbViewModel.imagesWithoutTextRecognition() }
+        .onChange(of: cbViewModel.pendingTextRecognitionCount) { _, pending in
+            if pending == 0 { unrecognizedImageCount = cbViewModel.imagesWithoutTextRecognition() }
+        }
+        .alert("Recognize text in \(unrecognizedImageCount) images?", isPresented: $confirmingRecognizeAll) {
+            Button("Start") { cbViewModel.recognizeTextInAllImages() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Runs in the background, a few images at a time, and can take a while and use CPU on a large history. You can stop it here at any time.")
+        }
         .alert("Reset built-in categories?", isPresented: $confirmingReset) {
             Button("Reset", role: .destructive) { settingsManager.resetBuiltInCategories() }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Turns every built-in category back on with its original icon, color and match mode. Custom rules and app groups stay.")
+        }
+    }
+
+    /// "Recognize Text in All Images…", or the progress of a run with Stop.
+    @ViewBuilder
+    private var textRecognitionControls: some View {
+        if cbViewModel.pendingTextRecognitionCount > 0 {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Recognizing text: \(cbViewModel.pendingTextRecognitionCount) images left")
+                    .monospacedDigit()
+                Spacer()
+                Button("Stop") {
+                    cbViewModel.stopTextRecognition()
+                    unrecognizedImageCount = cbViewModel.imagesWithoutTextRecognition()
+                }
+            }
+        } else {
+            HStack {
+                Button("Recognize Text in All Images…") { confirmingRecognizeAll = true }
+                    .disabled(unrecognizedImageCount == 0)
+                Spacer()
+                Text(unrecognizedImageCount == 0
+                     ? "Every image has been read"
+                     : "\(unrecognizedImageCount) images not read yet")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

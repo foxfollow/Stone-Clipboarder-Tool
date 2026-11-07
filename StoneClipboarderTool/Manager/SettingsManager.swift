@@ -281,6 +281,12 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(analyzeImages, forKey: "analyzeImages") }
     }
 
+    /// OCR each new image once, right after it's copied. Off by default
+    /// for the existing history: "Recognize Text in All Images" does that.
+    @Published var recognizeTextInNewImages: Bool {
+        didSet { defaults.set(recognizeTextInNewImages, forKey: "recognizeTextInNewImages") }
+    }
+
     /// Search matches the text recognized in images.
     @Published var searchImageText: Bool {
         didSet { defaults.set(searchImageText, forKey: "searchImageText") }
@@ -416,6 +422,7 @@ final class SettingsManager: ObservableObject {
         self.recordSourceApp = defaults.object(forKey: "recordSourceApp") as? Bool ?? true
         self.analyzeImages = defaults.object(forKey: "analyzeImages") as? Bool ?? true
         self.searchImageText = defaults.object(forKey: "searchImageText") as? Bool ?? true
+        self.recognizeTextInNewImages = defaults.object(forKey: "recognizeTextInNewImages") as? Bool ?? true
         self.showImageTextInRows = defaults.object(forKey: "showImageTextInRows") as? Bool ?? true
         self.showRowBadges = defaults.object(forKey: "showRowBadges") as? Bool ?? true
 

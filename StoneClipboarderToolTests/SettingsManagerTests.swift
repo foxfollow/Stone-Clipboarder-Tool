@@ -99,6 +99,7 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertTrue(settings.recordSourceApp)
         XCTAssertTrue(settings.analyzeImages)
         XCTAssertTrue(settings.searchImageText)
+        XCTAssertTrue(settings.recognizeTextInNewImages)
         XCTAssertTrue(settings.showImageTextInRows)
         XCTAssertTrue(settings.showRowBadges)
     }
@@ -117,6 +118,7 @@ final class SettingsManagerTests: XCTestCase {
         settings.recordSourceApp = false
         settings.analyzeImages = false
         settings.searchImageText = false
+        settings.recognizeTextInNewImages = false
         settings.showImageTextInRows = false
         settings.showRowBadges = false
 
@@ -127,6 +129,7 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertFalse(reloaded.recordSourceApp)
         XCTAssertFalse(reloaded.analyzeImages)
         XCTAssertFalse(reloaded.searchImageText)
+        XCTAssertFalse(reloaded.recognizeTextInNewImages)
         XCTAssertFalse(reloaded.showImageTextInRows)
         XCTAssertFalse(reloaded.showRowBadges)
     }

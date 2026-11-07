@@ -8,15 +8,17 @@ import Foundation
 import ImageIO
 import Vision
 
-/// Categories of an image, found with Vision on the device: readable text
-/// (`ocr`), QR codes and barcodes (`barcode`), faces (`face`) and
-/// transparent areas (`transparent`). The recognized text and barcode
-/// payloads then go through `ContentClassifier`, so a screenshot of a link,
-/// an email or a document number lands in those categories too, and gets a
-/// language.
+/// What Vision sees in an image, on the device. Two independent parts:
 ///
-/// Synchronous and CPU-heavy (≈0.2–1 s per image): call it off the main
-/// thread. Never logs what it reads.
+/// - the visual pass (`analyzeVisual`): QR codes and barcodes (`barcode`,
+///   with their payloads), faces (`face`), transparent areas
+///   (`transparent`); fairly cheap;
+/// - text recognition (`recognizeText`, OCR): the expensive part. It runs
+///   once per image; `CBItem` keeps the text, so later rescans (a new
+///   regex rule…) reuse it instead of reading the image again.
+///
+/// Synchronous and CPU-heavy: call it off the main thread. Never logs what
+/// it reads.
 enum ImageClassifier {
     /// Images are scaled down to this many pixels on the long side first.
     static let maxPixelSize = 2048
@@ -24,18 +26,30 @@ enum ImageClassifier {
     static let minTextLength = 3
     static let minTextConfidence: Float = 0.4
 
+    /// Keys only the visual pass produces.
+    static let visualKeys: Set<String> = [
+        ItemCategory.BuiltIn.barcode.rawValue, ItemCategory.BuiltIn.face.rawValue,
+        ItemCategory.BuiltIn.transparent.rawValue,
+    ]
+
     struct Result: Equatable {
+        /// Visual keys found (a subset of `visualKeys`).
         var keys: Set<String> = []
-        var language: String?
-        /// The recognized text and barcode payloads; nil when there is none.
-        var text: String?
+        /// What OCR read; nil when OCR didn't run.
+        var recognizedText: String?
+        /// OCR ran and found at least `minTextLength` letters or digits.
+        var foundText = false
+        /// QR code and barcode contents.
+        var payloads: [String] = []
+
+        var didRecognizeText: Bool { recognizedText != nil }
     }
 
-    static func classify(_ data: Data, ruleset: ContentClassifier.Ruleset = .empty) -> Result {
-        guard let image = downscaledImage(from: data) else { return Result() }
+    static func classify(_ data: Data, analyzeVisual: Bool = true, recognizeText: Bool = true) -> Result {
+        guard analyzeVisual || recognizeText, let image = downscaledImage(from: data) else { return Result() }
 
-        var keys = Set<String>()
-        if hasTransparency(image) { keys.insert(ItemCategory.BuiltIn.transparent.rawValue) }
+        var result = Result()
+        if analyzeVisual && hasTransparency(image) { result.keys.insert(ItemCategory.BuiltIn.transparent.rawValue) }
 
         let textRequest = VNRecognizeTextRequest()
         textRequest.recognitionLevel = .accurate
@@ -43,44 +57,35 @@ enum ImageClassifier {
         textRequest.automaticallyDetectsLanguage = true
         let barcodeRequest = VNDetectBarcodesRequest()
         let faceRequest = VNDetectFaceRectanglesRequest()
+        var requests: [VNRequest] = []
+        if recognizeText { requests.append(textRequest) }
+        if analyzeVisual { requests += [barcodeRequest, faceRequest] }
 
         do {
-            try VNImageRequestHandler(cgImage: image, options: [:])
-                .perform([textRequest, barcodeRequest, faceRequest])
+            try VNImageRequestHandler(cgImage: image, options: [:]).perform(requests)
         } catch {
             ErrorLogger.shared.log("Failed to analyze an image", category: "Categories", error: error)
-            return Result(keys: keys)
+            return result
         }
 
-        let lines = (textRequest.results ?? []).compactMap { observation -> String? in
-            guard let candidate = observation.topCandidates(1).first,
-                  candidate.confidence >= minTextConfidence else { return nil }
-            return candidate.string
-        }
-        let recognized = lines.joined(separator: "\n")
-        if recognized.filter({ $0.isLetter || $0.isNumber }).count >= minTextLength {
-            keys.insert(ItemCategory.BuiltIn.ocr.rawValue)
-        }
-
-        let payloads = (barcodeRequest.results ?? []).compactMap(\.payloadStringValue)
-        if !(barcodeRequest.results ?? []).isEmpty {
-            keys.insert(ItemCategory.BuiltIn.barcode.rawValue)
+        if recognizeText {
+            let lines = (textRequest.results ?? []).compactMap { observation -> String? in
+                guard let candidate = observation.topCandidates(1).first,
+                      candidate.confidence >= minTextConfidence else { return nil }
+                return candidate.string
+            }
+            let recognized = lines.joined(separator: "\n")
+            result.recognizedText = recognized
+            result.foundText = recognized.filter { $0.isLetter || $0.isNumber }.count >= minTextLength
         }
 
-        if !(faceRequest.results ?? []).isEmpty {
-            keys.insert(ItemCategory.BuiltIn.face.rawValue)
+        if analyzeVisual {
+            let barcodes = barcodeRequest.results ?? []
+            if !barcodes.isEmpty { result.keys.insert(ItemCategory.BuiltIn.barcode.rawValue) }
+            result.payloads = barcodes.compactMap(\.payloadStringValue).filter { !$0.isEmpty }
+            if !(faceRequest.results ?? []).isEmpty { result.keys.insert(ItemCategory.BuiltIn.face.rawValue) }
         }
-
-        // The text the image carries, through the same detectors as copied
-        // text. "Entire text" makes no sense for a picture, so drop .full.
-        let text = ([recognized] + payloads).filter { !$0.isEmpty }.joined(separator: "\n")
-        var language: String?
-        if !text.isEmpty {
-            let found = ContentClassifier.classify(text, ruleset: ruleset)
-            keys.formUnion(found.keys.filter { !$0.hasSuffix(".full") })
-            language = found.language
-        }
-        return Result(keys: keys, language: language, text: text.isEmpty ? nil : text)
+        return result
     }
 
     /// Decodes at most `maxPixelSize` on the long side, honoring EXIF

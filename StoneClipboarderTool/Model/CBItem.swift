@@ -41,6 +41,18 @@ final class CBItem {
     /// OCR), so search finds the image by it. Inline, at most
     /// `maxRecognizedTextLength` characters.
     var recognizedText: String?
+    /// Whether OCR ran on the image: `TextRecognition` values. Kept as an
+    /// Int so predicates can test it.
+    var textRecognitionState: Int = 0
+
+    enum TextRecognition {
+        static let notRequested = 0
+        /// Waiting for the background pass (a new image with automatic
+        /// OCR on, or "Recognize Text in All Images").
+        static let pending = 1
+        static let noText = 2
+        static let found = 3
+    }
 
     // Lightweight preview content for UI performance
     var contentPreview: String?
@@ -370,10 +382,18 @@ final class CBItem {
         }
     }
 
-    /// Classifies the text (text and text + image items) with `ruleset`,
-    /// adds `image` (what `ImageClassifier` found, when it ran) and stamps
-    /// the item, so the next rescan skips it.
-    func classify(with ruleset: ContentClassifier.Ruleset, image: ImageClassifier.Result? = nil) {
+    /// Classifies the item with `ruleset` and stamps it, so the next rescan
+    /// skips it:
+    /// - the text of text-like items;
+    /// - `image`, what `ImageClassifier` just found: its visual keys, and
+    ///   its OCR text and barcode payloads, which are stored;
+    /// - the stored image text (`recognizedText`), through the same
+    ///   detectors as copied text, minus "entire text" keys.
+    /// Without `image`, visual keys are dropped unless `keepingVisualKeys`.
+    func classify(
+        with ruleset: ContentClassifier.Ruleset, image: ImageClassifier.Result? = nil,
+        keepingVisualKeys: Bool = false
+    ) {
         var keys = Set<String>()
         var language: String?
         if itemType == .text || itemType == .combined, let content {
@@ -381,16 +401,41 @@ final class CBItem {
             keys = result.keys
             language = result.language
         }
-        if let image {
-            keys.formUnion(image.keys)
-            language = language ?? image.language
+
+        if hasAnalyzableImage {
+            if let image {
+                keys.formUnion(image.keys)
+                store(image)
+            } else if keepingVisualKeys {
+                keys.formUnion(categoryKeySet.intersection(ImageClassifier.visualKeys))
+            }
+            if textRecognitionState == TextRecognition.found {
+                keys.insert(ItemCategory.BuiltIn.ocr.rawValue)
+            }
+            if let recognizedText {
+                let found = ContentClassifier.classify(recognizedText, ruleset: ruleset)
+                keys.formUnion(found.keys.filter { !$0.hasSuffix(".full") })
+                language = language ?? found.language
+            }
         }
-        if let text = image?.text {
-            setRecognizedText(text)
-        }
+
         categoryKeys = Self.encodeKeys(keys)
         languageCode = language
         classificationStamp = ruleset.stamp
+    }
+
+    /// OCR text replaces the stored text; payloads are added when missing.
+    private func store(_ image: ImageClassifier.Result) {
+        if let ocr = image.recognizedText {
+            setRecognizedText(([ocr] + image.payloads).joined(separator: "\n"))
+            textRecognitionState = image.foundText ? TextRecognition.found : TextRecognition.noText
+        } else {
+            let existing = recognizedText ?? ""
+            let missing = image.payloads.filter { !existing.contains($0) }
+            if !missing.isEmpty {
+                setRecognizedText(([existing] + missing).joined(separator: "\n"))
+            }
+        }
     }
 
     static func encodeKeys(_ keys: Set<String>) -> String? {
