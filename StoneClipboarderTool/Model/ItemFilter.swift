@@ -27,7 +27,8 @@ struct QPSearchQuery: Equatable {
         while let start = scanner.firstIndex(where: { !$0.isWhitespace }) {
             scanner = scanner[start...]
             let word: Substring
-            if let prefix = ["is:", "app:", "lang:"].first(where: { scanner.lowercased().hasPrefix($0) }),
+            let head = scanner.prefix(5).lowercased()
+            if let prefix = ["is:", "app:", "lang:"].first(where: { head.hasPrefix($0) }),
                scanner.dropFirst(prefix.count).first == "\"" {
                 // prefix:"quoted value"
                 let valueStart = scanner.index(scanner.startIndex, offsetBy: prefix.count + 1)
@@ -55,7 +56,11 @@ struct QPSearchQuery: Equatable {
                 words.append(String(word))
             }
         }
-        query.text = words.joined(separator: " ")
+        // Without tokens the text stays as typed (inner spacing and line
+        // breaks included), like a plain search.
+        query.text = query.hasTokens
+            ? words.joined(separator: " ")
+            : raw.trimmingCharacters(in: .whitespacesAndNewlines)
         return query
     }
 }

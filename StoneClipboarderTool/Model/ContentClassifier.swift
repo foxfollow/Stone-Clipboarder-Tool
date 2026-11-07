@@ -21,7 +21,7 @@ enum ContentClassifier {
     /// fast and bounds what a user regex has to scan.
     static let maxLength = 4000
     /// JSON is parsed whole, up to this size.
-    static let maxJSONLength = 1_000_000
+    static let maxJSONLength = 200_000
     static let minLanguageLetters = 20
     static let minLanguageConfidence = 0.6
 
@@ -47,7 +47,7 @@ enum ContentClassifier {
         /// classifier version, any rule or `analyzeImages` changes. Never 0
         /// (= unclassified).
         let stamp: Int
-        fileprivate let compiled: [(id: String, contains: NSRegularExpression, entire: NSRegularExpression)]
+        fileprivate let compiled: [(id: String, contains: NSRegularExpression, entire: NSRegularExpression?)]
 
         init(rules: [RegexRule], analyzeImages: Bool = true) {
             let sorted = rules.sorted { $0.id < $1.id }
@@ -59,10 +59,11 @@ enum ContentClassifier {
                 if !rule.caseSensitive { options.insert(.caseInsensitive) }
                 var entireOptions: NSRegularExpression.Options = []
                 if !rule.caseSensitive { entireOptions.insert(.caseInsensitive) }
-                guard
-                    let contains = try? NSRegularExpression(pattern: rule.pattern, options: options),
-                    let entire = try? NSRegularExpression(pattern: "\\A(?:\(rule.pattern))\\z", options: entireOptions)
-                else { return nil }
+                guard let contains = try? NSRegularExpression(pattern: rule.pattern, options: options) else {
+                    return nil
+                }
+                // Without the whole-text form the rule still matches "Contains".
+                let entire = try? NSRegularExpression(pattern: "\\A(?:\(rule.pattern))\\z", options: entireOptions)
                 return (rule.id, contains, entire)
             }
         }
@@ -142,7 +143,7 @@ enum ContentClassifier {
 
         for rule in ruleset.compiled {
             guard rule.contains.firstMatch(in: trimmed, range: range) != nil else { continue }
-            let full = rule.entire.firstMatch(in: trimmed, range: range) != nil
+            let full = rule.entire?.firstMatch(in: trimmed, range: range) != nil
             add(rule.id, full: full)
         }
 

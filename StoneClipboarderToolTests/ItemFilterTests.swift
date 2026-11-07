@@ -24,6 +24,11 @@ final class ItemFilterTests: XCTestCase {
         XCTAssertEqual(unclosed.appTokens, ["visual studio"])
     }
 
+    func testTextWithoutTokensKeepsItsSpacing() {
+        XCTAssertEqual(QPSearchQuery.parse("  two  spaces\nand a line ").text, "two  spaces\nand a line")
+        XCTAssertEqual(QPSearchQuery.parse("IS:link Mixed").isTokens, ["link"], "prefixes in any case")
+    }
+
     func testEmptyTokenValuesStayText() {
         let query = QPSearchQuery.parse("is: app:")
         XCTAssertEqual(query.text, "is: app:")

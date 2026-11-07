@@ -151,6 +151,13 @@ final class ContentClassifierTests: XCTestCase {
         XCTAssertFalse(found.contains("b"))
     }
 
+    func testARuleWhoseEntireFormDoesNotCompileStillMatches() {
+        // In (?x) mode "#" starts a comment, which swallows the wrapper's ")".
+        let rule = ContentClassifier.RegexRule(id: "x", pattern: "(?x)invoice # a note", caseSensitive: false)
+        XCTAssertTrue(ItemCategory.isValidPattern(rule.pattern))
+        XCTAssertEqual(keys("Invoice 7", rules: [rule]), ["x"])
+    }
+
     func testInvalidRegexIsSkipped() {
         let broken = ContentClassifier.RegexRule(id: "x", pattern: "(unclosed", caseSensitive: false)
         XCTAssertFalse(keys("(unclosed", rules: [broken]).contains("x"))
