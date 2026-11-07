@@ -16,7 +16,7 @@ import NaturalLanguage
 /// match covers the whole (trimmed) text.
 enum ContentClassifier {
     /// Bump when detection changes, so stored results are recomputed.
-    static let version = 1
+    static let version = 2
     /// Only this many leading characters are examined: keeps a capture
     /// fast and bounds what a user regex has to scan.
     static let maxLength = 4000
@@ -41,15 +41,19 @@ enum ContentClassifier {
     /// The user's regex rules, compiled once for many texts.
     struct Ruleset {
         let rules: [RegexRule]
+        /// Run `ImageClassifier` on images ("Analyze images" in Settings).
+        let analyzeImages: Bool
         /// Written to `CBItem.classificationStamp`; changes whenever the
-        /// classifier version or any rule changes. Never 0 (= unclassified).
+        /// classifier version, any rule or `analyzeImages` changes. Never 0
+        /// (= unclassified).
         let stamp: Int
         fileprivate let compiled: [(id: String, contains: NSRegularExpression, entire: NSRegularExpression)]
 
-        init(rules: [RegexRule]) {
+        init(rules: [RegexRule], analyzeImages: Bool = true) {
             let sorted = rules.sorted { $0.id < $1.id }
             self.rules = sorted
-            self.stamp = ContentClassifier.stamp(for: sorted)
+            self.analyzeImages = analyzeImages
+            self.stamp = ContentClassifier.stamp(for: sorted, analyzeImages: analyzeImages)
             self.compiled = sorted.compactMap { rule in
                 var options: NSRegularExpression.Options = [.anchorsMatchLines]
                 if !rule.caseSensitive { options.insert(.caseInsensitive) }
@@ -68,8 +72,8 @@ enum ContentClassifier {
 
     /// FNV-1a over the version and the rules: stable across launches,
     /// unlike `Hasher`.
-    static func stamp(for rules: [RegexRule]) -> Int {
-        var text = "v\(version)"
+    static func stamp(for rules: [RegexRule], analyzeImages: Bool = true) -> Int {
+        var text = "v\(version)" + (analyzeImages ? "+img" : "")
         for rule in rules.sorted(by: { $0.id < $1.id }) {
             text += "\u{1}\(rule.id)\u{2}\(rule.pattern)\u{2}\(rule.caseSensitive)"
         }

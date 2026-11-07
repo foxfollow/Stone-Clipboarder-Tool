@@ -43,6 +43,16 @@ struct ItemCategory: Codable, Identifiable, Hashable {
     /// Stable ids of the built-in categories.
     enum BuiltIn: String, CaseIterable {
         case link, email, phone, address, date, code, json, path, language
+        // Found in images by `ImageClassifier`.
+        case ocr, barcode, face, transparent
+
+        /// Settings lists these under "Images".
+        var isImageCategory: Bool {
+            switch self {
+            case .ocr, .barcode, .face, .transparent: return true
+            default: return false
+            }
+        }
     }
 
     var id: String
@@ -165,6 +175,10 @@ struct ItemCategory: Codable, Identifiable, Hashable {
         builtIn(.json, "JSON", .symbol("curlybraces"), "#64D2FF"),
         builtIn(.path, "Path", .symbol("folder"), "#AC8E68"),
         builtIn(.language, "Languages", .symbol("globe"), "#8E8E93"),
+        builtIn(.ocr, "Text in Image", .symbol("text.viewfinder"), "#30B0C7"),
+        builtIn(.barcode, "QR & Barcode", .symbol("qrcode"), "#FF375F"),
+        builtIn(.face, "People", .symbol("person.crop.square"), "#FF9F0A"),
+        builtIn(.transparent, "Transparent", .symbol("checkerboard.rectangle"), "#A2845E"),
     ]
 
     private static func builtIn(_ id: BuiltIn, _ name: String, _ icon: CategoryIcon, _ hex: String) -> ItemCategory {

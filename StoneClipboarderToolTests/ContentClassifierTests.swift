@@ -175,5 +175,7 @@ final class ContentClassifierTests: XCTestCase {
         let changed = ContentClassifier.RegexRule(id: "a", pattern: "x", caseSensitive: true)
         XCTAssertNotEqual(ContentClassifier.stamp(for: [a]), ContentClassifier.stamp(for: [changed]))
         XCTAssertNotEqual(ContentClassifier.Ruleset.empty.stamp, 0)
+        XCTAssertNotEqual(ContentClassifier.stamp(for: [a], analyzeImages: true),
+                          ContentClassifier.stamp(for: [a], analyzeImages: false))
     }
 }

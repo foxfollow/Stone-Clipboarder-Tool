@@ -348,17 +348,38 @@ final class CBItem {
         categoryKeys?.contains(",\(key),") ?? false
     }
 
-    /// Classifies text-like items with `ruleset` and stamps every item, so
-    /// images and files aren't picked up by the next rescan either.
-    func classify(with ruleset: ContentClassifier.Ruleset) {
+    /// Images, text + image items and image files: `ImageClassifier` can
+    /// look at them. Doesn't load any data.
+    var hasAnalyzableImage: Bool {
+        itemType == .image || itemType == .combined || isImageFile
+    }
+
+    /// The bytes `ImageClassifier` reads (loads external storage).
+    var analyzableImageData: Data? {
+        switch itemType {
+        case .image, .combined: return imageData
+        case .file: return isImageFile ? fileData : nil
+        case .text: return nil
+        }
+    }
+
+    /// Classifies the text (text and text + image items) with `ruleset`,
+    /// adds `image` (what `ImageClassifier` found, when it ran) and stamps
+    /// the item, so the next rescan skips it.
+    func classify(with ruleset: ContentClassifier.Ruleset, image: ImageClassifier.Result? = nil) {
+        var keys = Set<String>()
+        var language: String?
         if itemType == .text || itemType == .combined, let content {
             let result = ContentClassifier.classify(content, ruleset: ruleset)
-            categoryKeys = result.keys.isEmpty ? nil : "," + result.keys.sorted().joined(separator: ",") + ","
-            languageCode = result.language
-        } else {
-            categoryKeys = nil
-            languageCode = nil
+            keys = result.keys
+            language = result.language
         }
+        if let image {
+            keys.formUnion(image.keys)
+            language = language ?? image.language
+        }
+        categoryKeys = keys.isEmpty ? nil : "," + keys.sorted().joined(separator: ",") + ","
+        languageCode = language
         classificationStamp = ruleset.stamp
     }
 

@@ -45,16 +45,29 @@ struct CategoriesSettingsView: View {
             }
 
             Section {
-                ForEach(categories(.builtIn)) { category in
+                ForEach(categories(.builtIn).filter { $0.builtIn?.isImageCategory != true }) { category in
                     row(for: category, deletable: false)
                 }
             } header: {
                 HStack {
-                    Text("Built-in")
+                    Text("Built-in: text")
                     Spacer()
                     Button("Reset…") { confirmingReset = true }
                         .controlSize(.small)
                 }
+            }
+
+            Section {
+                Toggle("Analyze images", isOn: $settingsManager.analyzeImages)
+                Text("Apple Vision looks for text, QR codes, faces and transparency in images, in the background and on this Mac. Text it reads also counts for Link, Email, Phone, the language and your rules.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(categories(.builtIn).filter { $0.builtIn?.isImageCategory == true }) { category in
+                    row(for: category, deletable: false)
+                }
+                .disabled(!settingsManager.analyzeImages)
+            } header: {
+                Text("Built-in: images")
             }
 
             Section {

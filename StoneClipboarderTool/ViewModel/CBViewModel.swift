@@ -46,6 +46,7 @@ class CBViewModel: ObservableObject {
     private(set) var classifierRuleset = ContentClassifier.Ruleset.empty
     private var categoriesObserver: AnyCancellable?
     private var reclassifyTask: Task<Void, Never>?
+    private var reclassifyGeneration = 0
 
     // Memory management
     nonisolated(unsafe) private var memoryCleanupTimer: Timer?
@@ -76,16 +77,17 @@ class CBViewModel: ObservableObject {
         categoriesObserver = manager.$itemCategories
             .map { categories in categories.compactMap(\.regexRule) }
             .removeDuplicates()
-            .sink { [weak self] rules in
+            .combineLatest(manager.$analyzeImages.removeDuplicates())
+            .sink { [weak self] rules, analyzeImages in
                 MainActor.assumeIsolated {
-                    self?.updateClassifierRules(rules)
+                    self?.updateClassifierRules(rules, analyzeImages: analyzeImages)
                 }
             }
     }
 
     /// Swaps the rules and, when the stamp changed, rescans the history.
-    func updateClassifierRules(_ rules: [ContentClassifier.RegexRule]) {
-        let ruleset = ContentClassifier.Ruleset(rules: rules)
+    func updateClassifierRules(_ rules: [ContentClassifier.RegexRule], analyzeImages: Bool = true) {
+        let ruleset = ContentClassifier.Ruleset(rules: rules, analyzeImages: analyzeImages)
         guard ruleset.stamp != classifierRuleset.stamp else { return }
         classifierRuleset = ruleset
         reclassifyIfNeeded()
@@ -354,6 +356,10 @@ class CBViewModel: ObservableObject {
         } else {
             item = makeItem()
             item.classify(with: classifierRuleset)
+            if classifierRuleset.analyzeImages && item.hasAnalyzableImage {
+                // Text is classified; the image waits for the background pass.
+                item.classificationStamp = 0
+            }
             modelContext.insert(item)
         }
         if let source {
@@ -365,6 +371,9 @@ class CBViewModel: ObservableObject {
             try modelContext.save()
             fetchItems(reset: true)
             performCleanupIfNeeded()
+            if item.classificationStamp != classifierRuleset.stamp && reclassifyTask == nil {
+                reclassifyIfNeeded()
+            }
         } catch {
             modelContext.rollback()
             ErrorLogger.shared.log(errorMessage, category: "SwiftData", error: error)
@@ -738,13 +747,22 @@ class CBViewModel: ObservableObject {
     /// (or none: items from before categories). Restarts when called again.
     func reclassifyIfNeeded() {
         reclassifyTask?.cancel()
+        reclassifyGeneration += 1
+        let generation = reclassifyGeneration
         reclassifyTask = Task { [weak self] in
             await self?.reclassifyStaleItems()
+            // A newer pass may have replaced this one meanwhile.
+            if self?.reclassifyGeneration == generation {
+                self?.reclassifyTask = nil
+            }
         }
     }
 
     /// Pages of 100 with a run-loop turn between them, like the search.
-    /// Returns how many items were classified.
+    /// Text is classified here; images go to `ImageClassifier` off the main
+    /// thread, a few at a time, read through a throwaway background context
+    /// so their bytes don't stay loaded in the main one. Returns how many
+    /// items were classified.
     @discardableResult
     func reclassifyStaleItems() async -> Int {
         guard let modelContext = _modelContext else { return 0 }
@@ -752,7 +770,7 @@ class CBViewModel: ObservableObject {
         let stamp = ruleset.stamp
         var classified = 0
 
-        while !Task.isCancelled {
+        pages: while !Task.isCancelled {
             var descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.classificationStamp != stamp })
             descriptor.fetchLimit = Self.reclassifyPageSize
             let page: [CBItem]
@@ -764,15 +782,27 @@ class CBViewModel: ObservableObject {
             }
             guard !page.isEmpty else { break }
 
-            page.forEach { $0.classify(with: ruleset) }
-            do {
-                try modelContext.save()
-            } catch {
-                modelContext.rollback()
-                ErrorLogger.shared.log("Failed to save item categories", category: "SwiftData", error: error)
-                break
+            let images = ruleset.analyzeImages ? page.filter(\.hasAnalyzableImage) : []
+            for item in page where !(ruleset.analyzeImages && item.hasAnalyzableImage) {
+                item.classify(with: ruleset)
             }
-            classified += page.count
+            guard saveCategories(in: modelContext) else { break }
+            classified += page.count - images.count
+
+            var start = 0
+            while start < images.count {
+                let chunk = Array(images[start..<min(start + Self.imageChunkSize, images.count)])
+                start += chunk.count
+                let results = await Self.analyzeImages(
+                    chunk.map(\.persistentModelID), container: modelContext.container, ruleset: ruleset)
+                guard !Task.isCancelled else { break pages }
+                // Deleted meanwhile: nothing to write.
+                for item in chunk where !item.isDeleted {
+                    item.classify(with: ruleset, image: results[item.persistentModelID] ?? ImageClassifier.Result())
+                }
+                guard saveCategories(in: modelContext) else { break pages }
+                classified += chunk.count
+            }
             guard await pauseBetweenPages() else { break }
         }
 
@@ -784,6 +814,36 @@ class CBViewModel: ObservableObject {
     }
 
     private static let reclassifyPageSize = 100
+    private static let imageChunkSize = 4
+
+    private func saveCategories(in modelContext: ModelContext) -> Bool {
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save item categories", category: "SwiftData", error: error)
+            return false
+        }
+    }
+
+    /// Runs `ImageClassifier` on a utility-priority thread with its own
+    /// context, so the image bytes are released when it ends.
+    nonisolated private static func analyzeImages(
+        _ ids: [PersistentIdentifier], container: ModelContainer, ruleset: ContentClassifier.Ruleset
+    ) async -> [PersistentIdentifier: ImageClassifier.Result] {
+        await Task.detached(priority: .utility) {
+            let context = ModelContext(container)
+            var results: [PersistentIdentifier: ImageClassifier.Result] = [:]
+            for id in ids {
+                let descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.persistentModelID == id })
+                guard let item = try? context.fetch(descriptor).first,
+                      let data = item.analyzableImageData else { continue }
+                results[id] = ImageClassifier.classify(data, ruleset: ruleset)
+            }
+            return results
+        }.value
+    }
 
     /// "Forget recorded apps": clears the source app of every item.
     func clearSourceApps() {

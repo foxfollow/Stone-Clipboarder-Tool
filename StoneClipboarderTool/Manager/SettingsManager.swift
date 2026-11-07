@@ -275,6 +275,12 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(showCategoryBar, forKey: "showCategoryBar") }
     }
 
+    /// Look for text, codes, faces and transparency in images (Vision, in
+    /// the background).
+    @Published var analyzeImages: Bool {
+        didSet { defaults.set(analyzeImages, forKey: "analyzeImages") }
+    }
+
     /// Store the frontmost app's name and bundle id with each capture.
     @Published var recordSourceApp: Bool {
         didSet { defaults.set(recordSourceApp, forKey: "recordSourceApp") }
@@ -393,6 +399,7 @@ final class SettingsManager: ObservableObject {
         self.itemCategories = Self.loadCategories(from: defaults)
         self.showCategoryBar = defaults.object(forKey: "showCategoryBar") as? Bool ?? true
         self.recordSourceApp = defaults.object(forKey: "recordSourceApp") as? Bool ?? true
+        self.analyzeImages = defaults.object(forKey: "analyzeImages") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = defaults.string(forKey: "clipboardCaptureMode"),

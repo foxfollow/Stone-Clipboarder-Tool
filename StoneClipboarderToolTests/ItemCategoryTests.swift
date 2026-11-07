@@ -15,7 +15,10 @@ final class ItemCategoryTests: XCTestCase {
     func testBuiltInIdsAreStable() {
         // Stored in CBItem.categoryKeys and settings: never rename.
         XCTAssertEqual(ItemCategory.builtIns.map(\.id),
-                       ["link", "email", "phone", "address", "date", "code", "json", "path", "language"])
+                       ["link", "email", "phone", "address", "date", "code", "json", "path", "language",
+                        "ocr", "barcode", "face", "transparent"])
+        XCTAssertEqual(ItemCategory.BuiltIn.allCases.filter(\.isImageCategory), [.ocr, .barcode, .face, .transparent])
+        XCTAssertFalse(ItemCategory.builtIns.first { $0.id == "ocr" }!.supportsMatchMode)
         XCTAssertTrue(ItemCategory.builtIns.allSatisfy { $0.isEnabled && $0.kind == .builtIn })
     }
 

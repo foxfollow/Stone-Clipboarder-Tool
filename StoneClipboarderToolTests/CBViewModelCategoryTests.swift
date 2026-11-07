@@ -71,7 +71,7 @@ final class CBViewModelCategoryTests: XCTestCase {
         XCTAssertTrue(item.hasCategoryKey("email.full"))
     }
 
-    func testImagesAreStampedWithoutKeys() throws {
+    func testClassifyWithoutAnImageResultClearsImageKeys() throws {
         let image = CBItem(timestamp: Date(), imageData: Data([1, 2, 3]), itemType: .image)
         image.categoryKeys = ",stale,"
         image.languageCode = "en"
@@ -81,11 +81,58 @@ final class CBViewModelCategoryTests: XCTestCase {
         XCTAssertEqual(image.classificationStamp, viewModel.classifierRuleset.stamp)
     }
 
+    func testCombinedItemsMergeTextAndImageResults() {
+        let item = CBItem(timestamp: Date(), content: "Call +1 408 555 0123 now", imageData: Data([1]), itemType: .combined)
+        item.classify(with: .empty, image: ImageClassifier.Result(keys: ["ocr", "face"], language: "uk"))
+        XCTAssertTrue(item.hasCategoryKey("phone"))
+        XCTAssertTrue(item.hasCategoryKey("face"))
+        XCTAssertEqual(item.languageCode, "uk", "the image's language when the text has none")
+        XCTAssertTrue(item.hasAnalyzableImage)
+        XCTAssertEqual(item.analyzableImageData, Data([1]))
+    }
+
+    func testImageFilesAreAnalyzableOtherFilesAreNot() {
+        let png = CBItem(timestamp: Date(), fileData: Data([7]), fileName: "a.png", fileUTI: "public.png", itemType: .file)
+        let zip = CBItem(timestamp: Date(), fileData: Data([7]), fileName: "a.zip", fileUTI: "public.zip-archive", itemType: .file)
+        XCTAssertTrue(png.hasAnalyzableImage)
+        XCTAssertEqual(png.analyzableImageData, Data([7]))
+        XCTAssertFalse(zip.hasAnalyzableImage)
+        XCTAssertNil(zip.analyzableImageData)
+        XCTAssertNil(CBItem(timestamp: Date(), content: "x", itemType: .text).analyzableImageData)
+    }
+
+    func testCapturedImagesAreAnalyzedInTheBackground() async throws {
+        let qr = try ImageClassifierTests.qrCode("https://stone.example.com/qr")
+        viewModel.getClipboardManager().onClipboardChange?(.image(qr), safari)
+
+        // The first Vision request of a run loads its models: allow a cold start.
+        await waitUntil(timeout: 60) {
+            (try? self.allItems().first?.hasCategoryKey("barcode")) == true
+        }
+        let item = try XCTUnwrap(try allItems().first)
+        XCTAssertTrue(item.hasCategoryKey("barcode"))
+        XCTAssertTrue(item.hasCategoryKey("link"))
+        XCTAssertEqual(item.classificationStamp, viewModel.classifierRuleset.stamp)
+    }
+
+    func testTurningImageAnalysisOffClearsImageKeys() async throws {
+        let qr = try ImageClassifierTests.qrCode("hello")
+        context.insert(CBItem(timestamp: Date(), imageData: qr, itemType: .image))
+        try context.save()
+        await viewModel.reclassifyStaleItems()
+        XCTAssertTrue(try XCTUnwrap(try allItems().first).hasCategoryKey("barcode"))
+
+        viewModel.updateClassifierRules([], analyzeImages: false)
+        await waitUntil { (try? self.allItems().first?.categoryKeys) == .some(nil) }
+
+        XCTAssertNil(try XCTUnwrap(try allItems().first).categoryKeys)
+    }
+
     // MARK: - Rescans
 
     func testOldItemsAreClassifiedByTheRescan() async throws {
         context.insert(CBItem(timestamp: Date(), content: "/Users/me/Desktop", itemType: .text))
-        context.insert(CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image))
+        context.insert(CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image))  // not decodable
         try context.save()
 
         let classified = await viewModel.reclassifyStaleItems()

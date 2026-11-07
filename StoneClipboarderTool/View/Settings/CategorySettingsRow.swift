@@ -37,6 +37,10 @@ struct CategorySettingsRow: View {
         case .json: return "Valid JSON objects and arrays"
         case .path: return "File paths: /Users/…, ~/…, C:\\…"
         case .language: return "One chip per detected language"
+        case .ocr: return "Images with readable text (Vision)"
+        case .barcode: return "Images with a QR code or barcode"
+        case .face: return "Images with faces"
+        case .transparent: return "Images with transparent areas: icons, logos, cut-outs"
         case nil: return ""
         }
     }
