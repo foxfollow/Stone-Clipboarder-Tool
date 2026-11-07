@@ -159,14 +159,28 @@ final class SettingsManagerTests: XCTestCase {
         rule.name = "Documents"
         rule.pattern = "№"
         let good = String(decoding: try JSONEncoder().encode(rule), as: UTF8.self)
-        let json = "[\(good), {\"id\": \"future\", \"kind\": \"somethingNew\"}]"
+        let json = """
+            [\(good), {"id": "future", "kind": "somethingNew"}, {"id": "screenshot", "kind": "builtIn"},
+             {"id": "lenient", "kind": "regex", "pattern": "x", "matchMode": "fuzzy", "icon": {"sticker": {}}}]
+            """
         defaults.set(Data(json.utf8), forKey: SettingsManager.itemCategoriesKey)
 
         let settings = SettingsManager(defaults: defaults)
 
         XCTAssertTrue(settings.itemCategories.contains(rule))
-        XCTAssertEqual(defaults.data(forKey: SettingsManager.itemCategoriesBackupKey), Data(json.utf8),
-                       "the raw JSON is kept before it's overwritten")
+        let lenient = try XCTUnwrap(settings.itemCategories.first { $0.id == "lenient" })
+        XCTAssertEqual(lenient.matchMode, .contains, "an unknown match mode falls back")
+        XCTAssertEqual(lenient.icon, .symbol("tag"), "an unknown icon falls back")
+        XCTAssertFalse(settings.itemCategories.contains { $0.id == "future" || $0.id == "screenshot" })
+
+        // Editing writes the unreadable ones back, so a newer version finds them.
+        settings.deleteCategory(id: rule.id)
+        let saved = try XCTUnwrap(defaults.data(forKey: SettingsManager.itemCategoriesKey))
+        let ids = try XCTUnwrap(JSONSerialization.jsonObject(with: saved) as? [[String: Any]]).compactMap { $0["id"] as? String }
+        XCTAssertTrue(ids.contains("future"))
+        XCTAssertTrue(ids.contains("screenshot"))
+        XCTAssertFalse(ids.contains(rule.id))
+        XCTAssertTrue(SettingsManager(defaults: defaults).itemCategories.contains { $0.id == "lenient" })
     }
 
     func testCorruptCategoryDataFallsBackToBuiltIns() {

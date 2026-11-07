@@ -263,10 +263,23 @@ final class SettingsManager: ObservableObject {
     /// Built-in, regex and app-group categories, in display order. JSON in
     /// `itemCategories`; built-ins missing from it are added on load.
     @Published var itemCategories: [ItemCategory] {
-        didSet {
-            if let data = try? JSONEncoder().encode(itemCategories) {
-                defaults.set(data, forKey: Self.itemCategoriesKey)
-            }
+        didSet { saveCategories() }
+    }
+
+    /// Saved categories this version can't read (from a newer version: an
+    /// unknown kind or built-in). Written back after ours, so going back to
+    /// an older version and editing doesn't lose them.
+    private var unreadableCategoryJSON: [Any] = []
+
+    private func saveCategories() {
+        var objects: [Any] = []
+        if let ours = try? JSONEncoder().encode(itemCategories),
+           let array = try? JSONSerialization.jsonObject(with: ours) as? [Any] {
+            objects = array
+        }
+        objects += unreadableCategoryJSON
+        if let data = try? JSONSerialization.data(withJSONObject: objects) {
+            defaults.set(data, forKey: Self.itemCategoriesKey)
         }
     }
 
@@ -309,28 +322,32 @@ final class SettingsManager: ObservableObject {
 
     static let itemCategoriesKey = "itemCategories"
 
-    static let itemCategoriesBackupKey = "itemCategories.unreadable"
-
-    /// One element that can't be decoded (from a newer or damaged version)
-    /// is skipped, not the whole list. When something is skipped, the raw
-    /// JSON is kept under `itemCategoriesBackupKey` before the next write
-    /// replaces it.
-    static func loadCategories(from defaults: UserDefaults) -> [ItemCategory] {
-        guard let data = defaults.data(forKey: itemCategoriesKey) else { return ItemCategory.builtIns }
-        let elements = try? JSONDecoder().decode([LossyCategory].self, from: data)
-        let stored = elements?.compactMap(\.category) ?? []
-        if elements == nil || stored.count != elements?.count {
-            defaults.set(data, forKey: itemCategoriesBackupKey)
-            ErrorLogger.shared.log("Some saved categories could not be read; kept a backup", category: "Settings")
+    /// Decodes the saved list element by element: one this version can't
+    /// read (an unknown kind or built-in) is set aside as raw JSON instead of
+    /// taking the others down with it. Unknown match modes and icons fall
+    /// back to defaults inside `ItemCategory`.
+    static func loadCategories(from defaults: UserDefaults) -> (categories: [ItemCategory], unreadable: [Any]) {
+        guard let data = defaults.data(forKey: itemCategoriesKey),
+              let array = try? JSONSerialization.jsonObject(with: data) as? [Any] else {
+            return (ItemCategory.builtIns, [])
         }
-        return ItemCategory.merged(stored: stored)
-    }
-
-    private struct LossyCategory: Decodable {
-        let category: ItemCategory?
-        init(from decoder: Decoder) throws {
-            category = try? ItemCategory(from: decoder)
+        var stored: [ItemCategory] = []
+        var unreadable: [Any] = []
+        for element in array {
+            if JSONSerialization.isValidJSONObject(element),
+               let elementData = try? JSONSerialization.data(withJSONObject: element),
+               let category = try? JSONDecoder().decode(ItemCategory.self, from: elementData),
+               category.kind != .builtIn || category.builtIn != nil {
+                stored.append(category)
+            } else {
+                unreadable.append(element)
+            }
         }
+        if !unreadable.isEmpty {
+            ErrorLogger.shared.log("\(unreadable.count) saved categories are from a newer version; kept as they are",
+                                   category: "Settings")
+        }
+        return (ItemCategory.merged(stored: stored), unreadable)
     }
 
     /// Replaces the category with the same id, or appends a new one.
@@ -433,7 +450,9 @@ final class SettingsManager: ObservableObject {
         self.pinDismissAllConfirm = defaults.object(forKey: "pinDismissAllConfirm") as? Bool ?? false
         self.pinQuickPickerDismissesPins = defaults.object(forKey: "pinQuickPickerDismissesPins") as? Bool ?? false
 
-        self.itemCategories = Self.loadCategories(from: defaults)
+        let loaded = Self.loadCategories(from: defaults)
+        self.itemCategories = loaded.categories
+        self.unreadableCategoryJSON = loaded.unreadable
         self.showCategoryBar = defaults.object(forKey: "showCategoryBar") as? Bool ?? true
         self.recordSourceApp = defaults.object(forKey: "recordSourceApp") as? Bool ?? true
         self.analyzeImages = defaults.object(forKey: "analyzeImages") as? Bool ?? true
