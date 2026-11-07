@@ -154,6 +154,21 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertEqual(settings.itemCategories, ItemCategory.builtIns)
     }
 
+    func testOneUnreadableCategoryDoesNotLoseTheOthers() throws {
+        var rule = ItemCategory.newRegex()
+        rule.name = "Documents"
+        rule.pattern = "№"
+        let good = String(decoding: try JSONEncoder().encode(rule), as: UTF8.self)
+        let json = "[\(good), {\"id\": \"future\", \"kind\": \"somethingNew\"}]"
+        defaults.set(Data(json.utf8), forKey: SettingsManager.itemCategoriesKey)
+
+        let settings = SettingsManager(defaults: defaults)
+
+        XCTAssertTrue(settings.itemCategories.contains(rule))
+        XCTAssertEqual(defaults.data(forKey: SettingsManager.itemCategoriesBackupKey), Data(json.utf8),
+                       "the raw JSON is kept before it's overwritten")
+    }
+
     func testCorruptCategoryDataFallsBackToBuiltIns() {
         defaults.set(Data("nonsense".utf8), forKey: SettingsManager.itemCategoriesKey)
         XCTAssertEqual(SettingsManager(defaults: defaults).itemCategories, ItemCategory.builtIns)

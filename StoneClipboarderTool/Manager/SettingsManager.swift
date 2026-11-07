@@ -309,12 +309,28 @@ final class SettingsManager: ObservableObject {
 
     static let itemCategoriesKey = "itemCategories"
 
+    static let itemCategoriesBackupKey = "itemCategories.unreadable"
+
+    /// One element that can't be decoded (from a newer or damaged version)
+    /// is skipped, not the whole list. When something is skipped, the raw
+    /// JSON is kept under `itemCategoriesBackupKey` before the next write
+    /// replaces it.
     static func loadCategories(from defaults: UserDefaults) -> [ItemCategory] {
-        guard let data = defaults.data(forKey: itemCategoriesKey),
-              let stored = try? JSONDecoder().decode([ItemCategory].self, from: data) else {
-            return ItemCategory.builtIns
+        guard let data = defaults.data(forKey: itemCategoriesKey) else { return ItemCategory.builtIns }
+        let elements = try? JSONDecoder().decode([LossyCategory].self, from: data)
+        let stored = elements?.compactMap(\.category) ?? []
+        if elements == nil || stored.count != elements?.count {
+            defaults.set(data, forKey: itemCategoriesBackupKey)
+            ErrorLogger.shared.log("Some saved categories could not be read; kept a backup", category: "Settings")
         }
         return ItemCategory.merged(stored: stored)
+    }
+
+    private struct LossyCategory: Decodable {
+        let category: ItemCategory?
+        init(from decoder: Decoder) throws {
+            category = try? ItemCategory(from: decoder)
+        }
     }
 
     /// Replaces the category with the same id, or appends a new one.
