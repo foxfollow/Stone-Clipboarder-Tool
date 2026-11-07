@@ -10,11 +10,31 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
-        <new>
-            <li>🪟 NEW: Name any clipboard item: press ⌥E in the Quick Picker to give it a title. The title shows above the content, marked with a tag, in the Quick Picker, the menu bar and the main window, and search finds it</li>
-            <li>✨ NEW: The ⌥E editor also adds an item to Favorites or removes it (removing asks first) and moves a favorite up or down with ⌥↑ / ⌥↓. Favorites can be reordered again, and ⌃⇧1…0 follow the new order</li>
-            <li>✨ IMPROVED: Quick Look, "Open with TextEdit" and "Open in Preview" name the file after the item's title instead of "Clipboard Text.txt"</li>
-        </new>
+    <item>
+        <title>Version 1.9.0</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <sparkle:version>24</sparkle:version>
+        <sparkle:shortVersionString>1.9.0</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>Version 1.9.0</h2>
+            <ul>
+<li>🪟 NEW: Name any clipboard item: press ⌥E in the Quick Picker to give it a title. The title shows above the content, marked with a tag, in the Quick Picker, the menu bar and the main window, and search finds it</li>
+<li>✨ NEW: The ⌥E editor also adds an item to Favorites or removes it (removing asks first) and moves a favorite up or down with ⌥↑ / ⌥↓. Favorites can be reordered again, and ⌃⇧1…0 follow the new order</li>
+<li>✨ IMPROVED: Quick Look, "Open with TextEdit" and "Open in Preview" name the file after the item's title instead of "Clipboard Text.txt"</li>
+            </ul>
+        ]]></description>
+        <pubDate>Sat, 07 Nov 2026 10:30:47 +0000</pubDate>
+        <enclosure
+            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.9.0/StoneClipboarderTool.zip"
+            sparkle:version="24"
+            sparkle:shortVersionString="1.9.0"
+            sparkle:edSignature="XrcCDWkfOkK87ZCKw/xuxp7veiJpIHqjTqaJWVCJkIwkKaV62uvl7nC1FZ03RAV5gkNQLE6+Vu0EfrwZ91pYCg=="
+            length="5848560"
+            type="application/octet-stream"
+        />
+    </item>
+
 
     <item>
         <title>Version 1.8.0</title>
