@@ -153,8 +153,9 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   (`SettingsManager.itemCategories`), not a `@Model`. Built-in ids and
   regex/app-group UUIDs are written into `CBItem.categoryKeys`: never
   rename them. Detection results are stored, not computed per render;
-  change `ContentClassifier` → bump `ContentClassifier.version`, and the
-  launch-time `reclassifyIfNeeded` rescans. Toggling, icons and colors
+  change `ContentClassifier` → bump `ContentClassifier.version` (the visual
+  pass: `ImageClassifier.visualVersion`), and the launch-time
+  `reclassifyIfNeeded` rescans. Toggling, icons and colors
   must not change the stamp. `ImageClassifier` (Vision) is slow: only the
   background pass calls it, off the main thread, reading image bytes
   through its own `ModelContext`. OCR runs once per image (new images by
