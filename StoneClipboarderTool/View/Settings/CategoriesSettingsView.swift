@@ -31,6 +31,7 @@ struct CategoriesSettingsView: View {
         Form {
             Section("Quick Picker") {
                 Toggle("Show the category bar", isOn: $settingsManager.showCategoryBar)
+                Toggle("Show category, language and app icons on rows", isOn: $settingsManager.showRowBadges)
                 Text("Chips under the tabs filter the list; ⌥← and ⌥→ switch between them. In the search field, is:link, app:Safari and lang:uk filter too, and combine with text.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -60,6 +61,11 @@ struct CategoriesSettingsView: View {
             Section {
                 Toggle("Analyze images", isOn: $settingsManager.analyzeImages)
                 Text("Apple Vision looks for text, QR codes, faces and transparency in images, in the background and on this Mac. Text it reads also counts for Link, Email, Phone, the language and your rules.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle("Find images by the text in them", isOn: $settingsManager.searchImageText)
+                Toggle("Show the text of images in Quick Picker rows", isOn: $settingsManager.showImageTextInRows)
+                Text("Text read in the background, or by your own OCR (⌥⏎, Extract Text), stays with the image.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 ForEach(categories(.builtIn).filter { $0.builtIn?.isImageCategory == true }) { category in

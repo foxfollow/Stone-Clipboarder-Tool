@@ -27,6 +27,8 @@ enum ImageClassifier {
     struct Result: Equatable {
         var keys: Set<String> = []
         var language: String?
+        /// The recognized text and barcode payloads; nil when there is none.
+        var text: String?
     }
 
     static func classify(_ data: Data, ruleset: ContentClassifier.Ruleset = .empty) -> Result {
@@ -78,7 +80,7 @@ enum ImageClassifier {
             keys.formUnion(found.keys.filter { !$0.hasSuffix(".full") })
             language = found.language
         }
-        return Result(keys: keys, language: language)
+        return Result(keys: keys, language: language, text: text.isEmpty ? nil : text)
     }
 
     /// Decodes at most `maxPixelSize` on the long side, honoring EXIF

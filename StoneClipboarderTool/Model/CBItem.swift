@@ -37,6 +37,10 @@ final class CBItem {
     /// The app in front when the item was (last) copied.
     var sourceAppBundleID: String?
     var sourceAppName: String?
+    /// Text Vision read in the image (background analysis, or the user's
+    /// OCR), so search finds the image by it. Inline, at most
+    /// `maxRecognizedTextLength` characters.
+    var recognizedText: String?
 
     // Lightweight preview content for UI performance
     var contentPreview: String?
@@ -323,8 +327,11 @@ final class CBItem {
     /// The one matching rule behind every search box: the item's title, the
     /// text of text-like items, the name of files, the "[Image - W×H]" label
     /// of images. Case-insensitive. `query` is expected trimmed and non-empty.
-    func matchesSearch(_ query: String) -> Bool {
+    func matchesSearch(_ query: String, includingImageText: Bool = true) -> Bool {
         if title?.localizedCaseInsensitiveContains(query) == true {
+            return true
+        }
+        if includingImageText, recognizedText?.localizedCaseInsensitiveContains(query) == true {
             return true
         }
         switch itemType {
@@ -378,9 +385,34 @@ final class CBItem {
             keys.formUnion(image.keys)
             language = language ?? image.language
         }
-        categoryKeys = keys.isEmpty ? nil : "," + keys.sorted().joined(separator: ",") + ","
+        if let text = image?.text {
+            setRecognizedText(text)
+        }
+        categoryKeys = Self.encodeKeys(keys)
         languageCode = language
         classificationStamp = ruleset.stamp
+    }
+
+    static func encodeKeys(_ keys: Set<String>) -> String? {
+        keys.isEmpty ? nil : "," + keys.sorted().joined(separator: ",") + ","
+    }
+
+    static let maxRecognizedTextLength = 10_000
+
+    /// Trimmed and capped; empty clears it.
+    func setRecognizedText(_ text: String?) {
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        recognizedText = trimmed.isEmpty ? nil : String(trimmed.prefix(Self.maxRecognizedTextLength))
+    }
+
+    /// The recognized text on one line, for a row.
+    var recognizedTextSnippet: String? {
+        guard let recognizedText else { return nil }
+        return recognizedText
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
     }
 
     // MARK: - Deduplication

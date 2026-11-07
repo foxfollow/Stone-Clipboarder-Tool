@@ -120,7 +120,9 @@ struct QuickPickerView: View {
 
     /// The chip plus the search field (is:/app:/lang: tokens and text).
     private var itemFilter: ItemFilter {
-        ItemFilter(categories: categories, selection: activeCategory, query: .parse(searchText))
+        ItemFilter(
+            categories: categories, selection: activeCategory, query: .parse(searchText),
+            searchImageText: settingsManager?.searchImageText ?? true)
     }
 
     private var categoryChips: [QPCategoryChip] {
@@ -325,7 +327,9 @@ struct QuickPickerView: View {
                     openItemEditor(for: item)
                 },
                 badgeCategories: badgeCategories,
-                showLanguage: showsLanguageBadge
+                showLanguage: showsLanguageBadge,
+                showBadges: settingsManager?.showRowBadges ?? true,
+                showImageText: settingsManager?.showImageTextInRows ?? true
             )
             footerBar
         }
@@ -989,6 +993,7 @@ struct QuickPickerView: View {
 
         // Close the picker immediately (same UX as normal Enter)
         viewModel.markItemAccessed(item)
+        let itemID = item.persistentModelID
         onClose()
 
         // Run OCR on background thread
@@ -997,6 +1002,8 @@ struct QuickPickerView: View {
                   !recognizedText.isEmpty else { return }
 
             DispatchQueue.main.async {
+                // The image keeps its text, so search finds it later.
+                viewModel.rememberRecognizedText(recognizedText, forItemWithID: itemID)
                 // Straight to the pasteboard on purpose: the clipboard monitor
                 // then saves the recognized text as a history item, honoring
                 // pause and excluded apps.
@@ -1017,7 +1024,7 @@ struct QuickPickerView: View {
     private func performMultiOCR(items: [CBItem], range: ClosedRange<Int>) {
         enum OCRSource {
             case text(String)
-            case image(CGImage)
+            case image(CGImage, PersistentIdentifier)
         }
 
         let sources: [OCRSource] = items.compactMap { item -> OCRSource? in
@@ -1029,7 +1036,7 @@ struct QuickPickerView: View {
                 if item.itemType == .combined,
                    let img = item.image,
                    let cg = TextRecognizer.cgImage(from: img) {
-                    return .image(cg)
+                    return .image(cg, item.persistentModelID)
                 }
                 return nil
             case .image:
@@ -1037,14 +1044,14 @@ struct QuickPickerView: View {
                       let cg = TextRecognizer.cgImage(from: img) else {
                     return nil
                 }
-                return .image(cg)
+                return .image(cg, item.persistentModelID)
             case .file:
                 guard item.isImageFile,
                       let img = item.filePreviewImage,
                       let cg = TextRecognizer.cgImage(from: img) else {
                     return nil
                 }
-                return .image(cg)
+                return .image(cg, item.persistentModelID)
             }
         }
 
@@ -1064,13 +1071,15 @@ struct QuickPickerView: View {
         // parallelism wouldn't help much and pulls in Sendable headaches.
         DispatchQueue.global(qos: .userInitiated).async {
             var parts: [String] = []
+            var recognizedByItem: [(PersistentIdentifier, String)] = []
             for source in sources {
                 switch source {
                 case .text(let s):
                     parts.append(s)
-                case .image(let cg):
+                case .image(let cg, let id):
                     if let recognized = TextRecognizer.recognizeText(in: cg) {
                         parts.append(recognized)
+                        recognizedByItem.append((id, recognized))
                     }
                 }
             }
@@ -1079,6 +1088,9 @@ struct QuickPickerView: View {
             guard !combined.isEmpty else { return }
 
             DispatchQueue.main.async {
+                for (id, text) in recognizedByItem {
+                    viewModel.rememberRecognizedText(text, forItemWithID: id)
+                }
                 // Straight to the pasteboard on purpose, like single OCR: the
                 // monitor saves the recognized text as a history item.
                 let pb = NSPasteboard.general

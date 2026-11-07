@@ -281,6 +281,21 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(analyzeImages, forKey: "analyzeImages") }
     }
 
+    /// Search matches the text recognized in images.
+    @Published var searchImageText: Bool {
+        didSet { defaults.set(searchImageText, forKey: "searchImageText") }
+    }
+
+    /// Quick Picker rows of images show their recognized text.
+    @Published var showImageTextInRows: Bool {
+        didSet { defaults.set(showImageTextInRows, forKey: "showImageTextInRows") }
+    }
+
+    /// Quick Picker rows show category icons, the language and the app.
+    @Published var showRowBadges: Bool {
+        didSet { defaults.set(showRowBadges, forKey: "showRowBadges") }
+    }
+
     /// Store the frontmost app's name and bundle id with each capture.
     @Published var recordSourceApp: Bool {
         didSet { defaults.set(recordSourceApp, forKey: "recordSourceApp") }
@@ -400,6 +415,9 @@ final class SettingsManager: ObservableObject {
         self.showCategoryBar = defaults.object(forKey: "showCategoryBar") as? Bool ?? true
         self.recordSourceApp = defaults.object(forKey: "recordSourceApp") as? Bool ?? true
         self.analyzeImages = defaults.object(forKey: "analyzeImages") as? Bool ?? true
+        self.searchImageText = defaults.object(forKey: "searchImageText") as? Bool ?? true
+        self.showImageTextInRows = defaults.object(forKey: "showImageTextInRows") as? Bool ?? true
+        self.showRowBadges = defaults.object(forKey: "showRowBadges") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = defaults.string(forKey: "clipboardCaptureMode"),

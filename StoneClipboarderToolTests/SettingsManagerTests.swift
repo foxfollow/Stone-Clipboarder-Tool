@@ -98,6 +98,9 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertTrue(settings.showCategoryBar)
         XCTAssertTrue(settings.recordSourceApp)
         XCTAssertTrue(settings.analyzeImages)
+        XCTAssertTrue(settings.searchImageText)
+        XCTAssertTrue(settings.showImageTextInRows)
+        XCTAssertTrue(settings.showRowBadges)
     }
 
     func testCategoriesPersist() {
@@ -113,6 +116,9 @@ final class SettingsManagerTests: XCTestCase {
         settings.showCategoryBar = false
         settings.recordSourceApp = false
         settings.analyzeImages = false
+        settings.searchImageText = false
+        settings.showImageTextInRows = false
+        settings.showRowBadges = false
 
         let reloaded = SettingsManager(defaults: defaults)
         XCTAssertEqual(reloaded.itemCategories.last, rule)
@@ -120,6 +126,9 @@ final class SettingsManagerTests: XCTestCase {
         XCTAssertFalse(reloaded.showCategoryBar)
         XCTAssertFalse(reloaded.recordSourceApp)
         XCTAssertFalse(reloaded.analyzeImages)
+        XCTAssertFalse(reloaded.searchImageText)
+        XCTAssertFalse(reloaded.showImageTextInRows)
+        XCTAssertFalse(reloaded.showRowBadges)
     }
 
     func testBuiltInsCannotBeDeletedButCanBeReset() {

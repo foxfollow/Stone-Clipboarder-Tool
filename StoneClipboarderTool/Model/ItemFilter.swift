@@ -75,6 +75,8 @@ struct ItemFilter {
     var categories: [ItemCategory] = []
     var selection: CategorySelection?
     var query = QPSearchQuery()
+    /// Free text also matches the text recognized in images.
+    var searchImageText = true
 
     var isEmpty: Bool { selection == nil && query.isEmpty }
     /// True when only inline columns are checked (no content reads).
@@ -85,7 +87,9 @@ struct ItemFilter {
         for token in query.isTokens where !matches(item, isToken: token) { return false }
         for token in query.appTokens where !Self.matches(item, app: token) { return false }
         for token in query.langTokens where !Self.matches(item, language: token) { return false }
-        if !query.text.isEmpty && !item.matchesSearch(query.text) { return false }
+        if !query.text.isEmpty && !item.matchesSearch(query.text, includingImageText: searchImageText) {
+            return false
+        }
         return true
     }
 

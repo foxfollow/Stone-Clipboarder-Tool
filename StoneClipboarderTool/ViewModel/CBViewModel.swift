@@ -625,7 +625,10 @@ class CBViewModel: ObservableObject {
     func searchItems(matching query: String, types: Set<CBItemType>? = nil, limit: Int = 300) async -> [CBItem] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return [] }
-        return await searchItems(types: types, limit: limit) { $0.matchesSearch(query) }
+        let includingImageText = settingsManager?.searchImageText ?? true
+        return await searchItems(types: types, limit: limit) {
+            $0.matchesSearch(query, includingImageText: includingImageText)
+        }
     }
 
     /// Items passing `filter` (chip, `is:`/`app:`/`lang:` tokens, free text)
@@ -843,6 +846,35 @@ class CBViewModel: ObservableObject {
             }
             return results
         }.value
+    }
+
+    /// Keeps text the user's OCR (⌥⏎, "Extract Text") found in an image on
+    /// that image, so search finds it, and adds the categories the text
+    /// brings (Text in Image, Link, …). Ignores items deleted meanwhile.
+    func rememberRecognizedText(_ text: String, forItemWithID id: PersistentIdentifier) {
+        guard let modelContext = _modelContext else { return }
+        var descriptor = FetchDescriptor<CBItem>(predicate: #Predicate { $0.persistentModelID == id })
+        descriptor.fetchLimit = 1
+        do {
+            guard let item = try modelContext.fetch(descriptor).first, !item.isDeleted,
+                  item.hasAnalyzableImage else { return }
+            item.setRecognizedText(text)
+            guard let stored = item.recognizedText else { return }
+
+            let found = ContentClassifier.classify(stored, ruleset: classifierRuleset)
+            var keys = item.categoryKeySet
+            keys.formUnion(found.keys.filter { !$0.hasSuffix(".full") })
+            keys.insert(ItemCategory.BuiltIn.ocr.rawValue)
+            item.categoryKeys = CBItem.encodeKeys(keys)
+            if item.languageCode == nil { item.languageCode = found.language }
+
+            try modelContext.save()
+            refreshItemCounts()
+            objectWillChange.send()
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to save recognized text", category: "SwiftData", error: error)
+        }
     }
 
     /// "Forget recorded apps": clears the source app of every item.

@@ -22,6 +22,7 @@ final class ImageClassifierTests: XCTestCase {
         XCTAssertTrue(result.keys.contains("email"), "\(result.keys)")
         XCTAssertFalse(result.keys.contains { $0.hasSuffix(".full") }, "no entire-text keys for images")
         XCTAssertFalse(result.keys.contains("transparent"))
+        XCTAssertTrue(result.text?.contains("stone.example.com") == true, "the text is kept for search")
     }
 
     func testRegexRulesSeeTheRecognizedText() throws {
@@ -44,6 +45,7 @@ final class ImageClassifierTests: XCTestCase {
 
         XCTAssertTrue(result.keys.contains("barcode"), "\(result.keys)")
         XCTAssertTrue(result.keys.contains("link"), "the payload is a link")
+        XCTAssertTrue(result.text?.contains("https://stone.example.com/qr") == true)
     }
 
     func testTransparency() throws {

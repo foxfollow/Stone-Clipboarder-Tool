@@ -21,6 +21,15 @@ struct QPItemRow: View {
     var badgeCategories: [ItemCategory] = []
     /// Show the detected language's code (the Languages category is on).
     var showLanguage: Bool = false
+    /// Category icons, language and app icon in the meta line.
+    var showBadges: Bool = true
+    /// An image's recognized text under its "[Image - W×H]" line.
+    var showImageText: Bool = true
+
+    private var imageTextSnippet: String? {
+        guard showImageText, item.itemType != .text else { return nil }
+        return item.recognizedTextSnippet
+    }
 
     private static let maxBadges = 3
 
@@ -74,6 +83,22 @@ struct QPItemRow: View {
                         .font(.system(size: 11))
                         .lineLimit(1)
                         .foregroundStyle(.secondary)
+                } else if let snippet = imageTextSnippet {
+                    // The image's own text says more than its size.
+                    Text(item.displayContent)
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "text.viewfinder")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                        Text(snippet)
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                    }
+                    .help("Text in the image")
                 } else {
                     Text(item.displayContent)
                         .font(.system(size: 13))
@@ -94,7 +119,9 @@ struct QPItemRow: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    categoryBadges
+                    if showBadges {
+                        categoryBadges
+                    }
 
                     Spacer()
 

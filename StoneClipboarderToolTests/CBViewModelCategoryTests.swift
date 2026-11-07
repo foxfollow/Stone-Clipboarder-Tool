@@ -91,6 +91,60 @@ final class CBViewModelCategoryTests: XCTestCase {
         XCTAssertEqual(item.analyzableImageData, Data([1]))
     }
 
+    func testImageTextIsKeptAndSearchable() async throws {
+        let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
+        image.classify(with: .empty, image: ImageClassifier.Result(keys: ["ocr"], text: "  Quarterly report\nQ3 2026 \n"))
+        context.insert(image)
+        try context.save()
+
+        XCTAssertEqual(image.recognizedText, "Quarterly report\nQ3 2026")
+        XCTAssertEqual(image.recognizedTextSnippet, "Quarterly report · Q3 2026")
+        XCTAssertTrue(image.matchesSearch("quarterly"))
+        XCTAssertFalse(image.matchesSearch("quarterly", includingImageText: false))
+
+        let found = await viewModel.searchItems(matching: "Q3 2026")
+        XCTAssertEqual(found.count, 1)
+
+        let settings = SettingsManager(defaults: isolated.defaults)
+        settings.searchImageText = false
+        viewModel.setSettingsManager(settings)
+        let hidden = await viewModel.searchItems(matching: "Q3 2026")
+        XCTAssertTrue(hidden.isEmpty)
+        XCTAssertFalse(ItemFilter(query: .parse("quarterly"), searchImageText: false).matches(image))
+        XCTAssertTrue(ItemFilter(query: .parse("quarterly")).matches(image))
+    }
+
+    func testAnImageWithoutTextKeepsEarlierText() {
+        let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
+        image.setRecognizedText("from the user's OCR")
+        image.classify(with: .empty, image: ImageClassifier.Result())
+        XCTAssertEqual(image.recognizedText, "from the user's OCR")
+
+        image.setRecognizedText(String(repeating: "x", count: CBItem.maxRecognizedTextLength + 50))
+        XCTAssertEqual(image.recognizedText?.count, CBItem.maxRecognizedTextLength)
+        image.setRecognizedText("   ")
+        XCTAssertNil(image.recognizedText)
+        XCTAssertNil(image.recognizedTextSnippet)
+    }
+
+    func testTheUsersOCRStaysWithTheImage() throws {
+        let image = CBItem(timestamp: Date(), imageData: Data([1]), itemType: .image)
+        image.languageCode = nil
+        let text = CBItem(timestamp: Date(), content: "plain", itemType: .text)
+        context.insert(image)
+        context.insert(text)
+        try context.save()
+
+        viewModel.rememberRecognizedText("Pay at https://bank.example.com", forItemWithID: image.persistentModelID)
+        viewModel.rememberRecognizedText("ignored", forItemWithID: text.persistentModelID)
+
+        XCTAssertEqual(image.recognizedText, "Pay at https://bank.example.com")
+        XCTAssertTrue(image.hasCategoryKey("ocr"))
+        XCTAssertTrue(image.hasCategoryKey("link"))
+        XCTAssertFalse(image.hasCategoryKey("link.full"))
+        XCTAssertNil(text.recognizedText, "only images keep recognized text")
+    }
+
     func testImageFilesAreAnalyzableOtherFilesAreNot() {
         let png = CBItem(timestamp: Date(), fileData: Data([7]), fileName: "a.png", fileUTI: "public.png", itemType: .file)
         let zip = CBItem(timestamp: Date(), fileData: Data([7]), fileName: "a.zip", fileUTI: "public.zip-archive", itemType: .file)
