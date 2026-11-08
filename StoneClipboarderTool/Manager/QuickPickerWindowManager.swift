@@ -63,6 +63,8 @@ class KeyCapturingPanel: NSPanel {
 @MainActor
 class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate {
     private var window: NSPanel?
+    /// The open picker's panel (the screenshot tour captures it).
+    var pickerWindow: NSWindow? { window }
     private let quickLookCoordinator = QPQuickLookCoordinator()
     private let customPreviewManager = QPCustomPreviewManager()
     // Runs the Quick Picker's ⌘⇧Return type-out. Lives here (not in the

@@ -30,7 +30,10 @@ StoneClipboarderToolApp (App)
 Then it cleans old Quick Look sessions, loads hotkeys, applies menu bar and
 window visibility, installs the ⌘Q monitor, and on the next main-queue turn
 loads the first history rows. Under unit tests it returns before all of
-this (`AppEnvironment.isRunningUnitTests`).
+this (`AppEnvironment.isRunningUnitTests`). In demo mode (`--demo`,
+`--screenshots`) it calls `setUpDemo` instead: in-memory stores filled by
+`DemoData`, a separate UserDefaults suite, no monitoring, hotkeys, menu bar
+item or pins, and the `ScreenshotTour` when asked (docs/DEMO_MODE.md).
 
 ## Files
 
@@ -89,7 +92,9 @@ user's OCR result (⌥⏎, Extract Text) on the image.
 
 | File | What |
 | --- | --- |
-| AppEnvironment | `isRunningUnitTests` |
+| AppEnvironment | `isRunningUnitTests`; `isDemo`, `screenshotsDirectory` and `settingsDefaults` for demo mode (docs/DEMO_MODE.md) |
+| DemoData | The made-up history, categories and settings of demo mode |
+| ScreenshotTour | `--screenshots`: shows each screen in dark and light and waits for `scripts/screenshots.sh` to capture it |
 | AppIconCache | App icons by bundle id for source-app badges |
 | AppNotifications | Every `Notification.Name` the app posts |
 | ExternalOpener | Temp file + open in Preview / TextEdit / the default app |
@@ -192,9 +197,10 @@ app's container for sandboxed Debug builds).
   detection in `ContentClassifier.classify` → bump
   `ContentClassifier.version` so stored items are rescanned →
   `CategorySettingsRow.builtInDescription`.
-- **The landing screenshots.** Made-up history in `MockHistory` and the
-  views in `LandingScreenshots` (StoneClipboarderToolTests) →
-  `make screenshots` (`scripts/screenshots.sh`) → `docs/resources/index/sct-*.png`.
+- **The landing screenshots.** Data in `DemoData`, screens in
+  `ScreenshotTour` → `make screenshots` (`scripts/screenshots.sh`) →
+  `docs/resources/index/sct-*.png` → the App Preview cards in
+  `docs/index*.html`. See docs/DEMO_MODE.md.
 - **A pin option.** Default in SettingsManager (`pin…`) → per-pin field in
   `PinnedItemConfig` → `PinViewState` → PinChromeView / PinWindowController →
   PinSettingsView.

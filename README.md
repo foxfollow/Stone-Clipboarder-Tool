@@ -154,7 +154,7 @@ Unit tests run inside the app but against in-memory stores and throwaway setting
 xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarderTool -destination "platform=macOS"
 ```
 
-`make screenshots` re-renders the landing page screenshots from the app's real views with made-up data.
+`make demo` opens the app with a made-up history (it runs next to your installed copy and never touches your data); `make screenshots` re-renders the landing page screenshots from it. See [docs/DEMO_MODE.md](docs/DEMO_MODE.md).
 
 Manual checks per feature are in [TESTING_GUIDE.md](TESTING_GUIDE.md); contributor and agent notes are in [AGENTS.md](AGENTS.md) and [docs/CODEMAP.md](docs/CODEMAP.md).
 

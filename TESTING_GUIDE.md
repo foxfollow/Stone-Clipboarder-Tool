@@ -146,6 +146,10 @@ all pins.
 - [ ] "Show the category bar" off hides the row; is:/app:/lang: still work,
       and ⌥←/⌥→ move the cursor by word again (⌥→ doesn't open the
       preview).
+- [ ] `make demo` with the installed app running: the demo opens with the
+      made-up history; the installed app's hotkeys, clipboard capture and
+      history are unaffected, and its settings unchanged after quitting
+      the demo.
 - [ ] Updating from 1.9.0: existing items (hundreds of images too) get
       categories after launch without a freeze or a memory spike; titles, favorites and their order are unchanged.
 
