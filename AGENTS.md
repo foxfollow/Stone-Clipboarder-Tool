@@ -67,6 +67,11 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   default DerivedData and swaps the running app for it (sandboxed data);
   `make install` builds like CI into /Applications (the release's data).
   Both quit the running app. See `scripts/local-build.sh`.
+- Landing screenshots: `make screenshots` renders the App Preview images
+  (`docs/resources/index/sct-*.png`) from the real views with made-up
+  data (`LandingScreenshots`, skipped in normal test runs) and captures
+  the windows with `screencapture`, so the terminal needs Screen
+  Recording. Never put real clipboard history on the site.
 - Building needs Xcode 26: the app icon is an Icon Composer file and some
   views use macOS 26 APIs behind `#available`.
 - Don't quit or relaunch a running copy of the app without asking its

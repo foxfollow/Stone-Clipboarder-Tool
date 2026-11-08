@@ -52,11 +52,11 @@ this (`AppEnvironment.isRunningUnitTests`).
 
 | File | What |
 | --- | --- |
-| CBItem | `@Model`, clipboard container. External storage: `content`, `imageData`, `fileData`, `thumbnailData`. Inline: `timestamp`, `itemType`, `fileName`, `fileUTI`, `isFavorite`, `orderIndex`, `title` (user-given, optional), `contentPreview` (first 100 characters), `imageSize` ("W×H"), `fileSize`, `categoryKeys` (",link,link.full,…"), `languageCode`, `classificationStamp`, `sourceAppBundleID` / `sourceAppName`, `recognizedText` (what OCR read in an image, ≤10,000 characters) and `barcodeText` (QR / barcode contents from the visual pass), both searched by `matchesSearch`, `textRecognitionState` (OCR not requested / pending for a new image / queued by "Recognize Text in All Images" / no text / found), `visualAnalysisVersion` (the visual pass, apart from the rules stamp; negative = failed, reset by `retryFailedImageAnalysis` at launch). `classify(with:image:)` holds all image bookkeeping. Also the thumbnail cache (never written during render), `ContentKey` / `hasSameContent` for deduplication, `matchesSearch`, `classify(with:)` |
+| CBItem | `@Model`, clipboard container. External storage: `content`, `imageData`, `fileData`, `thumbnailData`. Inline: `timestamp`, `itemType`, `fileName`, `fileUTI`, `isFavorite`, `orderIndex`, `title` (user-given, optional), `contentPreview` (first 100 characters), `imageSize` ("W×H"), `fileSize`, `categoryKeys` (",link,link.full,…"), `languageCode`, `classificationStamp`, `sourceAppBundleID` / `sourceAppName`, `recognizedText` (what OCR read in an image, ≤10,000 characters) and `barcodeText` (QR / barcode contents from the visual pass), both searched by `matchesSearch`, `textRecognitionState` (OCR not requested / pending for a new image / queued by "Recognize Text in All Images" / no text / found / failed), `visualAnalysisVersion` (the visual pass, apart from the rules stamp; negative = failed; `visualNotApplicable` for items without an image), `imageAnalysisFailures` (failed Vision runs; `retryFailedImageAnalysis` retries failures at launch up to `ImageClassifier.maxRetries`). `classify(with:image:)` holds all image bookkeeping. Also the thumbnail cache (never written during render), `ContentKey` / `hasSameContent` for deduplication, `matchesSearch`, `classify(with:)` |
 | ContentClassifier | Finds links, emails, phones, addresses, dates (NSDataDetector), code, JSON, paths, the language (NaturalLanguage) and regex-rule matches in the first 4000 characters; `key` for a match, `key.full` when it covers the whole text. `Ruleset` compiles the rules once and carries the `stamp` |
 | ImageClassifier | Vision on a downscaled (2048 px) image, two independent parts: the visual pass (QR codes and barcodes with payloads, faces, transparency) and OCR. `CBItem.classify(with:image:)` stores the text and runs it through ContentClassifier. Synchronous, off the main thread only |
 | ItemCategory | A chip: built-in (stable ids `link` … `language`, image ones `ocr`, `barcode`, `face`, `transparent`), regex rule or app group, with match mode, SF Symbol or emoji, color. `builtIns`, `merged(stored:)`, `matches(_:)`, `count(in:)`. JSON in UserDefaults, not a `@Model` |
-| ItemFilter | `QPSearchQuery` (is:/app:/lang: tokens + free text), `CategorySelection` (the active chip), `ItemFilter.matches`, `FacetCounts` (per-key / language / app counts) |
+| ItemFilter | `QPSearchQuery` (is:/app:/lang: tokens + free text, which keeps its spacing), `CategorySelection` and `ChipSelection` (the chips that are on, cursor and anchor for ⌥⇧←/→ and ⇧-click), `ItemFilter.matches`, `FacetCounts` (per-key / language / app counts) |
 | HotkeyConfig | `@Model` per `HotkeyAction` (23 actions and their default shortcuts), settings container |
 | HotkeyShortcut | Parses and formats shortcut strings; the key table; reserved system shortcuts; Carbon modifier mask |
 | PinnedItemConfig | `@Model` pin: content snapshot plus layout and flags, settings container; `contentKey` |
@@ -74,7 +74,9 @@ by the Quick Picker and search, and opening items in other apps.
 Categories: new items are classified in `insertOrBump`, which also stores
 the source app; `reclassifyIfNeeded` rescans items whose
 `classificationStamp` differs from the current rules (at launch and when a
-regex rule or "Analyze images" changes) in pages of 100; images go to
+regex rule changes; images also when "Find QR codes, faces and
+transparency" is switched or `ImageClassifier.visualVersion` bumps) in
+pages of 100; images go to
 `ImageClassifier` four at a time on a utility thread through a throwaway
 `ModelContext`, and a new image is left unstamped for that pass; `facetCounts(ofTypes:)` shares the
 cached count scan; `searchItems(filter:types:limit:)` applies an
@@ -131,7 +133,7 @@ app's container for sandboxed Debug builds).
 | --- | --- |
 | Clipboard history | `ClipboardHistory.store`, blobs in `.ClipboardHistory_SUPPORT/` |
 | Hotkeys, excluded apps, pins | `Settings.store` |
-| Settings | UserDefaults through SettingsManager; keys are the property names. `enableErrorFileLogging` is also read by ErrorLogger; `itemCategories` is a JSON array of `ItemCategory` |
+| Settings | UserDefaults through SettingsManager; keys are the property names. `enableErrorFileLogging` is also read by ErrorLogger; `itemCategories` is a JSON array of `ItemCategory` (fields a newer version wrote are written back unless edited here) |
 | Error log | `StoneClipboarder_errors.log` (+ `.old.log`) |
 
 ### Temp files
@@ -161,7 +163,7 @@ app's container for sandboxed Debug builds).
 | ⌘Q down / up (local) | AppDelegate | app lifetime / while ⌘Q is held |
 | Esc cancels type-out (global + local) | TypePaster | while typing |
 | Click outside, Esc (global); key re-routing (local) | QuickPickerWindowManager | while the picker is open |
-| Tab, ⇧Tab, ⌥P, ⌥⏎, ⌥E, ⌥←/⌥→ (category chips); in the ⌥E editor ⏎, Esc, ⌥F, ⌥↑/⌥↓ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
+| Tab, ⇧Tab, ⌥P, ⌥⏎, ⌥E, ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editor ⏎, Esc, ⌥F, ⌥↑/⌥↓ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
 | ⌘C / ⌘W in a pin (local) | PinContentView `CommandKeyHandler` | while the pin is in a window |
 | Pinch zoom (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
@@ -190,6 +192,9 @@ app's container for sandboxed Debug builds).
   detection in `ContentClassifier.classify` → bump
   `ContentClassifier.version` so stored items are rescanned →
   `CategorySettingsRow.builtInDescription`.
+- **The landing screenshots.** Made-up history in `MockHistory` and the
+  views in `LandingScreenshots` (StoneClipboarderToolTests) →
+  `make screenshots` (`scripts/screenshots.sh`) → `docs/resources/index/sct-*.png`.
 - **A pin option.** Default in SettingsManager (`pin…`) → per-pin field in
   `PinnedItemConfig` → `PinViewState` → PinChromeView / PinWindowController →
   PinSettingsView.
