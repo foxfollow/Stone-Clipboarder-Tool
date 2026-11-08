@@ -343,7 +343,7 @@
                 <h2 class="section-title text-3xl font-bold mb-4">App Preview</h2>
                 <p class="section-sub text-gray-400">Fits perfectly into your macOS workflow.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
                 <div class="reveal">
                     <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Main Window')">
                         <img alt="Main Window" class="theme-image"
@@ -366,6 +366,14 @@
                             data-light-src="resources/index/sct-light-menubar.png"
                             data-dark-src="resources/index/sct-dark-menubar.png"
                             src="resources/index/sct-dark-menubar.png" />
+                    </div>
+                </div>
+                <div class="reveal" style="transition-delay: 300ms">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Settings — Categories')">
+                        <img alt="Settings — Categories" class="theme-image"
+                            data-light-src="resources/index/sct-light-categories.png"
+                            data-dark-src="resources/index/sct-dark-categories.png"
+                            src="resources/index/sct-dark-categories.png" />
                     </div>
                 </div>
             </div>
