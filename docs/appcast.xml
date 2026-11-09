@@ -10,6 +10,16 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
+        <new>
+            <li>🪟 NEW: Categories in the Quick Picker: a row of chips under the tabs groups items by what they contain — links, emails, phone numbers, addresses, dates, code, JSON, file paths and languages. ⌥← / ⌥→ switch between chips; ⇧-click or ⌥⇧← / ⌥⇧→ select several.</li>
+            <li>🪟 NEW: Categories for images, on the Images tab: Apple Vision finds text, QR codes and barcodes, faces and transparent areas, in the background and on your Mac. Text read from a screenshot counts for links, emails, languages and your own rules too.</li>
+            <li>🪟 NEW: Text in images is searchable: new screenshots and copied images are read once right after the copy, older ones when you choose "Recognize Text in All Images" in Settings, and your own OCR (⌥⏎, Extract Text) is kept too. Searching a word finds the picture, and the Quick Picker shows its text under the image.</li>
+            <li>✨ NEW: Your own categories: regular-expression rules (with a live test) and groups of source apps. Settings → Categories gives any category an SF Symbol or an emoji and a color, switches built-ins off, and sets Contains or Entire text matching.</li>
+            <li>✨ NEW: The app you copied from is remembered and shown as a small icon on the row. Turn it off or forget recorded apps in Settings → Categories.</li>
+            <li>⌨️ IMPROVED: Search filters in the Quick Picker: is:link, is:fav, app:Safari, lang:uk — on their own or together with text.</li>
+            <li>🎨 IMPROVED: Quick Picker rows show the icons of their categories, the language and the source app.</li>
+        </new>
+
     <item>
         <title>Version 1.9.0</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>

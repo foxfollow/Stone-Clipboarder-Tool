@@ -80,8 +80,9 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   Application Support / temp folders: an unsigned test run is unsandboxed
   and would change the installed app's data.
 - Unit tests cover models and enums, `HotkeyShortcut`, the capture rules,
-  CBViewModel (list paging, deduplication, queries, cleanup), pin linking,
-  settings and the type-out key tables. Clipboard, windows, hotkeys and
+  CBViewModel (list paging, deduplication, queries, cleanup, categories),
+  the content classifier and category filters, pin linking, settings and
+  the type-out key tables. Clipboard, windows, hotkeys and
   synthetic key events are checked by hand with TESTING_GUIDE.md.
 
 ## Architecture in one screen
@@ -148,6 +149,17 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   sandboxed, data in `~/Library/Application Support/StoneClipboarderTool/`.
   Changing signing or entitlements moves user data and needs a migration
   plan.
+- **Categories.** Definitions are `ItemCategory` values in UserDefaults
+  (`SettingsManager.itemCategories`), not a `@Model`. Built-in ids and
+  regex/app-group UUIDs are written into `CBItem.categoryKeys`: never
+  rename them. Detection results are stored, not computed per render;
+  change `ContentClassifier` → bump `ContentClassifier.version`, and the
+  launch-time `reclassifyIfNeeded` rescans. Toggling, icons and colors
+  must not change the stamp. `ImageClassifier` (Vision) is slow: only the
+  background pass calls it, off the main thread, reading image bytes
+  through its own `ModelContext`. OCR runs once per image (new images by
+  default, older ones only when the user asks); rescans reuse
+  `recognizedText`.
 - Favorites have had no drag-to-reorder UI since Dec 2025. A new favorite
   goes last; the Quick Picker's ⌥E editor moves one (`CBViewModel.moveFavorite`
   renumbers `orderIndex` 0…n-1). ⌃⇧1…0 follow that order.

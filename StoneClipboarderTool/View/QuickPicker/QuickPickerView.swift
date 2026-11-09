@@ -57,6 +57,10 @@ struct QuickPickerView: View {
     @State private var hasMoreItems = true
     @State private var searchTask: Task<Void, Never>?
     @State private var typeCounts = CBViewModel.ItemTypeCounts()
+    /// The chip picked in the category bar; nil = no category filter.
+    @State private var chipSelection = ChipSelection()
+    /// Category, language and app counts for the active tab's chips.
+    @State private var facets = FacetCounts()
     /// The open ⌥E editor, nil when closed.
     @State private var itemEditor: QPItemEditorModel?
     @FocusState private var isSearchFocused: Bool
@@ -104,11 +108,50 @@ struct QuickPickerView: View {
             base = quickPickerItems
         }
 
-        let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedSearch.isEmpty {
-            return base
+        let filter = itemFilter
+        return filter.isEmpty ? base : base.filter(filter.matches)
+    }
+
+    // MARK: - Categories
+
+    private var categories: [ItemCategory] {
+        settingsManager?.itemCategories ?? ItemCategory.builtIns
+    }
+
+    /// The chip plus the search field (is:/app:/lang: tokens and text).
+    private var itemFilter: ItemFilter {
+        ItemFilter(
+            categories: categories, selections: chipSelection.selected, query: .parse(searchText),
+            searchImageText: settingsManager?.searchImageText ?? true)
+    }
+
+    private var categoryChips: [QPCategoryChip] {
+        guard settingsManager?.showCategoryBar ?? true else { return [] }
+        return QPCategoryChip.chips(for: categories, facets: facets, forImages: activeTab == .images)
+    }
+
+    /// Content and regex categories shown as row badges.
+    private var badgeCategories: [ItemCategory] {
+        categories.filter { $0.isEnabled && $0.kind != .apps && $0.builtIn != .language }
+    }
+
+    private var showsLanguageBadge: Bool {
+        categories.contains { $0.builtIn == .language && $0.isEnabled }
+    }
+
+    /// ⌥← / ⌥→ move to one chip; with ⇧ they extend a run of chips.
+    private func moveChipSelection(by step: Int, extending: Bool) {
+        let chips = categoryChips.map(\.selection)
+        if extending {
+            chipSelection.extend(step, in: chips)
+        } else {
+            chipSelection.step(step, in: chips)
         }
-        return base.filter { $0.matchesSearch(trimmedSearch) }
+    }
+
+    /// Drops chips the active tab doesn't show (no items of its types).
+    private func dropUnavailableCategory() {
+        chipSelection.keep(only: categoryChips.map(\.selection))
     }
 
     var body: some View {
@@ -205,7 +248,7 @@ struct QuickPickerView: View {
                     searchTask = Task {
                         try? await Task.sleep(nanoseconds: 300_000_000)
                         if !Task.isCancelled {
-                            await performSearch(newValue)
+                            await performSearch()
                         }
                     }
                 } else {
@@ -217,8 +260,16 @@ struct QuickPickerView: View {
                 selectedIndex = 0
                 selectionAnchor = nil
                 searchTask?.cancel()
+                loadTabCounts()
+                dropUnavailableCategory()
                 reloadForActiveTab()
                 isSearchFocused = true
+            }
+            .onChange(of: chipSelection.selected) { _, _ in
+                selectedIndex = 0
+                selectionAnchor = nil
+                searchTask?.cancel()
+                reloadForActiveTab()
             }
             .onChange(of: filteredItems.count) { _, newCount in
                 if selectedIndex >= newCount {
@@ -237,6 +288,16 @@ struct QuickPickerView: View {
             dragHandle
             searchBar
             tabBar
+            if !categoryChips.isEmpty {
+                QPCategoryBar(chips: categoryChips, selection: chipSelection) { chip, adding in
+                    chipSelection.click(chip, adding: adding)
+                    // Same focus re-grab as the tab pills.
+                    isSearchFocused = false
+                    DispatchQueue.main.async {
+                        isSearchFocused = true
+                    }
+                }
+            }
             Divider()
             QPItemList(
                 filteredItems: filteredItems,
@@ -265,7 +326,11 @@ struct QuickPickerView: View {
                 },
                 onEdit: { item in
                     openItemEditor(for: item)
-                }
+                },
+                badgeCategories: badgeCategories,
+                showLanguage: showsLanguageBadge,
+                showBadges: settingsManager?.showRowBadges ?? true,
+                showImageText: settingsManager?.showImageTextInRows ?? true
             )
             footerBar
         }
@@ -312,6 +377,9 @@ struct QuickPickerView: View {
             tabInterceptor.onOptionReturn = {
                 performOptionReturn()
             }
+            tabInterceptor.onOptionArrow = { step, extending in
+                moveChipSelection(by: step, extending: extending)
+            }
             tabInterceptor.onOptionE = {
                 guard let item = filteredItems[safe: selectedIndex] else { return }
                 openItemEditor(for: item)
@@ -349,7 +417,9 @@ struct QuickPickerView: View {
                 .font(.system(size: 14, weight: .medium))
 
             TextField(
-                activeTab == .favorites ? "Search favorites..." : "Search clipboard...",
+                activeTab == .favorites
+                    ? "Search favorites… (is:link, app:Safari, lang:uk)"
+                    : "Search clipboard… (is:link, app:Safari, lang:uk)",
                 text: $searchText
             )
                 .textFieldStyle(.plain)
@@ -619,6 +689,9 @@ struct QuickPickerView: View {
     /// a full scan, which the view model caches until the history changes.
     private func loadTabCounts() {
         typeCounts = viewModel.itemTypeCounts()
+        facets = activeTab == .favorites
+            ? FacetCounts(items: viewModel.favoriteItems)
+            : viewModel.facetCounts(ofTypes: activeTab.itemTypes)
     }
 
     private func togglePinForSelection() {
@@ -723,12 +796,11 @@ struct QuickPickerView: View {
     }
 
     private func reloadForActiveTab() {
-        // Switching tabs keeps an active search instead of listing the tab's
-        // newest rows and filtering only those.
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !query.isEmpty && activeTab != .favorites {
+        // Switching tabs keeps an active search (or chip) instead of listing
+        // the tab's newest rows and filtering only those.
+        if !itemFilter.isEmpty && activeTab != .favorites {
             searchTask?.cancel()
-            searchTask = Task { await performSearch(query) }
+            searchTask = Task { await performSearch() }
             return
         }
 
@@ -919,6 +991,7 @@ struct QuickPickerView: View {
 
         // Close the picker immediately (same UX as normal Enter)
         viewModel.markItemAccessed(item)
+        let itemID = item.persistentModelID
         onClose()
 
         // Run OCR on background thread
@@ -927,6 +1000,8 @@ struct QuickPickerView: View {
                   !recognizedText.isEmpty else { return }
 
             DispatchQueue.main.async {
+                // The image keeps its text, so search finds it later.
+                viewModel.rememberRecognizedText(recognizedText, forItemWithID: itemID)
                 // Straight to the pasteboard on purpose: the clipboard monitor
                 // then saves the recognized text as a history item, honoring
                 // pause and excluded apps.
@@ -947,7 +1022,7 @@ struct QuickPickerView: View {
     private func performMultiOCR(items: [CBItem], range: ClosedRange<Int>) {
         enum OCRSource {
             case text(String)
-            case image(CGImage)
+            case image(CGImage, PersistentIdentifier)
         }
 
         let sources: [OCRSource] = items.compactMap { item -> OCRSource? in
@@ -959,7 +1034,7 @@ struct QuickPickerView: View {
                 if item.itemType == .combined,
                    let img = item.image,
                    let cg = TextRecognizer.cgImage(from: img) {
-                    return .image(cg)
+                    return .image(cg, item.persistentModelID)
                 }
                 return nil
             case .image:
@@ -967,14 +1042,14 @@ struct QuickPickerView: View {
                       let cg = TextRecognizer.cgImage(from: img) else {
                     return nil
                 }
-                return .image(cg)
+                return .image(cg, item.persistentModelID)
             case .file:
                 guard item.isImageFile,
                       let img = item.filePreviewImage,
                       let cg = TextRecognizer.cgImage(from: img) else {
                     return nil
                 }
-                return .image(cg)
+                return .image(cg, item.persistentModelID)
             }
         }
 
@@ -994,13 +1069,15 @@ struct QuickPickerView: View {
         // parallelism wouldn't help much and pulls in Sendable headaches.
         DispatchQueue.global(qos: .userInitiated).async {
             var parts: [String] = []
+            var recognizedByItem: [(PersistentIdentifier, String)] = []
             for source in sources {
                 switch source {
                 case .text(let s):
                     parts.append(s)
-                case .image(let cg):
+                case .image(let cg, let id):
                     if let recognized = TextRecognizer.recognizeText(in: cg) {
                         parts.append(recognized)
+                        recognizedByItem.append((id, recognized))
                     }
                 }
             }
@@ -1009,6 +1086,9 @@ struct QuickPickerView: View {
             guard !combined.isEmpty else { return }
 
             DispatchQueue.main.async {
+                for (id, text) in recognizedByItem {
+                    viewModel.rememberRecognizedText(text, forItemWithID: id)
+                }
                 // Straight to the pasteboard on purpose, like single OCR: the
                 // monitor saves the recognized text as a history item.
                 let pb = NSPasteboard.general
@@ -1093,10 +1173,13 @@ struct QuickPickerView: View {
     }
 
     /// Searches the whole history (limited to the tab's types), not just the
-    /// newest 300 rows as before. Runs inside `searchTask`; a newer search or
-    /// tab switch cancels it.
-    private func performSearch(_ searchTerm: String) async {
-        let found = await viewModel.searchItems(matching: searchTerm, types: activeTab.itemTypes)
+    /// newest 300 rows as before. Runs inside `searchTask`; a newer search,
+    /// chip or tab switch cancels it. A chip or tokens alone check only
+    /// inline columns, so they list every match; free text stops at 300.
+    private func performSearch() async {
+        let filter = itemFilter
+        let limit = filter.isCheap ? Int.max : 300
+        let found = await viewModel.searchItems(filter: filter, types: activeTab.itemTypes, limit: limit)
         guard !Task.isCancelled else { return }
         quickPickerItems = found
         hasMoreItems = false
@@ -1131,6 +1214,10 @@ final class TabKeyInterceptor: ObservableObject {
     // ⌥E opens the item editor. By key code: ⌥E is a dead key (´) on the US
     // layout and would start a composed character in the search field.
     var onOptionE: (() -> Void)?
+    // ⌥← / ⌥→ step through the category chips, ⌥⇧← / ⌥⇧→ extend the chip
+    // selection (-1 / +1, extending). Swallowed, so the search field
+    // doesn't move or select by word.
+    var onOptionArrow: ((Int, Bool) -> Void)?
 
     enum EditorKey {
         case save, cancel, moveUp, moveDown, toggleFavorite
@@ -1149,6 +1236,8 @@ final class TabKeyInterceptor: ObservableObject {
     private static let escapeKeyCode: UInt16 = 53
     private static let upArrowKeyCode: UInt16 = 126
     private static let downArrowKeyCode: UInt16 = 125
+    private static let leftArrowKeyCode: UInt16 = 123
+    private static let rightArrowKeyCode: UInt16 = 124
     private static let returnKeyCodes: Set<UInt16> = [36, 76]  // Return, keypad Enter
 
     func start() {
@@ -1172,6 +1261,7 @@ final class TabKeyInterceptor: ObservableObject {
         onOptionP = nil
         onOptionReturn = nil
         onOptionE = nil
+        onOptionArrow = nil
         onEditorKey = nil
     }
 
@@ -1180,6 +1270,19 @@ final class TabKeyInterceptor: ObservableObject {
 
         if let onEditorKey {
             return interceptForEditor(event, flags: flags, handler: onEditorKey)
+        }
+
+        // ⌥← / ⌥→, with or without ⇧ (no Control/Command).
+        if event.keyCode == Self.leftArrowKeyCode || event.keyCode == Self.rightArrowKeyCode,
+           flags.contains(.option),
+           !flags.contains(.control),
+           !flags.contains(.command) {
+            let step = event.keyCode == Self.leftArrowKeyCode ? -1 : 1
+            let extending = flags.contains(.shift)
+            DispatchQueue.main.async { [weak self] in
+                self?.onOptionArrow?(step, extending)
+            }
+            return nil
         }
 
         // ⌥E (no Control/Command).

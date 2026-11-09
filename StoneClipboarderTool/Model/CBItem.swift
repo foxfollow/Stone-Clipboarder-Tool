@@ -26,6 +26,34 @@ final class CBItem {
     /// in 1.9.0; optional, so existing stores migrate without a version bump.
     var title: String?
 
+    // Categories. All optional or defaulted, so stores migrate lightly.
+    /// Keys found by `ContentClassifier`, comma-wrapped: ",link,link.full,code,".
+    var categoryKeys: String?
+    /// BCP-47 code of the detected language ("uk", "en"); nil when unsure.
+    var languageCode: String?
+    /// `ContentClassifier.Ruleset.stamp` the keys were computed with; 0 =
+    /// never classified. A mismatch makes CBViewModel classify the item again.
+    var classificationStamp: Int = 0
+    /// The app in front when the item was (last) copied.
+    var sourceAppBundleID: String?
+    var sourceAppName: String?
+    /// Text Vision read in the image (background analysis, or the user's
+    /// OCR), so search finds the image by it. Inline, at most
+    /// `maxRecognizedTextLength` characters.
+    var recognizedText: String?
+    /// Whether OCR ran on the image: `TextRecognition` values. Kept as an
+    /// Int so predicates can test it.
+    var textRecognitionState: Int = 0
+
+    enum TextRecognition {
+        static let notRequested = 0
+        /// Waiting for the background pass (a new image with automatic
+        /// OCR on, or "Recognize Text in All Images").
+        static let pending = 1
+        static let noText = 2
+        static let found = 3
+    }
+
     // Lightweight preview content for UI performance
     var contentPreview: String?
     var imageSize: String?
@@ -311,8 +339,11 @@ final class CBItem {
     /// The one matching rule behind every search box: the item's title, the
     /// text of text-like items, the name of files, the "[Image - W×H]" label
     /// of images. Case-insensitive. `query` is expected trimmed and non-empty.
-    func matchesSearch(_ query: String) -> Bool {
+    func matchesSearch(_ query: String, includingImageText: Bool = true) -> Bool {
         if title?.localizedCaseInsensitiveContains(query) == true {
+            return true
+        }
+        if includingImageText, recognizedText?.localizedCaseInsensitiveContains(query) == true {
             return true
         }
         switch itemType {
@@ -323,6 +354,110 @@ final class CBItem {
         case .image:
             return displayContent.localizedCaseInsensitiveContains(query)
         }
+    }
+
+    // MARK: - Categories
+
+    var categoryKeySet: Set<String> {
+        guard let categoryKeys else { return [] }
+        return Set(categoryKeys.split(separator: ",").map(String.init))
+    }
+
+    func hasCategoryKey(_ key: String) -> Bool {
+        categoryKeys?.contains(",\(key),") ?? false
+    }
+
+    /// Images, text + image items and image files: `ImageClassifier` can
+    /// look at them. Doesn't load any data.
+    var hasAnalyzableImage: Bool {
+        itemType == .image || itemType == .combined || isImageFile
+    }
+
+    /// The bytes `ImageClassifier` reads (loads external storage).
+    var analyzableImageData: Data? {
+        switch itemType {
+        case .image, .combined: return imageData
+        case .file: return isImageFile ? fileData : nil
+        case .text: return nil
+        }
+    }
+
+    /// Classifies the item with `ruleset` and stamps it, so the next rescan
+    /// skips it:
+    /// - the text of text-like items;
+    /// - `image`, what `ImageClassifier` just found: its visual keys, and
+    ///   its OCR text and barcode payloads, which are stored;
+    /// - the stored image text (`recognizedText`), through the same
+    ///   detectors as copied text, minus "entire text" keys.
+    /// Without `image`, visual keys are dropped unless `keepingVisualKeys`.
+    func classify(
+        with ruleset: ContentClassifier.Ruleset, image: ImageClassifier.Result? = nil,
+        keepingVisualKeys: Bool = false
+    ) {
+        var keys = Set<String>()
+        var language: String?
+        if itemType == .text || itemType == .combined, let content {
+            let result = ContentClassifier.classify(content, ruleset: ruleset)
+            keys = result.keys
+            language = result.language
+        }
+
+        if hasAnalyzableImage {
+            if let image {
+                keys.formUnion(image.keys)
+                store(image)
+            } else if keepingVisualKeys {
+                keys.formUnion(categoryKeySet.intersection(ImageClassifier.visualKeys))
+            }
+            if textRecognitionState == TextRecognition.found {
+                keys.insert(ItemCategory.BuiltIn.ocr.rawValue)
+            }
+            if let recognizedText {
+                let found = ContentClassifier.classify(recognizedText, ruleset: ruleset)
+                keys.formUnion(found.keys.filter { !$0.hasSuffix(".full") })
+                language = language ?? found.language
+            }
+        }
+
+        categoryKeys = Self.encodeKeys(keys)
+        languageCode = language
+        classificationStamp = ruleset.stamp
+    }
+
+    /// OCR text replaces the stored text; payloads are added when missing.
+    private func store(_ image: ImageClassifier.Result) {
+        if let ocr = image.recognizedText {
+            setRecognizedText(([ocr] + image.payloads).joined(separator: "\n"))
+            textRecognitionState = image.foundText ? TextRecognition.found : TextRecognition.noText
+        } else {
+            let existing = recognizedText ?? ""
+            let missing = image.payloads.filter { !existing.contains($0) }
+            if !missing.isEmpty {
+                setRecognizedText(([existing] + missing).joined(separator: "\n"))
+            }
+        }
+    }
+
+    static func encodeKeys(_ keys: Set<String>) -> String? {
+        keys.isEmpty ? nil : "," + keys.sorted().joined(separator: ",") + ","
+    }
+
+    static let maxRecognizedTextLength = 10_000
+
+    /// Trimmed and capped; empty clears it.
+    func setRecognizedText(_ text: String?) {
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        recognizedText = trimmed.isEmpty ? nil : String(trimmed.prefix(Self.maxRecognizedTextLength))
+    }
+
+    /// The recognized text on one line, for a row.
+    var recognizedTextSnippet: String? {
+        guard let recognizedText else { return nil }
+        return recognizedText
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
     }
 
     // MARK: - Deduplication

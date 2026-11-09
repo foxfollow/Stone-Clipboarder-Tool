@@ -27,6 +27,10 @@ struct QPItemList: View {
     var onOpenTextEdit: ((CBItem) -> Void)?
     /// Opens the ⌥E editor (title, favorite, favorite order).
     var onEdit: ((CBItem) -> Void)?
+    var badgeCategories: [ItemCategory] = []
+    var showLanguage: Bool = false
+    var showBadges: Bool = true
+    var showImageText: Bool = true
 
     var body: some View {
         if filteredItems.isEmpty {
@@ -67,7 +71,11 @@ struct QPItemList: View {
                             isSelected: index == selectedIndex,
                             isInMultiSelection: multiSelectionRange?.contains(index) == true,
                             showOCRHint: ocrEnabled,
-                            isPinned: isItemPinned(item)
+                            isPinned: isItemPinned(item),
+                            badgeCategories: badgeCategories,
+                            showLanguage: showLanguage,
+                            showBadges: showBadges,
+                            showImageText: showImageText
                         )
                             .id(item.id)
                             .contentShape(Rectangle())
