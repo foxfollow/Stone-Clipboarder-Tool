@@ -40,15 +40,28 @@
         chat: { name: 'Telegram', icon: 'fa-paper-plane' },
         shot: { name: 'Screenshot', icon: 'fa-crop-simple' },
     };
+    // Date examples follow the page language; the rest of the demo is shared.
+    const DATES = document.documentElement.lang === 'uk' ? [
+        { type: 'text', text: 'Зустріч перенесли на 25.11 о 15:00', cats: ['date'], lang: 'UK', app: 'chat' },
+        { type: 'text', title: 'Рахунок № 0420', text: 'Сплатити до 30 листопада 2026, 1 250,00 грн', cats: ['docs', 'date'], lang: 'UK', app: 'mail' },
+        { type: 'text', text: 'Дедлайн — п’ятниця, 20.11.2026', cats: ['date'], lang: 'UK', app: 'chat' },
+    ] : [
+        { type: 'text', text: 'Meeting moved to Nov 25 at 3:00 PM', cats: ['date'], lang: 'EN', app: 'chat' },
+        { type: 'text', title: 'Invoice INV-0420', text: 'Payment due November 30, 2026 · $1,250.00', cats: ['docs', 'date'], lang: 'EN', app: 'mail' },
+        { type: 'text', text: 'Deadline moved to Friday, 11/20/2026', cats: ['date'], lang: 'EN', app: 'chat' },
+    ];
     const DEMO_ITEMS = [
         { type: 'text', text: 'brew install stone-clipboarder-tool', cats: ['code'], app: 'terminal' },
         { type: 'image', text: '[Image - 1470×923]', ocr: 'Stone Clipboarder Tool · Never lose what you copy.', cats: ['ocr', 'link'], lang: 'EN', app: 'shot', thumb: 'resources/index/sct-dark-basicwindow.png' },
         { type: 'text', title: 'Reply to the bank', text: 'Dear team, please find the signed contract attached.', lang: 'EN', app: 'mail' },
-        { type: 'text', text: '№ 9351/2026 від 19.05.2026', cats: ['docs', 'date'], lang: 'UK', app: 'chat' },
+        DATES[0],
         { type: 'file', text: '[File - invite.ics (5 KB)]', app: 'mail' },
         { type: 'text', text: 'git remote add origin https://github.com/foxfollow/Stone-Clipboarder-Tool.git', cats: ['code', 'link'], app: 'terminal' },
         { type: 'image', text: '[Image - 815×813]', ocr: 'https://foxfollow.github.io/Stone-Clipboarder-Tool/', cats: ['qr', 'link'], app: 'browser', thumb: 'resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@1x.png' },
         { type: 'text', text: '~/Projects/StoneClipboarderTool/docs', cats: ['path'], app: 'terminal' },
+        DATES[1],
+        DATES[2],
+        { type: 'text', text: 'TZ=UTC date -d "2026-12-01T10:00:00Z"', cats: ['code', 'date'], app: 'terminal' },
         { type: 'text', title: 'Address for the courier', text: 'вул. Хрещатик, 22, Київ — завтра о 10:00', cats: ['date'], lang: 'UK', app: 'notes' },
         { type: 'text', text: 'hello@stone.example', cats: ['email'], app: 'browser' },
     ];

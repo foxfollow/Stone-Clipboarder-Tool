@@ -114,7 +114,7 @@ html:not(.dark) .hero-title .hw { background-image: linear-gradient(to bottom, #
 .qp-caret { width: 2px; height: 18px; margin-right: -10px; background: #3b82f6; animation: caretBlink 1s steps(1) infinite; }
 .qp-ph { color: #8b8b8f; }
 
-.qp-chips { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; white-space: nowrap; overflow: hidden; }
+.qp-chips { display: flex; align-items: center; gap: 6px; padding: 1px 12px 9px; white-space: nowrap; overflow: hidden; }
 .qp-chip {
     flex: none; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
     border: 1px solid rgba(255, 255, 255, 0.22); color: #f3f4f6;
@@ -126,9 +126,10 @@ html:not(.dark) .hero-title .hw { background-image: linear-gradient(to bottom, #
 .qp-chip.bump b, .qp-cat.bump b { display: inline-block; animation: countBump 0.6s var(--ease-spring); }
 
 /* Category chips: icon, name, count; outlined in the category's color. */
-.qp-cats { display: flex; align-items: center; gap: 8px; padding: 0 12px 10px; white-space: nowrap; }
+.qp-cats { display: flex; align-items: center; gap: 8px; padding: 0 12px 6px; white-space: nowrap; }
 .qp-cats-row {
-    display: flex; gap: 6px; overflow: hidden; flex: 1; min-width: 0;
+    /* Vertical padding keeps overflow:hidden from clipping the chip borders and the count bump. */
+    display: flex; align-items: center; gap: 6px; overflow: hidden; flex: 1; min-width: 0; padding: 4px 0;
     -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent);
 }
 .qp-cat {
