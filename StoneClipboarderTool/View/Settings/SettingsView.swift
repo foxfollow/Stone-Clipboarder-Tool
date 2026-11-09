@@ -12,9 +12,15 @@ struct SettingsView: View {
     @EnvironmentObject var settingsManager: SettingsManager
     let updater: SPUUpdater?
 
-    @State private var selectedSection: SettingsSection = .general
+    @State private var selectedSection: SettingsSection
     @State private var showAutoStartPrompt = false
     @State private var accessibilityGranted = AccessibilityAlertHelper.isAccessibilityGranted
+
+    /// `initialSection` opens another page first (the landing screenshots).
+    init(updater: SPUUpdater?, initialSection: SettingsSection = .general) {
+        self.updater = updater
+        _selectedSection = State(initialValue: initialSection)
+    }
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"

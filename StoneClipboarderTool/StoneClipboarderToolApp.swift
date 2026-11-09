@@ -142,6 +142,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // clipboard monitoring, global hotkeys, menu bar item, pins or ⌘Q
         // monitor. Tests build the objects they need themselves.
         if AppEnvironment.isRunningUnitTests { return }
+        if AppEnvironment.isDemo {
+            setUpDemo(cbViewModel: cbViewModel, settingsManager: settingsManager, hotkeyManager: hotkeyManager,
+                      quickPickerManager: quickPickerManager, pinManager: pinManager,
+                      settingsContainer: settingsContainer, clipboardContainer: clipboardContainer)
+            return
+        }
 
         cbViewModel.setModelContext(clipboardContainer.mainContext)
         cbViewModel.setSettingsManager(settingsManager)
@@ -151,6 +157,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             cbViewModel.fetchItems(reset: true)
             // Items from before categories, or from other regex rules.
+            cbViewModel.retryFailedImageAnalysis()
             cbViewModel.reclassifyIfNeeded()
         }
 
@@ -192,6 +199,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             cbViewModel: cbViewModel)
         updateWindowVisibility(settingsManager: settingsManager)
         startQuitKeyMonitor()
+    }
+
+    /// Demo mode (docs/DEMO_MODE.md): the made-up history in the in-memory
+    /// store, and only what the screens need. No clipboard watching,
+    /// hotkey registration, menu bar item, pin restore or ⌘Q monitor, so it
+    /// can run next to the installed app.
+    private func setUpDemo(
+        cbViewModel: CBViewModel, settingsManager: SettingsManager, hotkeyManager: HotkeyManager,
+        quickPickerManager: QuickPickerWindowManager, pinManager: PinManager,
+        settingsContainer: ModelContainer, clipboardContainer: ModelContainer
+    ) {
+        DemoData.addCategories(to: settingsManager)
+        cbViewModel.setModelContext(clipboardContainer.mainContext)
+        cbViewModel.setSettingsManager(settingsManager)
+        do {
+            try DemoData.fill(clipboardContainer.mainContext, ruleset: cbViewModel.classifierRuleset)
+        } catch {
+            ErrorLogger.shared.log("Failed to fill the demo history", category: "Demo", error: error)
+        }
+        DispatchQueue.main.async { cbViewModel.fetchItems(reset: true) }
+
+        hotkeyManager.setModelContext(settingsContainer.mainContext)
+        quickPickerManager.setCBViewModel(cbViewModel)
+        quickPickerManager.setSettingsManager(settingsManager)
+        quickPickerManager.setPinManager(pinManager)
+        pinManager.viewModel = cbViewModel
+        pinManager.settingsManager = settingsManager
+        pinManager.modelContext = settingsContainer.mainContext
+        updateWindowVisibility(settingsManager: settingsManager)
+
+        if let directory = AppEnvironment.screenshotsDirectory {
+            let tour = ScreenshotTour(
+                directory: directory, viewModel: cbViewModel, settings: settingsManager,
+                quickPicker: quickPickerManager, hotkeyManager: hotkeyManager, pinManager: pinManager,
+                settingsContainer: settingsContainer)
+            Task { await tour.run() }  // holds the tour until it quits the app
+        }
     }
 
     /// Applies `showInMenubar`. Called at setup and when the setting changes.
@@ -409,6 +453,9 @@ enum ModelContainerFactory {
         guard !AppEnvironment.isRunningUnitTests else {
             return makeInMemoryContainer(schema: schema, name: "\(storeName)Tests")
         }
+        guard !AppEnvironment.isDemo else {
+            return makeInMemoryContainer(schema: schema, name: "\(storeName)Demo")
+        }
 
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let storeURL = appSupport
@@ -468,7 +515,7 @@ struct StoneClipboarderToolApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     @StateObject private var cbViewModel = CBViewModel()
-    @StateObject private var settingsManager = SettingsManager()
+    @StateObject private var settingsManager = SettingsManager(defaults: AppEnvironment.settingsDefaults)
     @StateObject private var menuBarManager = MenuBarManager()
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var quickPickerManager = QuickPickerWindowManager()
@@ -483,9 +530,9 @@ struct StoneClipboarderToolApp: App {
     var settingsContainer: ModelContainer = ModelContainerFactory.makeSettingsContainer()
 
     init() {
-        // A unit-test host must not check for (or offer) updates.
+        // A unit-test host or a demo must not check for (or offer) updates.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: !AppEnvironment.isRunningUnitTests,
+            startingUpdater: !AppEnvironment.isRunningUnitTests && !AppEnvironment.isDemo,
             updaterDelegate: nil, userDriverDelegate: nil)
     }
 

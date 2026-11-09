@@ -253,12 +253,13 @@ struct ItemCategory: Codable, Identifiable, Hashable {
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
         kind = try c.decode(Kind.self, forKey: .kind)
         isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
-        matchMode = try c.decodeIfPresent(MatchMode.self, forKey: .matchMode) ?? .contains
+        // A value from a newer version falls back instead of failing the category.
+        matchMode = ((try? c.decodeIfPresent(MatchMode.self, forKey: .matchMode)) ?? nil) ?? .contains
         pattern = try c.decodeIfPresent(String.self, forKey: .pattern) ?? ""
         caseSensitive = try c.decodeIfPresent(Bool.self, forKey: .caseSensitive) ?? false
         appBundleIDs = try c.decodeIfPresent([String].self, forKey: .appBundleIDs) ?? []
         appNames = try c.decodeIfPresent([String].self, forKey: .appNames) ?? []
-        icon = try c.decodeIfPresent(CategoryIcon.self, forKey: .icon) ?? .symbol("tag")
+        icon = ((try? c.decodeIfPresent(CategoryIcon.self, forKey: .icon)) ?? nil) ?? .symbol("tag")
         colorHex = try c.decodeIfPresent(String.self, forKey: .colorHex) ?? "#8E8E93"
     }
 }

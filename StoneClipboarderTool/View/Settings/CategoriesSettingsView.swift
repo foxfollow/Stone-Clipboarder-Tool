@@ -141,6 +141,11 @@ struct CategoriesSettingsView: View {
         .onChange(of: cbViewModel.pendingTextRecognitionCount) { _, pending in
             if pending == 0 { unrecognizedImageCount = cbViewModel.imagesWithoutTextRecognition() }
         }
+        .onChange(of: cbViewModel.countsRevision) { _, _ in
+            // Automatic OCR switched off, a capture, a finished pass.
+            guard cbViewModel.pendingTextRecognitionCount == 0 else { return }
+            unrecognizedImageCount = cbViewModel.imagesWithoutTextRecognition()
+        }
         .alert("Recognize text in \(unrecognizedImageCount) images?", isPresented: $confirmingRecognizeAll) {
             Button("Start") { cbViewModel.recognizeTextInAllImages() }
             Button("Cancel", role: .cancel) {}

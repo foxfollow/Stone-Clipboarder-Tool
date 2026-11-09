@@ -16,12 +16,12 @@ import NaturalLanguage
 /// match covers the whole (trimmed) text.
 enum ContentClassifier {
     /// Bump when detection changes, so stored results are recomputed.
-    static let version = 4
+    static let version = 5
     /// Only this many leading characters are examined: keeps a capture
     /// fast and bounds what a user regex has to scan.
     static let maxLength = 4000
     /// JSON is parsed whole, up to this size.
-    static let maxJSONLength = 1_000_000
+    static let maxJSONLength = 200_000
     static let minLanguageLetters = 20
     static let minLanguageConfidence = 0.6
 
@@ -41,28 +41,33 @@ enum ContentClassifier {
     /// The user's regex rules, compiled once for many texts.
     struct Ruleset {
         let rules: [RegexRule]
-        /// Run `ImageClassifier` on images ("Analyze images" in Settings).
+        /// Run the visual pass on images ("Find QR codes, faces and
+        /// transparency"). Not part of the stamp: switching it only affects
+        /// images, through `CBItem.visualAnalysisVersion`.
         let analyzeImages: Bool
         /// Written to `CBItem.classificationStamp`; changes whenever the
-        /// classifier version, any rule or `analyzeImages` changes. Never 0
-        /// (= unclassified).
+        /// classifier version or any rule changes. Never 0 (= unclassified).
         let stamp: Int
-        fileprivate let compiled: [(id: String, contains: NSRegularExpression, entire: NSRegularExpression)]
+        fileprivate let compiled: [(id: String, contains: NSRegularExpression, entire: NSRegularExpression?)]
 
         init(rules: [RegexRule], analyzeImages: Bool = true) {
             let sorted = rules.sorted { $0.id < $1.id }
             self.rules = sorted
             self.analyzeImages = analyzeImages
-            self.stamp = ContentClassifier.stamp(for: sorted, analyzeImages: analyzeImages)
+            self.stamp = ContentClassifier.stamp(for: sorted)
             self.compiled = sorted.compactMap { rule in
                 var options: NSRegularExpression.Options = [.anchorsMatchLines]
                 if !rule.caseSensitive { options.insert(.caseInsensitive) }
                 var entireOptions: NSRegularExpression.Options = []
                 if !rule.caseSensitive { entireOptions.insert(.caseInsensitive) }
-                guard
-                    let contains = try? NSRegularExpression(pattern: rule.pattern, options: options),
-                    let entire = try? NSRegularExpression(pattern: "\\A(?:\(rule.pattern))\\z", options: entireOptions)
-                else { return nil }
+                guard let contains = try? NSRegularExpression(pattern: rule.pattern, options: options) else {
+                    return nil
+                }
+                // The whole-text form. A line break before the closing ")"
+                // ends a (?x) comment that would swallow it; if neither
+                // compiles, the rule still matches "Contains".
+                let entire = (try? NSRegularExpression(pattern: "\\A(?:\(rule.pattern))\\z", options: entireOptions))
+                    ?? (try? NSRegularExpression(pattern: "\\A(?:\(rule.pattern)\n)\\z", options: entireOptions))
                 return (rule.id, contains, entire)
             }
         }
@@ -72,8 +77,8 @@ enum ContentClassifier {
 
     /// FNV-1a over the version and the rules: stable across launches,
     /// unlike `Hasher`.
-    static func stamp(for rules: [RegexRule], analyzeImages: Bool = true) -> Int {
-        var text = "v\(version)" + (analyzeImages ? "+img" : "")
+    static func stamp(for rules: [RegexRule]) -> Int {
+        var text = "v\(version)"
         for rule in rules.sorted(by: { $0.id < $1.id }) {
             text += "\u{1}\(rule.id)\u{2}\(rule.pattern)\u{2}\(rule.caseSensitive)"
         }
@@ -142,7 +147,13 @@ enum ContentClassifier {
 
         for rule in ruleset.compiled {
             guard rule.contains.firstMatch(in: trimmed, range: range) != nil else { continue }
-            let full = rule.entire.firstMatch(in: trimmed, range: range) != nil
+            let full: Bool
+            if let entire = rule.entire {
+                full = entire.firstMatch(in: trimmed, range: range) != nil
+            } else {
+                // The wrapped form didn't compile: some match must span it all.
+                full = rule.contains.matches(in: trimmed, range: range).contains { $0.range == range }
+            }
             add(rule.id, full: full)
         }
 

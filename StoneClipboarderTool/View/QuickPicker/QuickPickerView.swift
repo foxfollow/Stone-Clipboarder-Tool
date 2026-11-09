@@ -61,6 +61,7 @@ struct QuickPickerView: View {
     @State private var chipSelection = ChipSelection()
     /// Category, language and app counts for the active tab's chips.
     @State private var facets = FacetCounts()
+    @State private var countsReloadTask: Task<Void, Never>?
     /// The open ⌥E editor, nil when closed.
     @State private var itemEditor: QPItemEditorModel?
     @FocusState private var isSearchFocused: Bool
@@ -218,8 +219,11 @@ struct QuickPickerView: View {
                 guard triggerKey == .space else { return .ignored }
                 return handlePreviewTrigger()
             }
-            .onKeyPress(.rightArrow) {
-                guard triggerKey == .arrowRight else { return .ignored }
+            .onKeyPress(keys: [.rightArrow]) { keyPress in
+                // ⌥→ / ⌘→ move the cursor (by word, to the end); only a
+                // plain → opens the preview.
+                guard triggerKey == .arrowRight, keyPress.modifiers.isDisjoint(with: [.option, .command, .control])
+                else { return .ignored }
                 // Only open QL when cursor is at the end of search text
                 if isSearchFocused && !searchText.isEmpty,
                    let fieldEditor = NSApp.keyWindow?.firstResponder as? NSTextView {
@@ -264,6 +268,18 @@ struct QuickPickerView: View {
                 dropUnavailableCategory()
                 reloadForActiveTab()
                 isSearchFocused = true
+            }
+            .onChange(of: viewModel.countsRevision) { _, _ in
+                // A capture or a background rescan while the picker is open.
+                // Counting scans the whole history, so a burst of changes
+                // (a rescan, favorites toggled in a row) recounts once.
+                countsReloadTask?.cancel()
+                countsReloadTask = Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard !Task.isCancelled else { return }
+                    loadTabCounts()
+                    dropUnavailableCategory()
+                }
             }
             .onChange(of: chipSelection.selected) { _, _ in
                 selectedIndex = 0
@@ -380,6 +396,8 @@ struct QuickPickerView: View {
             tabInterceptor.onOptionArrow = { step, extending in
                 moveChipSelection(by: step, extending: extending)
             }
+            // Without chips, ⌥←/→ keep moving the cursor by word.
+            tabInterceptor.hasChips = { !categoryChips.isEmpty }
             tabInterceptor.onOptionE = {
                 guard let item = filteredItems[safe: selectedIndex] else { return }
                 openItemEditor(for: item)
@@ -392,6 +410,7 @@ struct QuickPickerView: View {
         }
         .onDisappear {
             tabInterceptor.stop()
+            countsReloadTask?.cancel()
         }
     }
 
@@ -1218,6 +1237,8 @@ final class TabKeyInterceptor: ObservableObject {
     // selection (-1 / +1, extending). Swallowed, so the search field
     // doesn't move or select by word.
     var onOptionArrow: ((Int, Bool) -> Void)?
+    /// Asked synchronously: ⌥←/→ are only taken while there are chips.
+    var hasChips: (() -> Bool)?
 
     enum EditorKey {
         case save, cancel, moveUp, moveDown, toggleFavorite
@@ -1262,6 +1283,7 @@ final class TabKeyInterceptor: ObservableObject {
         onOptionReturn = nil
         onOptionE = nil
         onOptionArrow = nil
+        hasChips = nil
         onEditorKey = nil
     }
 
@@ -1276,7 +1298,8 @@ final class TabKeyInterceptor: ObservableObject {
         if event.keyCode == Self.leftArrowKeyCode || event.keyCode == Self.rightArrowKeyCode,
            flags.contains(.option),
            !flags.contains(.control),
-           !flags.contains(.command) {
+           !flags.contains(.command),
+           hasChips?() ?? false {
             let step = event.keyCode == Self.leftArrowKeyCode ? -1 : 1
             let extending = flags.contains(.shift)
             DispatchQueue.main.async { [weak self] in

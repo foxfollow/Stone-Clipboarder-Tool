@@ -67,6 +67,12 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   default DerivedData and swaps the running app for it (sandboxed data);
   `make install` builds like CI into /Applications (the release's data).
   Both quit the running app. See `scripts/local-build.sh`.
+- Demo and landing screenshots: `make demo` opens the app with made-up
+  data (`--demo`), `make screenshots` re-renders the App Preview images
+  (`docs/resources/index/sct-*.png`) from the running demo and needs
+  Screen Recording for the terminal. Both run next to the installed app.
+  Never put real clipboard history on the site. See
+  [docs/DEMO_MODE.md](docs/DEMO_MODE.md).
 - Building needs Xcode 26: the app icon is an Icon Composer file and some
   views use macOS 26 APIs behind `#available`.
 - Don't quit or relaunch a running copy of the app without asking its
@@ -153,8 +159,9 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   (`SettingsManager.itemCategories`), not a `@Model`. Built-in ids and
   regex/app-group UUIDs are written into `CBItem.categoryKeys`: never
   rename them. Detection results are stored, not computed per render;
-  change `ContentClassifier` → bump `ContentClassifier.version`, and the
-  launch-time `reclassifyIfNeeded` rescans. Toggling, icons and colors
+  change `ContentClassifier` → bump `ContentClassifier.version` (the visual
+  pass: `ImageClassifier.visualVersion`), and the launch-time
+  `reclassifyIfNeeded` rescans. Toggling, icons and colors
   must not change the stamp. `ImageClassifier` (Vision) is slow: only the
   background pass calls it, off the main thread, reading image bytes
   through its own `ModelContext`. OCR runs once per image (new images by

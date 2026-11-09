@@ -41,17 +41,37 @@ final class CBItem {
     /// OCR), so search finds the image by it. Inline, at most
     /// `maxRecognizedTextLength` characters.
     var recognizedText: String?
+    /// QR code and barcode contents from the visual pass, apart from the OCR
+    /// text so neither overwrites the other. Searched and classified with it.
+    var barcodeText: String?
     /// Whether OCR ran on the image: `TextRecognition` values. Kept as an
     /// Int so predicates can test it.
     var textRecognitionState: Int = 0
+    /// `ImageClassifier.visualVersion` of the last visual pass (QR codes,
+    /// faces, transparency); 0 = none, negative = failed (retried at the
+    /// next launch), `visualNotApplicable` for items without an image. Kept apart from the rules stamp, so a regex change
+    /// doesn't send every image through Vision again.
+    var visualAnalysisVersion: Int = 0
+    /// Vision failures so far; the launch retry stops after
+    /// `ImageClassifier.maxRetries`.
+    var imageAnalysisFailures: Int = 0
 
     enum TextRecognition {
         static let notRequested = 0
-        /// Waiting for the background pass (a new image with automatic
-        /// OCR on, or "Recognize Text in All Images").
+        /// Waiting for the background pass: a new image with automatic OCR on.
         static let pending = 1
         static let noText = 2
         static let found = 3
+        /// Waiting for the background pass: queued by "Recognize Text in
+        /// All Images"; Stop puts these back to notRequested.
+        static let queued = 4
+        /// Vision failed; retried at the next launch (a few times).
+        static let failed = 5
+    }
+
+    /// OCR is waiting for the background pass.
+    var wantsTextRecognition: Bool {
+        textRecognitionState == TextRecognition.pending || textRecognitionState == TextRecognition.queued
     }
 
     // Lightweight preview content for UI performance
@@ -343,7 +363,9 @@ final class CBItem {
         if title?.localizedCaseInsensitiveContains(query) == true {
             return true
         }
-        if includingImageText, recognizedText?.localizedCaseInsensitiveContains(query) == true {
+        if includingImageText,
+           recognizedText?.localizedCaseInsensitiveContains(query) == true
+            || barcodeText?.localizedCaseInsensitiveContains(query) == true {
             return true
         }
         switch itemType {
@@ -383,17 +405,19 @@ final class CBItem {
     }
 
     /// Classifies the item with `ruleset` and stamps it, so the next rescan
-    /// skips it:
-    /// - the text of text-like items;
-    /// - `image`, what `ImageClassifier` just found: its visual keys, and
-    ///   its OCR text and barcode payloads, which are stored;
-    /// - the stored image text (`recognizedText`), through the same
-    ///   detectors as copied text, minus "entire text" keys.
-    /// Without `image`, visual keys are dropped unless `keepingVisualKeys`.
-    func classify(
-        with ruleset: ContentClassifier.Ruleset, image: ImageClassifier.Result? = nil,
-        keepingVisualKeys: Bool = false
-    ) {
+    /// skips it. All image bookkeeping lives here:
+    /// - text of text-like items through `ContentClassifier`;
+    /// - the visual pass (QR codes, faces, transparency): `image`'s keys and
+    ///   payloads when it ran; otherwise earlier visual keys are kept while
+    ///   "Analyze images" is on and dropped when it's off;
+    ///   `visualAnalysisVersion` follows;
+    /// - OCR: `image`'s text replaces `recognizedText` when it ran;
+    /// - the stored image text and payloads through the same detectors as
+    ///   copied text, minus "entire text" keys.
+    /// A failed Vision request (`failedVisual` / `failedText`) changes
+    /// nothing of its part and marks it for a retry at the next launch
+    /// (`CBViewModel.retryFailedImageAnalysis`).
+    func classify(with ruleset: ContentClassifier.Ruleset, image: ImageClassifier.Result? = nil) {
         var keys = Set<String>()
         var language: String?
         if itemType == .text || itemType == .combined, let content {
@@ -403,20 +427,42 @@ final class CBItem {
         }
 
         if hasAnalyzableImage {
-            if let image {
+            let earlierVisualKeys = categoryKeySet.intersection(ImageClassifier.visualKeys)
+            if let image, image.ranVisual {
                 keys.formUnion(image.keys)
-                store(image)
-            } else if keepingVisualKeys {
-                keys.formUnion(categoryKeySet.intersection(ImageClassifier.visualKeys))
+                barcodeText = image.payloads.isEmpty ? nil : image.payloads.joined(separator: "\n")
+                visualAnalysisVersion = ImageClassifier.visualVersion
+            } else if let image, image.failedVisual {
+                keys.formUnion(earlierVisualKeys)
+                visualAnalysisVersion = -ImageClassifier.visualVersion
+                imageAnalysisFailures += 1
+            } else if ruleset.analyzeImages {
+                keys.formUnion(earlierVisualKeys)
+            } else {
+                barcodeText = nil
+                visualAnalysisVersion = 0
+            }
+
+            if let text = image?.recognizedText {
+                setRecognizedText(text)
+                textRecognitionState = image?.foundText == true ? TextRecognition.found : TextRecognition.noText
+            } else if image?.failedText == true {
+                textRecognitionState = TextRecognition.failed
+                if image?.failedVisual != true { imageAnalysisFailures += 1 }
             }
             if textRecognitionState == TextRecognition.found {
                 keys.insert(ItemCategory.BuiltIn.ocr.rawValue)
             }
-            if let recognizedText {
-                let found = ContentClassifier.classify(recognizedText, ruleset: ruleset)
+
+            if let imageText {
+                let found = ContentClassifier.classify(imageText, ruleset: ruleset)
                 keys.formUnion(found.keys.filter { !$0.hasSuffix(".full") })
                 language = language ?? found.language
             }
+        } else {
+            visualAnalysisVersion = Self.visualNotApplicable
+            // Waiting for OCR without an image to read: done.
+            if wantsTextRecognition { textRecognitionState = TextRecognition.noText }
         }
 
         categoryKeys = Self.encodeKeys(keys)
@@ -424,19 +470,33 @@ final class CBItem {
         classificationStamp = ruleset.stamp
     }
 
-    /// OCR text replaces the stored text; payloads are added when missing.
-    private func store(_ image: ImageClassifier.Result) {
-        if let ocr = image.recognizedText {
-            setRecognizedText(([ocr] + image.payloads).joined(separator: "\n"))
-            textRecognitionState = image.foundText ? TextRecognition.found : TextRecognition.noText
-        } else {
-            let existing = recognizedText ?? ""
-            let missing = image.payloads.filter { !existing.contains($0) }
-            if !missing.isEmpty {
-                setRecognizedText(([existing] + missing).joined(separator: "\n"))
-            }
-        }
+    /// `visualAnalysisVersion` of items without an image: never due, so the
+    /// image switch and version bumps don't reach the text history.
+    static let visualNotApplicable = 1_000_000
+
+    /// The visual pass is due: on, an image, and neither done nor failed
+    /// for the current or a newer version (a newer build's results survive
+    /// a downgrade).
+    func needsVisualPass(_ ruleset: ContentClassifier.Ruleset) -> Bool {
+        ruleset.analyzeImages && hasAnalyzableImage && Self.isVisualVersionDue(visualAnalysisVersion)
     }
+
+    /// Done = the current version or newer; failed = its negative. 0 and
+    /// older versions are due. Mirrors the rescan predicate.
+    static func isVisualVersionDue(_ version: Int) -> Bool {
+        let current = ImageClassifier.visualVersion
+        return version < current && version > -current
+    }
+
+    /// The text found in the image: OCR text and barcode payloads.
+    var imageText: String? {
+        let text = [recognizedText, barcodeText].compactMap { $0 }.joined(separator: "\n")
+        return text.isEmpty ? nil : text
+    }
+
+    /// Still in its context: not deleted here, nor deleted and saved in
+    /// another turn (AGENTS rule 7).
+    var isAlive: Bool { modelContext != nil && !isDeleted }
 
     static func encodeKeys(_ keys: Set<String>) -> String? {
         keys.isEmpty ? nil : "," + keys.sorted().joined(separator: ",") + ","
@@ -452,8 +512,8 @@ final class CBItem {
 
     /// The recognized text on one line, for a row.
     var recognizedTextSnippet: String? {
-        guard let recognizedText else { return nil }
-        return recognizedText
+        guard let text = imageText else { return nil }
+        return text
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }

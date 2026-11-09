@@ -122,14 +122,17 @@ all pins.
       numbers a chip within seconds (background rescan).
 - [ ] OCR: a new screenshot gets its text read right away; older images
       don't until Settings → Categories → "Recognize Text in All
-      Images…", which shows "N images left" and stops on Stop. "Recognize
-      text in new images" off: new images get no text (QR/faces still).
+      Images…", which shows "N images left" and stops on Stop (a new
+      screenshot waiting for its own OCR still gets it). "Recognize text
+      in new images" off: new images get no text (QR/faces still), and the
+      "N images not read yet" count updates at once.
 - [ ] Images: a screenshot with text gets Text in Image (and Link/Email
       when they're in it, plus a language), a QR code gets QR & Barcode
       (and Link for a URL), a photo of a person gets People, a PNG icon
       with a clear background gets Transparent. A capture doesn't stall
-      the picker; badges appear within seconds. "Analyze images" off
-      removes them after the rescan; on brings them back.
+      the picker; badges appear within seconds. "Find QR codes, faces and
+      transparency" off removes QR & Barcode, People and Transparent
+      after the rescan (text from OCR stays); on brings them back.
 - [ ] Searching a word that is only inside a screenshot finds the
       screenshot; its row shows the text under "[Image - W×H]". After ⌥⏎
       (or Extract Text) on an image, the image is found by that text too.
@@ -140,7 +143,13 @@ all pins.
 - [ ] "Remember the source app" off: new copies get no app icon.
       "Forget Recorded Apps…" removes every app icon and empties app
       groups.
-- [ ] "Show the category bar" off hides the row; is:/app:/lang: still work.
+- [ ] "Show the category bar" off hides the row; is:/app:/lang: still work,
+      and ⌥←/⌥→ move the cursor by word again (⌥→ doesn't open the
+      preview).
+- [ ] `make demo` with the installed app running: the demo opens with the
+      made-up history; the installed app's hotkeys, clipboard capture and
+      history are unaffected, and its settings unchanged after quitting
+      the demo.
 - [ ] Updating from 1.9.0: existing items (hundreds of images too) get
       categories after launch without a freeze or a memory spike; titles, favorites and their order are unchanged.
 
