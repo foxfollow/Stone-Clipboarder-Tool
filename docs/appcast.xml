@@ -10,9 +10,29 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
-        <new>
-            <li>🛠️ FIXED: Type-out paste (⌘⇧↩) keeps Shift over Remote Desktop: capitals and symbols such as # and $ no longer arrive as lowercase letters and digits on the Windows side.</li>
-        </new>
+    <item>
+        <title>Version 1.10.1</title>
+        <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
+        <sparkle:version>26</sparkle:version>
+        <sparkle:shortVersionString>1.10.1</sparkle:shortVersionString>
+        <description
+        ><![CDATA[
+            <h2>Version 1.10.1</h2>
+            <ul>
+<li>🛠️ FIXED: Type-out paste (⌘⇧↩) keeps Shift over Remote Desktop: capitals and symbols such as # and $ no longer arrive as lowercase letters and digits on the Windows side.</li>
+            </ul>
+        ]]></description>
+        <pubDate>Thu, 12 Nov 2026 10:24:06 +0000</pubDate>
+        <enclosure
+            url="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/download/v1.10.1/StoneClipboarderTool.zip"
+            sparkle:version="26"
+            sparkle:shortVersionString="1.10.1"
+            sparkle:edSignature="eL+NjQ15FlUslT1LoSxklqPAk+M/2lyPbyOeMxtZICtQ4ATSzbgxjUNz2UgVs88btWOm/kyuZFw2swLIFOhgAQ=="
+            length="6682858"
+            type="application/octet-stream"
+        />
+    </item>
+
 
     <item>
         <title>Version 1.10.0</title>
