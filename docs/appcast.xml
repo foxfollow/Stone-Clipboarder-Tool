@@ -10,6 +10,10 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
+        <new>
+            <li>🛠️ FIXED: Type-out paste (⌘⇧↩) keeps Shift over Remote Desktop: capitals and symbols such as # and $ no longer arrive as lowercase letters and digits on the Windows side.</li>
+        </new>
+
     <item>
         <title>Version 1.10.0</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>

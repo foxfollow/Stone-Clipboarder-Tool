@@ -49,14 +49,8 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.10.0
-- **🪟 Categories**: A row of chips in the Quick Picker under the tabs groups items by what they contain — links, emails, phone numbers, addresses, dates, code, JSON, file paths and languages. ⌥← / ⌥→ switch between chips; ⇧-click or ⌥⇧← / ⌥⇧→ select several
-- **🪟 Image Categories**: On the Images tab, Apple Vision finds text, QR codes and barcodes, faces and transparent areas, in the background and on your Mac. Text read from a screenshot counts for links, emails, languages and your own rules too
-- **🪟 Searchable Image Text**: New screenshots and copied images are read once right after the copy, older ones when you choose "Recognize Text in All Images" in Settings, and your own OCR (⌥⏎, Extract Text) is kept too. Searching a word finds the picture, and the Quick Picker shows its text under the image
-- **✨ Custom Categories**: Regular-expression rules (with a live test) and groups of source apps. Settings → Categories gives any category an SF Symbol or an emoji and a color, switches built-ins off, and sets Contains or Entire text matching
-- **✨ Source App**: The app you copied from is remembered and shown as a small icon on the row. Turn it off or forget recorded apps in Settings → Categories
-- **⌨️ Search Filters**: The Quick Picker's search takes is:link, is:fav, app:Safari, lang:uk — on their own or together with text
-- **🎨 Row Badges**: Quick Picker rows show the icons of their categories, the language and the source app; Settings → Categories turns the icons and the image text off
+### 🆕 New in Version 1.10.1
+- **🛠️ Type-Out over Remote Desktop**: Type-out paste (⌘⇧↩) keeps Shift over Remote Desktop: capitals and symbols such as # and $ no longer arrive as lowercase letters and digits on the Windows side
 
 **📖 [See the full changelog →](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)**
 

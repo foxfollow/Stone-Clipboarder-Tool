@@ -46,4 +46,20 @@ final class KeyboardLayoutTablesTests: XCTestCase {
         XCTAssertEqual(table["*"]?.keyCode, CGKeyCode(kVK_ANSI_8), "not keypad multiply")
         XCTAssertEqual(table["+"]?.keyCode, CGKeyCode(kVK_ANSI_Equal), "not keypad plus")
     }
+
+    // MARK: - Modifier flags as hardware reports them
+
+    func testHardwareFlagsAddTheLeftHandDeviceBits() {
+        // Remote-desktop clients pick the Shift scancode from these bits;
+        // without them the far end never sees Shift ("#" arrives as "3").
+        let shift = KeyStroke.hardwareFlags(.maskShift)
+        XCTAssertTrue(shift.contains(.maskShift))
+        XCTAssertEqual(shift.rawValue & KeyStroke.deviceLeftShift, KeyStroke.deviceLeftShift)
+        XCTAssertEqual(shift.rawValue & KeyStroke.deviceLeftOption, 0)
+
+        let both = KeyStroke.hardwareFlags([.maskShift, .maskAlternate])
+        XCTAssertEqual(both.rawValue & KeyStroke.deviceLeftOption, KeyStroke.deviceLeftOption)
+
+        XCTAssertEqual(KeyStroke.hardwareFlags([]), [], "no modifiers, no device bits")
+    }
 }
