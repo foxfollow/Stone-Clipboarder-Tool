@@ -18,6 +18,25 @@ struct KeyStroke: Sendable {
     let overridesUnicode: Bool
 
     var flags: CGEventFlags { CGEventFlags(rawValue: flagsRawValue) }
+
+    /// `flags` as a physical keyboard reports them: each device-independent
+    /// modifier plus the bit naming the left-hand key that produced it
+    /// (`NX_DEVICELSHIFTKEYMASK`, `NX_DEVICELALTKEYMASK` in IOLLEvent.h).
+    ///
+    /// Remote-desktop clients (Windows App, FreeRDP) translate a
+    /// `flagsChanged` event into a left- or right-Shift *scancode* by looking
+    /// at these device bits. With only `.maskShift` set they see neither key
+    /// go down, so the far end never gets a Shift and "12#$Asdf" arrives as
+    /// "1234asdf".
+    static func hardwareFlags(_ flags: CGEventFlags) -> CGEventFlags {
+        var result = flags
+        if flags.contains(.maskShift) { result.insert(CGEventFlags(rawValue: deviceLeftShift)) }
+        if flags.contains(.maskAlternate) { result.insert(CGEventFlags(rawValue: deviceLeftOption)) }
+        return result
+    }
+
+    static let deviceLeftShift: UInt64 = 0x0000_0002
+    static let deviceLeftOption: UInt64 = 0x0000_0020
 }
 
 /// Builds character → keystroke tables from keyboard layouts.
@@ -274,7 +293,7 @@ final class TypePaster {
         for isDown in [true, false] {
             guard let event = CGEvent(keyboardEventSource: source, virtualKey: stroke.keyCode, keyDown: isDown)
             else { continue }
-            event.flags = stroke.flags
+            event.flags = KeyStroke.hardwareFlags(stroke.flags)
             if let utf16 {
                 event.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
             }
@@ -321,7 +340,9 @@ final class TypePaster {
         guard let event = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: down)
         else { return }
         event.type = .flagsChanged
-        event.flags = flags
+        // Device bits + non-coalesced, exactly what a physical left Shift /
+        // Option produces; see `KeyStroke.hardwareFlags`.
+        event.flags = KeyStroke.hardwareFlags(flags).union(.maskNonCoalesced)
         event.post(tap: location)
     }
 
