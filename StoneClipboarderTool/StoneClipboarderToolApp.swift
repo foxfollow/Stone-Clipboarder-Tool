@@ -151,7 +151,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             vaultManager.clipboardManager = cbViewModel.getClipboardManager()
             quickPickerManager.setVaultManager(vaultManager)
             setUpDemo(cbViewModel: cbViewModel, settingsManager: settingsManager, hotkeyManager: hotkeyManager,
-                      quickPickerManager: quickPickerManager, pinManager: pinManager,
+                      quickPickerManager: quickPickerManager, pinManager: pinManager, vaultManager: vaultManager,
                       settingsContainer: settingsContainer, clipboardContainer: clipboardContainer)
             return
         }
@@ -236,7 +236,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// can run next to the installed app.
     private func setUpDemo(
         cbViewModel: CBViewModel, settingsManager: SettingsManager, hotkeyManager: HotkeyManager,
-        quickPickerManager: QuickPickerWindowManager, pinManager: PinManager,
+        quickPickerManager: QuickPickerWindowManager, pinManager: PinManager, vaultManager: VaultManager,
         settingsContainer: ModelContainer, clipboardContainer: ModelContainer
     ) {
         DemoData.addCategories(to: settingsManager)
@@ -258,12 +258,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pinManager.modelContext = settingsContainer.mainContext
         updateWindowVisibility(settingsManager: settingsManager)
 
-        if let directory = AppEnvironment.screenshotsDirectory {
-            let tour = ScreenshotTour(
+        let tour = AppEnvironment.screenshotsDirectory.map { directory in
+            ScreenshotTour(
                 directory: directory, viewModel: cbViewModel, settings: settingsManager,
                 quickPicker: quickPickerManager, hotkeyManager: hotkeyManager, pinManager: pinManager,
-                settingsContainer: settingsContainer)
-            Task { await tour.run() }  // holds the tour until it quits the app
+                vaultManager: vaultManager, settingsContainer: settingsContainer)
+        }
+        Task {
+            // The made-up Passwords first, so every screen shows them.
+            await DemoData.fillVault(vaultManager)
+            await tour?.run()  // holds the tour until it quits the app
         }
     }
 

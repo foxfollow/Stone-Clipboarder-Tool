@@ -37,3 +37,10 @@ final class LocalAuthenticationAuthenticator: VaultAuthenticator {
         }
     }
 }
+
+/// Demo mode only (`--demo`, `--screenshots`): the made-up vault opens
+/// without a prompt. Never used with the real vault (`makeForApp`).
+@MainActor
+final class DemoAuthenticator: VaultAuthenticator {
+    func authenticate(reason: String) async -> Bool { AppEnvironment.isDemo }
+}

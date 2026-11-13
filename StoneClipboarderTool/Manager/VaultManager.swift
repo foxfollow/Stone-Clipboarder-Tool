@@ -87,18 +87,22 @@ final class VaultManager: ObservableObject {
     /// The app's vault. A unit-test host and demo mode get a throwaway
     /// folder and an in-memory key, never the real vault or keychain.
     static func makeForApp() -> VaultManager {
-        guard AppEnvironment.isRunningUnitTests || AppEnvironment.isDemo else { return VaultManager() }
+        if AppEnvironment.isDemo {
+            // The demo's made-up Passwords open without Touch ID.
+            return makeInert(authenticator: DemoAuthenticator())
+        }
+        guard AppEnvironment.isRunningUnitTests else { return VaultManager() }
         return makeInert()
     }
 
     /// A vault in a throwaway folder with in-memory keys: tests, demo mode,
     /// previews and fallbacks. Never touches the real vault or Keychain.
-    static func makeInert() -> VaultManager {
+    static func makeInert(authenticator: VaultAuthenticator? = nil) -> VaultManager {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("StoneClipboarderTool-Vault-\(UUID().uuidString)", isDirectory: true)
         return VaultManager(
             store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(),
-            fingerprintKeyProvider: InMemoryVaultKeyProvider())
+            fingerprintKeyProvider: InMemoryVaultKeyProvider(), authenticator: authenticator)
     }
 
     deinit {
