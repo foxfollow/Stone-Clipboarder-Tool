@@ -37,6 +37,9 @@ struct SettingsSidebar: View {
             Divider()
             SettingsSidebarFooter(appVersion: appVersion)
         }
+        // The column width alone isn't kept in every host (the screenshot
+        // tour's window shrank it until page names were cut off).
+        .frame(minWidth: 200)
         .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
     }
 }
