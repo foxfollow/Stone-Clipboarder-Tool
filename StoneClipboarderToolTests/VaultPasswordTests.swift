@@ -162,6 +162,36 @@ final class VaultManagerPasswordTests: XCTestCase {
         XCTAssertTrue(settings.vaultUsesPassword, "the lock screen now asks for the password")
     }
 
+    func testAPasswordNeverOpensAKeyGuardedByTouchID() async {
+        // A raw key stored; the setting (UserDefaults, editable by anyone in
+        // the session) claims a password is set.
+        let manager = makeManager()
+        await manager.unlock()
+        _ = manager.add(VaultPayload(itemType: .text, content: "pw"))
+        manager.lock()
+        let touchIDCalls = authenticator.calls
+        settings.vaultUsesPassword = true
+
+        let byAnyPassword = await manager.unlock(password: "x")
+        XCTAssertFalse(byAnyPassword)
+        XCTAssertFalse(manager.isUnlocked)
+        XCTAssertTrue(manager.entries.isEmpty)
+        XCTAssertEqual(authenticator.calls, touchIDCalls)
+        XCTAssertFalse(settings.vaultUsesPassword, "the lock screen goes back to Touch ID")
+
+        let byTouchID = await manager.unlock()
+        XCTAssertTrue(byTouchID)
+        XCTAssertEqual(authenticator.calls, touchIDCalls + 1)
+    }
+
+    func testAPasswordCannotCreateTheFirstKey() async {
+        settings.vaultUsesPassword = true
+        let manager = makeManager()
+        let unlocked = await manager.unlock(password: "x")
+        XCTAssertFalse(unlocked)
+        XCTAssertFalse(keyProvider.hasKey)
+    }
+
     func testNeedsUnlockToChangeAndDeleteAllClearsIt() async {
         let manager = makeManager()
         let lockedSet = await manager.setPassword("secret1", hint: nil, rounds: 1_000)

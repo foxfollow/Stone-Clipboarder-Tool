@@ -150,13 +150,19 @@ final class VaultManager: ObservableObject {
         return await loadKeyAndUnlock(password: password)
     }
 
-    /// Whether unlocking takes the Passwords password instead of Touch ID.
+    /// Whether the lock screen asks for the Passwords password instead of
+    /// Touch ID. A UI hint only (UserDefaults, which anyone in the session
+    /// can edit): the gate is decided by what the Keychain holds, in
+    /// `loadKeyAndUnlock`.
     var usesPassword: Bool {
         settingsManager?.vaultUsesPassword ?? false
     }
 
     private enum KeyLoadFailure: Error {
         case needsPassword
+        /// A password was given, but the key isn't wrapped with one: only
+        /// Touch ID may open it.
+        case needsTouchID
     }
 
     /// Reads the key off the main thread (a Keychain prompt blocks, and so
@@ -172,7 +178,10 @@ final class VaultManager: ObservableObject {
                     guard let password else { throw KeyLoadFailure.needsPassword }
                     key = try VaultKeyWrapper.unwrap(data, password: password)
                 } else {
-                    // A raw key (or none yet): a password typed anyway isn't needed.
+                    // A raw key (or none yet) is guarded by Touch ID alone. The
+                    // password path skips Touch ID, so it must never open it,
+                    // whatever the settings say.
+                    guard password == nil else { throw KeyLoadFailure.needsTouchID }
                     key = try provider.loadOrCreateKey()
                 }
                 return (key, try? fingerprintProvider.loadOrCreateKey())
@@ -196,6 +205,10 @@ final class VaultManager: ObservableObject {
             startExpiryTimer()
             onUnlocked?(entries)
             return true
+        case .failure(KeyLoadFailure.needsTouchID):
+            settingsManager?.vaultUsesPassword = false
+            statusMessage = "Passwords has no password: unlock it with Touch ID."
+            return false
         case .failure(KeyLoadFailure.needsPassword):
             settingsManager?.vaultUsesPassword = true
             statusMessage = "Enter your Passwords password."
