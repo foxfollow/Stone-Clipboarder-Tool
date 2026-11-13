@@ -234,6 +234,7 @@ final class VaultManagerTests: XCTestCase {
     }
 
     func testCopiesOfSavedEntriesAreRecognizedWhileLocked() async {
+        settings.vaultCopyDetection = .always
         let manager = makeManager()
         await manager.unlock()
         _ = manager.add(VaultPayload(itemType: .text, content: "379696"))
@@ -247,7 +248,44 @@ final class VaultManagerTests: XCTestCase {
         XCTAssertFalse(manager.isStoredSecret(.combined("379696", Data([1]))))
     }
 
+    func testByDefaultALockedVaultAnswersNothing() async {
+        let manager = makeManager()
+        XCTAssertEqual(settings.vaultCopyDetection, .whileUnlocked)
+        await manager.unlock()
+        _ = manager.add(VaultPayload(itemType: .text, content: "pw"))
+        XCTAssertTrue(manager.isStoredSecret(.text("pw")))
+        manager.lock()
+        XCTAssertFalse(manager.isStoredSecret(.text("pw")))
+
+        settings.vaultCopyDetection = .off
+        await manager.unlock()
+        XCTAssertFalse(manager.isStoredSecret(.text("pw")))
+    }
+
+    func testDefaultModeNeverReadsTheFingerprintKeyAtLaunch() async {
+        let first = makeManager()
+        await first.unlock()
+        _ = first.add(VaultPayload(itemType: .text, content: "pw"))
+        fingerprintProvider.failure = StubKeyError()  // a read would fail loudly
+        let relaunched = makeManager()
+        await relaunched.prepareCopyDetection()
+        XCTAssertFalse(relaunched.isStoredSecret(.text("pw")))
+    }
+
+    func testPastingOrTypingAnEntryReportsIt() async {
+        let manager = makeManager()
+        var used: [String?] = []
+        manager.onEntryUsed = { used.append($0.content) }
+        await manager.unlock()
+        guard case .added(let id) = manager.add(VaultPayload(itemType: .text, content: "pw")) else {
+            return XCTFail("expected an added entry")
+        }
+        XCTAssertEqual(manager.typeableText(of: id), "pw")
+        XCTAssertEqual(used, ["pw"])
+    }
+
     func testANewLaunchRecognizesCopiesWithoutUnlocking() async {
+        settings.vaultCopyDetection = .always
         let first = makeManager()
         await first.unlock()
         _ = first.add(VaultPayload(itemType: .text, content: "pw"))
@@ -261,6 +299,7 @@ final class VaultManagerTests: XCTestCase {
     }
 
     func testDeletedEntriesAreForgotten() async {
+        settings.vaultCopyDetection = .always
         let manager = makeManager()
         await manager.unlock()
         guard case .added(let id) = manager.add(VaultPayload(itemType: .text, content: "pw")) else {
@@ -276,6 +315,7 @@ final class VaultManagerTests: XCTestCase {
     }
 
     func testEmptyVaultNeverReadsTheFingerprintKey() async {
+        settings.vaultCopyDetection = .always
         fingerprintProvider.failure = StubKeyError()
         let manager = makeManager()
         await manager.prepareCopyDetection()  // no fingerprints: returns before the key
@@ -298,6 +338,8 @@ final class VaultSettingsTests: XCTestCase {
         defer { isolated.remove() }
         let settings = SettingsManager(defaults: isolated.defaults)
         XCTAssertTrue(settings.showPasswordsTab)
+        XCTAssertEqual(settings.vaultCopyDetection, .whileUnlocked)
+        XCTAssertTrue(settings.vaultRemoveHistoryCopies)
         XCTAssertEqual(settings.vaultRelockMinutes, 60)
         XCTAssertEqual(settings.vaultClipboardClearSeconds, 30)
 

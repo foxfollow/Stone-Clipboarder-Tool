@@ -365,6 +365,17 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(vaultUsesPassword, forKey: "vaultUsesPassword") }
     }
 
+    /// When copies of saved Passwords entries stay out of the history.
+    @Published var vaultCopyDetection: VaultCopyDetection {
+        didSet { defaults.set(vaultCopyDetection.rawValue, forKey: "vaultCopyDetection") }
+    }
+
+    /// History copies of saved entries are deleted at unlock and after
+    /// pasting from Passwords.
+    @Published var vaultRemoveHistoryCopies: Bool {
+        didSet { defaults.set(vaultRemoveHistoryCopies, forKey: "vaultRemoveHistoryCopies") }
+    }
+
     /// Shown on the lock screen next to the password field; may be empty.
     @Published var vaultPasswordHint: String {
         didSet { defaults.set(vaultPasswordHint, forKey: "vaultPasswordHint") }
@@ -545,6 +556,9 @@ final class SettingsManager: ObservableObject {
         self.vaultClipboardClearSeconds = max(0, defaults.object(forKey: "vaultClipboardClearSeconds") as? Int ?? 30)
         self.vaultUsesPassword = defaults.object(forKey: "vaultUsesPassword") as? Bool ?? false
         self.vaultPasswordHint = defaults.string(forKey: "vaultPasswordHint") ?? ""
+        self.vaultCopyDetection = defaults.string(forKey: "vaultCopyDetection")
+            .flatMap(VaultCopyDetection.init(rawValue:)) ?? .whileUnlocked
+        self.vaultRemoveHistoryCopies = defaults.object(forKey: "vaultRemoveHistoryCopies") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = defaults.string(forKey: "clipboardCaptureMode"),

@@ -67,6 +67,29 @@ struct PasswordsSettingsSection: View {
             .help("Passwords stay unlocked this long after you last used them. Locking the screen or sleep locks them at once.")
             .settingsAnchor("passwords.relock")
 
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("Keep copies of saved passwords out of the history", selection: $settingsManager.vaultCopyDetection) {
+                    ForEach(VaultCopyDetection.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                Text(copyDetectionNote)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .settingsAnchor("passwords.copyDetection")
+            .onChange(of: settingsManager.vaultCopyDetection) { _, mode in
+                if mode == .always {
+                    Task { await vaultManager.prepareCopyDetection() }
+                }
+            }
+
+            Toggle("Remove history copies of saved passwords", isOn: $settingsManager.vaultRemoveHistoryCopies)
+                .help("Every copy of a saved password in the history is deleted when Passwords unlocks and after you paste or type that password from Passwords.")
+                .settingsAnchor("passwords.removeCopies")
+
             Picker("Clear the clipboard after pasting", selection: $settingsManager.vaultClipboardClearSeconds) {
                 ForEach(clearChoices, id: \.self) { seconds in
                     Text(seconds == 0 ? "Never" : "\(seconds) seconds").tag(seconds)
@@ -100,6 +123,17 @@ struct PasswordsSettingsSection: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Every entry, its Keychain key and the Passwords password are removed. This can't be undone.")
+        }
+    }
+
+    private var copyDetectionNote: String {
+        switch settingsManager.vaultCopyDetection {
+        case .off:
+            return "Copying a saved password elsewhere adds it to the history like anything else."
+        case .whileUnlocked:
+            return "While Passwords is locked it answers nothing: copies then reach the history, and leave it at the next unlock or paste from Passwords if the option below is on."
+        case .always:
+            return "Also while locked. Someone at your unlocked Mac could copy guesses and see which ones stay out of the history."
         }
     }
 

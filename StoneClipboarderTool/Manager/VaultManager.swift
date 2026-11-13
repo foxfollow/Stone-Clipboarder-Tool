@@ -48,6 +48,8 @@ final class VaultManager: ObservableObject {
     /// Called with the decrypted entries after each unlock, so plaintext
     /// copies captured before an entry was saved leave the history.
     var onUnlocked: (([VaultPayload]) -> Void)?
+    /// Called with an entry just pasted or typed out, for the same cleanup.
+    var onEntryUsed: ((VaultPayload) -> Void)?
 
     private let store: VaultStore
     private let keyProvider: VaultKeyProvider
@@ -354,10 +356,16 @@ final class VaultManager: ObservableObject {
 
     // MARK: - Copies of saved entries
 
+    private var copyDetection: VaultCopyDetection {
+        settingsManager?.vaultCopyDetection ?? .whileUnlocked
+    }
+
     /// Reads the fingerprints and their key so copies of saved entries are
-    /// recognized while the vault is locked. Called once at launch; does
-    /// nothing (and never touches the Keychain) for an empty vault.
+    /// recognized while the vault is locked. Only for `.always`: at launch
+    /// and when the setting changes to it. Does nothing (and never touches
+    /// the Keychain) otherwise or for an empty vault.
     func prepareCopyDetection() async {
+        guard copyDetection == .always else { return }
         let saved = store.loadFingerprints()
         guard !saved.isEmpty else { return }
         fingerprints = saved
@@ -371,8 +379,14 @@ final class VaultManager: ObservableObject {
     }
 
     /// Whether a new capture has the same content as a saved entry, so the
-    /// history must not keep it in plaintext. Works while locked.
+    /// history must not keep it in plaintext. Follows `vaultCopyDetection`:
+    /// by default only while unlocked, so a locked vault reveals nothing.
     func isStoredSecret(_ capture: ClipboardContent) -> Bool {
+        switch copyDetection {
+        case .off: return false
+        case .whileUnlocked: guard isUnlocked else { return false }
+        case .always: break
+        }
         guard let fingerprintKey, !fingerprints.isEmpty else { return false }
         return fingerprints.contains(VaultFingerprint.of(capture, key: fingerprintKey))
     }
@@ -400,13 +414,17 @@ final class VaultManager: ObservableObject {
     func copyToPasteboard(_ id: UUID) -> Bool {
         guard isUnlocked, let entry = entry(withID: id), let clipboardManager else { return false }
         noteUse()
-        return clipboardManager.copySecret(entry, clearAfter: settingsManager?.vaultClipboardClearSeconds ?? 30)
+        guard clipboardManager.copySecret(entry, clearAfter: settingsManager?.vaultClipboardClearSeconds ?? 30)
+        else { return false }
+        onEntryUsed?(entry)
+        return true
     }
 
     /// The text ⌘⇧⏎ types out; nil for images, files or a locked vault.
     func typeableText(of id: UUID) -> String? {
-        guard isUnlocked, let text = entry(withID: id)?.typeableText else { return nil }
+        guard isUnlocked, let entry = entry(withID: id), let text = entry.typeableText else { return nil }
         noteUse()
+        onEntryUsed?(entry)
         return text
     }
 

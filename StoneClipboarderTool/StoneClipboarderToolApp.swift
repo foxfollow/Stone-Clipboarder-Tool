@@ -190,8 +190,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             vaultManager?.isStoredSecret(capture) ?? false
         }
         Task { await vaultManager.prepareCopyDetection() }
-        vaultManager.onUnlocked = { [weak cbViewModel] entries in
+        // Plaintext copies of saved entries leave the history at unlock
+        // and after each paste from Passwords (Settings → Passwords).
+        vaultManager.onUnlocked = { [weak cbViewModel, weak settingsManager] entries in
+            guard settingsManager?.vaultRemoveHistoryCopies ?? true else { return }
             cbViewModel?.removeHistoryCopies(of: entries.map(\.contentKey))
+        }
+        vaultManager.onEntryUsed = { [weak cbViewModel, weak settingsManager] entry in
+            guard settingsManager?.vaultRemoveHistoryCopies ?? true else { return }
+            cbViewModel?.removeHistoryCopies(of: [entry.contentKey])
         }
         quickPickerManager.setVaultManager(vaultManager)
 

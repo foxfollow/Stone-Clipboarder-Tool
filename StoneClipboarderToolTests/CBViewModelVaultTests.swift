@@ -27,6 +27,21 @@ final class CBViewModelVaultTests: XCTestCase {
         try await super.tearDown()
     }
 
+    func testRemovesEveryCopyIncludingOlderDuplicates() async throws {
+        // Two identical rows, as left by versions before deduplication.
+        context.insert(CBItem(timestamp: Date(timeIntervalSince1970: 1), content: "secret", itemType: .text))
+        context.insert(CBItem(timestamp: Date(timeIntervalSince1970: 2), content: "secret", itemType: .text))
+        context.insert(CBItem(timestamp: Date(timeIntervalSince1970: 3), content: "other", itemType: .text))
+        try context.save()
+
+        let key = VaultPayload(itemType: .text, content: "secret").contentKey
+        XCTAssertEqual(viewModel.removeHistoryCopies(of: [key, key]), 2, "each copy once")
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        XCTAssertEqual(try context.fetch(FetchDescriptor<CBItem>()).compactMap(\.content), ["other"])
+    }
+
     func testRemovesOnlyCopiesOfSavedEntries() async throws {
         viewModel.addTextItem(content: "379696")
         viewModel.addTextItem(content: " 379696")
