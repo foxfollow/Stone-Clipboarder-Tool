@@ -82,6 +82,12 @@ struct VaultPayload: Codable, Equatable, Identifiable, Sendable {
         }
     }
 
+    /// The history lookup key of the same content.
+    var contentKey: CBItem.ContentKey {
+        CBItem.ContentKey(
+            type: itemType, content: content, imageData: imageData, fileData: fileData, fileName: fileName)
+    }
+
     /// Same rules as `CBItem.hasSameContent`: the title doesn't count.
     func hasSameContent(as other: VaultPayload) -> Bool {
         guard itemType == other.itemType else { return false }

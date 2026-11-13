@@ -31,7 +31,7 @@ final class QPVaultEditorModelTests: XCTestCase {
             .appendingPathComponent("QPVaultEditorModelTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let manager = VaultManager(
-            store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(),
+            store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(), fingerprintKeyProvider: InMemoryVaultKeyProvider(),
             authenticator: AlwaysYesAuthenticator())
         await manager.unlock()
         _ = manager.add(VaultPayload(itemType: .text, content: "a"))

@@ -20,6 +20,7 @@ final class VaultManagerTests: XCTestCase {
 
     private var root: URL!
     private var keyProvider: InMemoryVaultKeyProvider!
+    private var fingerprintProvider: InMemoryVaultKeyProvider!
     private var authenticator: StubAuthenticator!
     private var clock = Date(timeIntervalSince1970: 100_000)
     private var isolated: IsolatedDefaults!
@@ -30,6 +31,7 @@ final class VaultManagerTests: XCTestCase {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("VaultManagerTests-\(UUID().uuidString)", isDirectory: true)
         keyProvider = InMemoryVaultKeyProvider()
+        fingerprintProvider = InMemoryVaultKeyProvider()
         authenticator = StubAuthenticator()
         isolated = IsolatedDefaults()
         settings = SettingsManager(defaults: isolated.defaults)
@@ -43,7 +45,8 @@ final class VaultManagerTests: XCTestCase {
 
     private func makeManager() -> VaultManager {
         let manager = VaultManager(
-            store: VaultStore(root: root), keyProvider: keyProvider, authenticator: authenticator,
+            store: VaultStore(root: root), keyProvider: keyProvider, fingerprintKeyProvider: fingerprintProvider,
+            authenticator: authenticator,
             now: { [unowned self] in self.clock })
         manager.settingsManager = settings
         return manager
@@ -200,6 +203,55 @@ final class VaultManagerTests: XCTestCase {
         XCTAssertEqual(manager.unreadableCount, 1)
     }
 
+    func testCopiesOfSavedEntriesAreRecognizedWhileLocked() async {
+        let manager = makeManager()
+        await manager.unlock()
+        _ = manager.add(VaultPayload(itemType: .text, content: "379696"))
+        _ = manager.add(VaultPayload(itemType: .file, fileData: Data([1]), fileName: "id_rsa"))
+        manager.lock()
+
+        XCTAssertTrue(manager.isStoredSecret(.text("379696")))
+        XCTAssertFalse(manager.isStoredSecret(.text("379697")))
+        XCTAssertTrue(manager.isStoredSecret(.file(URL(fileURLWithPath: "/tmp/id_rsa"), "public.data", Data([1]))))
+        XCTAssertFalse(manager.isStoredSecret(.file(URL(fileURLWithPath: "/tmp/other"), "public.data", Data([1]))))
+        XCTAssertFalse(manager.isStoredSecret(.combined("379696", Data([1]))))
+    }
+
+    func testANewLaunchRecognizesCopiesWithoutUnlocking() async {
+        let first = makeManager()
+        await first.unlock()
+        _ = first.add(VaultPayload(itemType: .text, content: "pw"))
+
+        let relaunched = makeManager()
+        XCTAssertFalse(relaunched.isStoredSecret(.text("pw")))  // nothing read yet
+        await relaunched.prepareCopyDetection()
+        XCTAssertTrue(relaunched.isStoredSecret(.text("pw")))
+        XCTAssertFalse(relaunched.isUnlocked)
+        XCTAssertEqual(authenticator.calls, 1)
+    }
+
+    func testDeletedEntriesAreForgotten() async {
+        let manager = makeManager()
+        await manager.unlock()
+        guard case .added(let id) = manager.add(VaultPayload(itemType: .text, content: "pw")) else {
+            return XCTFail("expected an added entry")
+        }
+        manager.delete(id)
+        XCTAssertFalse(manager.isStoredSecret(.text("pw")))
+
+        _ = manager.add(VaultPayload(itemType: .text, content: "other"))
+        manager.deleteAll()
+        XCTAssertFalse(manager.isStoredSecret(.text("other")))
+        XCTAssertFalse(fingerprintProvider.hasKey)
+    }
+
+    func testEmptyVaultNeverReadsTheFingerprintKey() async {
+        fingerprintProvider.failure = StubKeyError()
+        let manager = makeManager()
+        await manager.prepareCopyDetection()  // no fingerprints: returns before the key
+        XCTAssertFalse(manager.isStoredSecret(.text("x")))
+    }
+
     func testMakeForAppStaysOutOfTheRealVaultUnderTests() {
         // The test host must never read the real keychain or vault folder.
         let manager = VaultManager.makeForApp()
@@ -241,7 +293,8 @@ final class VaultPasteTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let authenticator = StubAuthenticator()
         let manager = VaultManager(
-            store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(), authenticator: authenticator)
+            store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(),
+            fingerprintKeyProvider: InMemoryVaultKeyProvider(), authenticator: authenticator)
 
         // No ClipboardManager is attached: the test never writes the real pasteboard.
         XCTAssertFalse(manager.copyToPasteboard(UUID()))

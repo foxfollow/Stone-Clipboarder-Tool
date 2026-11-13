@@ -45,12 +45,19 @@ final class VaultManager: ObservableObject {
     weak var settingsManager: SettingsManager?
     /// Writes pasted entries; never adds them to the history.
     weak var clipboardManager: ClipboardManager?
+    /// Called with the decrypted entries after each unlock, so plaintext
+    /// copies captured before an entry was saved leave the history.
+    var onUnlocked: (([VaultPayload]) -> Void)?
 
     private let store: VaultStore
     private let keyProvider: VaultKeyProvider
+    private let fingerprintKeyProvider: VaultKeyProvider
     private let authenticator: VaultAuthenticator
     private let now: () -> Date
     private var key: SymmetricKey?
+    /// Kept while locked too: recognizes copies of saved entries.
+    private var fingerprintKey: SymmetricKey?
+    private var fingerprints: Set<String> = []
     private var policy = VaultLockPolicy()
 
     nonisolated(unsafe) private var expiryTimer: Timer?
@@ -60,11 +67,14 @@ final class VaultManager: ObservableObject {
     init(
         store: VaultStore = VaultStore(),
         keyProvider: VaultKeyProvider = KeychainVaultKeyProvider(),
+        fingerprintKeyProvider: VaultKeyProvider = KeychainVaultKeyProvider(
+            account: KeychainVaultKeyProvider.fingerprintAccount),
         authenticator: VaultAuthenticator? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.store = store
         self.keyProvider = keyProvider
+        self.fingerprintKeyProvider = fingerprintKeyProvider
         self.authenticator = authenticator ?? LocalAuthenticationAuthenticator()
         self.now = now
     }
@@ -75,7 +85,9 @@ final class VaultManager: ObservableObject {
         guard AppEnvironment.isRunningUnitTests || AppEnvironment.isDemo else { return VaultManager() }
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("StoneClipboarderTool-Vault-\(UUID().uuidString)", isDirectory: true)
-        return VaultManager(store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider())
+        return VaultManager(
+            store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(),
+            fingerprintKeyProvider: InMemoryVaultKeyProvider())
     }
 
     deinit {
@@ -117,19 +129,23 @@ final class VaultManager: ObservableObject {
 
         // A keychain access prompt blocks the call; keep it off the main thread.
         let provider = keyProvider
-        let loaded: Result<SymmetricKey, Error> = await Task.detached(priority: .userInitiated) {
-            Result { try provider.loadOrCreateKey() }
+        let fingerprintProvider = fingerprintKeyProvider
+        let loaded: Result<(SymmetricKey, SymmetricKey?), Error> = await Task.detached(priority: .userInitiated) {
+            Result { (try provider.loadOrCreateKey(), try? fingerprintProvider.loadOrCreateKey()) }
         }.value
         isAuthenticating = false
 
         switch loaded {
-        case .success(let loadedKey):
+        case .success(let (loadedKey, loadedFingerprintKey)):
             key = loadedKey
+            fingerprintKey = loadedFingerprintKey ?? fingerprintKey
             isUnlocked = true
             statusMessage = nil
             reloadEntries()
+            rebuildFingerprints()
             noteUse()
             startExpiryTimer()
+            onUnlocked?(entries)
             return true
         case .failure(let error):
             ErrorLogger.shared.log("Could not read the vault key", category: "Vault", error: error)
@@ -196,6 +212,47 @@ final class VaultManager: ObservableObject {
         }
     }
 
+    // MARK: - Copies of saved entries
+
+    /// Reads the fingerprints and their key so copies of saved entries are
+    /// recognized while the vault is locked. Called once at launch; does
+    /// nothing (and never touches the Keychain) for an empty vault.
+    func prepareCopyDetection() async {
+        let saved = store.loadFingerprints()
+        guard !saved.isEmpty else { return }
+        fingerprints = saved
+        let provider = fingerprintKeyProvider
+        let loaded = await Task.detached(priority: .utility) {
+            try? provider.readKeyData().flatMap { try? VaultCrypto.key(from: $0) }
+        }.value
+        if fingerprintKey == nil {
+            fingerprintKey = loaded
+        }
+    }
+
+    /// Whether a new capture has the same content as a saved entry, so the
+    /// history must not keep it in plaintext. Works while locked.
+    func isStoredSecret(_ capture: ClipboardContent) -> Bool {
+        guard let fingerprintKey, !fingerprints.isEmpty else { return false }
+        return fingerprints.contains(VaultFingerprint.of(capture, key: fingerprintKey))
+    }
+
+    /// From the decrypted entries: covers entries from before fingerprints
+    /// and drops deleted ones.
+    private func rebuildFingerprints() {
+        guard let fingerprintKey else { return }
+        fingerprints = Set(entries.map { VaultFingerprint.of($0, key: fingerprintKey) })
+        saveFingerprints()
+    }
+
+    private func saveFingerprints() {
+        do {
+            try store.saveFingerprints(fingerprints)
+        } catch {
+            ErrorLogger.shared.log("Failed to save vault fingerprints", category: "Vault", error: error)
+        }
+    }
+
     // MARK: - Entries
 
     /// Puts an entry on the pasteboard for ⏎ (concealed, cleared after
@@ -235,6 +292,10 @@ final class VaultManager: ObservableObject {
             return .failed
         }
         entries.append(entry)
+        if let fingerprintKey {
+            fingerprints.insert(VaultFingerprint.of(entry, key: fingerprintKey))
+            saveFingerprints()
+        }
         noteUse()
         return .added(entry.id)
     }
@@ -256,6 +317,7 @@ final class VaultManager: ObservableObject {
             return false
         }
         entries.removeAll { $0.id == id }
+        rebuildFingerprints()
         noteUse()
         return true
     }
@@ -293,6 +355,9 @@ final class VaultManager: ObservableObject {
         do {
             try store.deleteAll()
             try keyProvider.deleteKey()
+            try fingerprintKeyProvider.deleteKey()
+            fingerprints = []
+            fingerprintKey = nil
             unreadableCount = 0
             statusMessage = nil
         } catch {

@@ -9,14 +9,29 @@ import CryptoKit
 import Foundation
 import Security
 
-/// Hands out the vault's 256-bit key. Calls may block (a Keychain access
+/// Stores one secret blob: the vault key (raw, or wrapped with the vault
+/// password) or the fingerprint key. Calls may block (a Keychain access
 /// prompt), so VaultManager makes them off the main thread.
 protocol VaultKeyProvider: Sendable {
-    /// The stored key, or a new one that is stored first. Never replaces a
-    /// key it failed to read: only a missing key is created.
-    func loadOrCreateKey() throws -> SymmetricKey
-    /// Removes the key ("Delete All Passwords").
+    /// nil when nothing is stored yet.
+    func readKeyData() throws -> Data?
+    /// Stores or replaces the blob.
+    func writeKeyData(_ data: Data) throws
+    /// Removes it ("Delete All Passwords").
     func deleteKey() throws
+}
+
+extension VaultKeyProvider {
+    /// A raw 256-bit key, created and stored when none is there yet. Never
+    /// replaces a key it failed to read: only a missing key is created.
+    func loadOrCreateKey() throws -> SymmetricKey {
+        if let data = try readKeyData() {
+            return try VaultCrypto.key(from: data)
+        }
+        let key = VaultCrypto.makeKey()
+        try writeKeyData(VaultCrypto.keyData(key))
+        return key
+    }
 }
 
 /// The key as a generic password in the user's login keychain.
@@ -30,6 +45,8 @@ protocol VaultKeyProvider: Sendable {
 struct KeychainVaultKeyProvider: VaultKeyProvider {
     static let service = "d3f0ld.StoneClipboarderTool.vault"
     static let account = "vault-key"
+    /// The HMAC key of `VaultFingerprint`.
+    static let fingerprintAccount = "vault-fingerprint-key"
 
     enum Failure: Error, Equatable {
         case keychain(OSStatus)
@@ -43,13 +60,16 @@ struct KeychainVaultKeyProvider: VaultKeyProvider {
         self.account = account
     }
 
-    func loadOrCreateKey() throws -> SymmetricKey {
-        if let data = try readKeyData() {
-            return try VaultCrypto.key(from: data)
+    func writeKeyData(_ data: Data) throws {
+        let status = SecItemUpdate(baseQuery as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        switch status {
+        case errSecSuccess:
+            return
+        case errSecItemNotFound:
+            try store(data)
+        default:
+            throw Failure.keychain(status)
         }
-        let key = VaultCrypto.makeKey()
-        try store(VaultCrypto.keyData(key))
-        return key
     }
 
     func deleteKey() throws {
@@ -65,7 +85,7 @@ struct KeychainVaultKeyProvider: VaultKeyProvider {
         ]
     }
 
-    private func readKeyData() throws -> Data? {
+    func readKeyData() throws -> Data? {
         var query = baseQuery
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -86,7 +106,8 @@ struct KeychainVaultKeyProvider: VaultKeyProvider {
         attributes[kSecValueData as String] = data
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
         attributes[kSecAttrLabel as String] = "Stone Clipboarder Passwords"
-        attributes[kSecAttrDescription as String] = "Encryption key of the Passwords vault"
+        attributes[kSecAttrDescription as String] = account == Self.fingerprintAccount
+            ? "Recognizes copies of saved passwords" : "Encryption key of the Passwords vault"
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else { throw Failure.keychain(status) }
     }
@@ -96,29 +117,35 @@ struct KeychainVaultKeyProvider: VaultKeyProvider {
 /// never touch the user's keychain.
 final class InMemoryVaultKeyProvider: VaultKeyProvider, @unchecked Sendable {
     private let lock = NSLock()
-    private var key: SymmetricKey?
-    /// Set by tests to make the next load fail.
+    private var data: Data?
+    /// Set by tests to make reads fail.
     var failure: Error?
 
     init(key: SymmetricKey? = nil) {
-        self.key = key
+        data = key.map(VaultCrypto.keyData)
     }
 
     var hasKey: Bool {
-        lock.withLock { key != nil }
+        lock.withLock { data != nil }
     }
 
-    func loadOrCreateKey() throws -> SymmetricKey {
+    /// What is stored (tests check raw vs wrapped).
+    var storedData: Data? {
+        lock.withLock { data }
+    }
+
+    func readKeyData() throws -> Data? {
         try lock.withLock {
             if let failure { throw failure }
-            if let key { return key }
-            let created = VaultCrypto.makeKey()
-            key = created
-            return created
+            return data
         }
     }
 
+    func writeKeyData(_ data: Data) throws {
+        lock.withLock { self.data = data }
+    }
+
     func deleteKey() throws {
-        lock.withLock { key = nil }
+        lock.withLock { data = nil }
     }
 }

@@ -274,3 +274,49 @@ final class VaultLockPolicyTests: XCTestCase {
         XCTAssertEqual(VaultLockPolicy(timeoutMinutes: 15).timeout, 900)
     }
 }
+
+final class VaultFingerprintTests: XCTestCase {
+
+    private let key = VaultCrypto.makeKey()
+
+    func testPayloadAndCaptureOfTheSameContentMatch() {
+        XCTAssertEqual(
+            VaultFingerprint.of(VaultPayload(itemType: .text, title: "ignored", content: "pw"), key: key),
+            VaultFingerprint.of(ClipboardContent.text("pw"), key: key))
+        XCTAssertEqual(
+            VaultFingerprint.of(VaultPayload(itemType: .image, imageData: Data([1, 2])), key: key),
+            VaultFingerprint.of(ClipboardContent.image(Data([1, 2])), key: key))
+        XCTAssertEqual(
+            VaultFingerprint.of(VaultPayload(itemType: .combined, content: "a", imageData: Data([3])), key: key),
+            VaultFingerprint.of(ClipboardContent.combined("a", Data([3])), key: key))
+        XCTAssertEqual(
+            VaultFingerprint.of(VaultPayload(itemType: .file, fileData: Data([4]), fileName: "k.pem"), key: key),
+            VaultFingerprint.of(ClipboardContent.file(URL(fileURLWithPath: "/x/k.pem"), "public.data", Data([4])), key: key))
+    }
+
+    func testTypeKeyAndBoundariesMatter() {
+        let text = VaultFingerprint.of(ClipboardContent.text("pw"), key: key)
+        XCTAssertNotEqual(text, VaultFingerprint.of(ClipboardContent.text("pw"), key: VaultCrypto.makeKey()))
+        XCTAssertNotEqual(text, VaultFingerprint.of(ClipboardContent.combined("pw", Data()), key: key))
+        XCTAssertNotEqual(
+            VaultFingerprint.of(ClipboardContent.combined("ab", Data("c".utf8)), key: key),
+            VaultFingerprint.of(ClipboardContent.combined("a", Data("bc".utf8)), key: key))
+    }
+
+    func testFingerprintDoesNotContainTheContent() {
+        let fingerprint = VaultFingerprint.of(ClipboardContent.text("hunter2"), key: key)
+        XCTAssertFalse(fingerprint.contains("hunter2"))
+        XCTAssertEqual(Data(base64Encoded: fingerprint)?.count, 32)
+    }
+
+    func testStoreKeepsFingerprints() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("VaultFingerprintTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = VaultStore(root: root)
+        XCTAssertTrue(store.loadFingerprints().isEmpty)
+        try store.saveFingerprints(["a", "b"])
+        XCTAssertEqual(store.loadFingerprints(), ["a", "b"])
+        XCTAssertFalse(store.hasEntries)  // not an entry file
+    }
+}

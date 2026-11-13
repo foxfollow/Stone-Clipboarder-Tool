@@ -182,6 +182,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         vaultManager.settingsManager = settingsManager
         vaultManager.clipboardManager = cbViewModel.getClipboardManager()
         vaultManager.startObservingSystemLocks()
+        // A password copied again stays out of the history, locked or not.
+        cbViewModel.isStoredSecret = { [weak vaultManager] capture in
+            vaultManager?.isStoredSecret(capture) ?? false
+        }
+        Task { await vaultManager.prepareCopyDetection() }
+        vaultManager.onUnlocked = { [weak cbViewModel] entries in
+            cbViewModel?.removeHistoryCopies(of: entries.map(\.contentKey))
+        }
         quickPickerManager.setVaultManager(vaultManager)
 
         // PinManager shares the settings container (PinnedItemConfig lives there)

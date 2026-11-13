@@ -80,6 +80,27 @@ struct VaultStore {
         try FileManager.default.removeItem(at: url)
     }
 
+    // MARK: - Fingerprints
+
+    /// `VaultFingerprint`s of every entry, one per line; readable while the
+    /// vault is locked.
+    var fingerprintsURL: URL {
+        root.appendingPathComponent("fingerprints")
+    }
+
+    func loadFingerprints() -> Set<String> {
+        guard let text = try? String(contentsOf: fingerprintsURL, encoding: .utf8) else { return [] }
+        return Set(text.split(separator: "\n").map(String.init).filter { !$0.isEmpty })
+    }
+
+    func saveFingerprints(_ fingerprints: Set<String>) throws {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try Data(fingerprints.sorted().joined(separator: "\n").utf8).write(to: fingerprintsURL, options: .atomic)
+        try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fingerprintsURL.path)
+    }
+
     /// Removes every entry file (and the folder).
     func deleteAll() throws {
         guard FileManager.default.fileExists(atPath: root.path) else { return }

@@ -308,7 +308,24 @@ class CBViewModel: ObservableObject {
         clipboardManager.startMonitoring()
     }
 
+    /// Deletes the history copy of each saved Passwords entry, if any (two
+    /// steps, like every delete). Returns how many went.
+    @discardableResult
+    func removeHistoryCopies(of keys: [CBItem.ContentKey]) -> Int {
+        let copies = keys.compactMap { existingItem(matching: $0) }
+        copies.forEach(deleteItem)
+        return copies.count
+    }
+
+    /// True for a capture whose content is saved in Passwords: it isn't
+    /// added to the history (VaultManager.isStoredSecret, set at launch).
+    var isStoredSecret: ((ClipboardContent) -> Bool)?
+
     private func handleClipboardChange(_ clipboardContent: ClipboardContent, source: CaptureSource?) {
+        if isStoredSecret?(clipboardContent) == true {
+            ErrorLogger.shared.debug("Skipped a copy that is saved in Passwords", category: "Vault")
+            return
+        }
         switch clipboardContent {
         case .text(let content):
             addOrUpdateTextItem(content: content, source: source)
