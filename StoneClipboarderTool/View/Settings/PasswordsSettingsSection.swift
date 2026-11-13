@@ -11,6 +11,7 @@ struct PasswordsSettingsSection: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var vaultManager: VaultManager
     @State private var isConfirmingDeleteAll = false
+    @State private var passwordSheet: VaultPasswordSheet.Mode?
 
     private static let clearChoices = [0, 15, 30, 60, 120]
 
@@ -22,6 +23,25 @@ struct PasswordsSettingsSection: View {
 
             Toggle("Show the Passwords tab", isOn: $settingsManager.showPasswordsTab)
                 .settingsAnchor("passwords.show")
+
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Password")
+                    Text(settingsManager.vaultUsesPassword
+                         ? "Passwords unlock with your password instead of Touch ID."
+                         : "Off: Passwords unlock with Touch ID.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                if settingsManager.vaultUsesPassword {
+                    Button("Change…") { passwordSheet = .change }
+                    Button("Remove…") { passwordSheet = .remove }
+                } else {
+                    Button("Require a Password…") { passwordSheet = .set }
+                }
+            }
+            .settingsAnchor("passwords.password")
 
             Picker("Lock again after", selection: $settingsManager.vaultRelockMinutes) {
                 ForEach(relockChoices, id: \.self) { minutes in
@@ -53,13 +73,18 @@ struct PasswordsSettingsSection: View {
             }
             .settingsAnchor("passwords.actions")
         }
+        .sheet(item: $passwordSheet) { mode in
+            VaultPasswordSheet(mode: mode)
+                .environmentObject(vaultManager)
+                .environmentObject(settingsManager)
+        }
         .confirmationDialog(
             "Delete all saved passwords?", isPresented: $isConfirmingDeleteAll, titleVisibility: .visible
         ) {
             Button("Delete All", role: .destructive) { vaultManager.deleteAll() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every entry and its Keychain key are removed. This can't be undone.")
+            Text("Every entry, its Keychain key and the Passwords password are removed. This can't be undone.")
         }
     }
 

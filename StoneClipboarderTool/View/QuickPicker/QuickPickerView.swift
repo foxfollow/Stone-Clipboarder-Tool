@@ -85,6 +85,8 @@ struct QuickPickerView: View {
     @State private var revealedVaultID: UUID?
     /// The open ⌥E editor on the Passwords tab.
     @State private var vaultEditor: QPVaultEditorModel?
+    /// The Passwords password, typed where the search field usually is.
+    @State private var vaultPasswordInput = ""
     @FocusState private var isSearchFocused: Bool
 
     let onClose: () -> Void
@@ -133,6 +135,11 @@ struct QuickPickerView: View {
     }
 
     private var isPasswordsTab: Bool { activeTab == .passwords }
+
+    /// A locked vault with a Passwords password: the search field takes it.
+    private var isTypingVaultPassword: Bool {
+        isPasswordsTab && !vaultManager.isUnlocked && vaultManager.usesPassword
+    }
 
     private var filteredItems: [CBItem] {
         // Apply tab filter in-memory too so ⌥Space (unfavorite while on
@@ -218,6 +225,7 @@ struct QuickPickerView: View {
         .onChange(of: vaultManager.isUnlocked) { _, isUnlocked in
             // Locked behind the picker (screen lock, timeout): nothing of the
             // vault may stay on screen.
+            vaultPasswordInput = ""
             guard !isUnlocked else { return }
             vaultPreview.hide()
             revealedVaultID = nil
@@ -297,6 +305,8 @@ struct QuickPickerView: View {
                 return .handled
             }
             .onKeyPress(keys: [.space]) { keyPress in
+                // Spaces are part of a password.
+                if isTypingVaultPassword { return .ignored }
                 // ⌥Space toggles favorite on the selected item.
                 if keyPress.modifiers.contains(.option) {
                     // Passwords have no favorites: ⌥Space is the large
@@ -312,6 +322,7 @@ struct QuickPickerView: View {
                 return handlePreviewTrigger()
             }
             .onKeyPress(keys: [.rightArrow]) { keyPress in
+                if isTypingVaultPassword { return .ignored }
                 // ⌥→ / ⌘→ move the cursor (by word, to the end); only a
                 // plain → opens the preview.
                 guard triggerKey == .arrowRight, keyPress.modifiers.isDisjoint(with: [.option, .command, .control])
@@ -364,6 +375,7 @@ struct QuickPickerView: View {
                 selectionAnchor = nil
                 vaultIndex = 0
                 revealedVaultID = nil
+                vaultPasswordInput = ""
                 // Neither a decrypted entry nor a history item stays in
                 // the preview across the Passwords boundary.
                 if (oldTab == .passwords || newTab == .passwords),
@@ -434,7 +446,7 @@ struct QuickPickerView: View {
                     selectedIndex: $vaultIndex,
                     revealedID: revealedVaultID,
                     searchText: searchText,
-                    onUnlock: { unlockVault() },
+                    onUnlock: { performVaultAction() },
                     onPaste: { performVaultAction() },
                     onEdit: { _ in openVaultEditor() },
                     onToggleReveal: { entry in toggleVaultReveal(entry.id) }
@@ -527,7 +539,9 @@ struct QuickPickerView: View {
             }
             // Without chips, ⌥←/→ keep moving the cursor by word.
             tabInterceptor.hasChips = { !categoryChips.isEmpty }
-            tabInterceptor.isPasswordsTab = { isPasswordsTab }
+            tabInterceptor.isPasswordsTab = { isPasswordsTab && vaultManager.isUnlocked }
+            // ⌥ letters can be part of a password: let them type.
+            tabInterceptor.passesOptionKeys = { isTypingVaultPassword }
             tabInterceptor.onOptionL = {
                 vaultManager.lock()
             }
@@ -570,6 +584,36 @@ struct QuickPickerView: View {
 
     @ViewBuilder
     private var searchBar: some View {
+        if isTypingVaultPassword {
+            vaultPasswordBar
+        } else {
+            historySearchBar
+        }
+    }
+
+    /// Where the search field is, so the cursor is already there.
+    private var vaultPasswordBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.fill")
+                .foregroundColor(.accentColor)
+                .font(.system(size: 14, weight: .medium))
+            SecureField("Passwords password, then ⏎", text: $vaultPasswordInput)
+                .textFieldStyle(.plain)
+                .focused($isSearchFocused)
+                .onSubmit { performVaultAction() }
+                .disabled(vaultManager.isAuthenticating)
+            if vaultManager.isAuthenticating {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    @ViewBuilder
+    private var historySearchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.accentColor)
@@ -1031,6 +1075,10 @@ struct QuickPickerView: View {
               let item = quickPickerItems.first(where: { $0.persistentModelID == editor.itemID })
         else { return }
         editor.vaultMessage = nil
+        if !vaultManager.isUnlocked, vaultManager.usesPassword {
+            editor.vaultMessage = "Unlock the Passwords tab with your password first."
+            return
+        }
         editor.isMovingToVault = true
         Task { @MainActor in
             let unlocked = await vaultManager.unlock(reason: "move this item to your passwords")
@@ -1500,6 +1548,17 @@ struct QuickPickerView: View {
         vaultPreview.toggle(entry, expanded)
     }
 
+    private func unlockVaultWithPassword() {
+        let password = vaultPasswordInput
+        guard !password.isEmpty, !vaultManager.isAuthenticating else { return }
+        Task { @MainActor in
+            let unlocked = await vaultManager.unlock(password: password)
+            vaultPasswordInput = ""
+            if unlocked { vaultIndex = 0 }
+            DispatchQueue.main.async { isSearchFocused = true }
+        }
+    }
+
     /// Touch ID (or the password) while the picker stays open.
     private func unlockVault() {
         Task { @MainActor in
@@ -1509,11 +1568,15 @@ struct QuickPickerView: View {
         }
     }
 
-    /// ⏎: unlock, or paste the selected entry.
+    /// ⏎: unlock (Touch ID, or the typed password), or paste the selected entry.
     private func performVaultAction() {
         vaultManager.checkExpiry()
         guard vaultManager.isUnlocked else {
-            unlockVault()
+            if vaultManager.usesPassword {
+                unlockVaultWithPassword()
+            } else {
+                unlockVault()
+            }
             return
         }
         guard let entry = vaultEntries[safe: vaultIndex],
@@ -1692,6 +1755,8 @@ final class TabKeyInterceptor: ObservableObject {
     /// only while the Passwords tab is active.
     var onOptionL: (() -> Void)?
     var onOptionR: (() -> Void)?
+    /// True while a password is typed: ⌥ letters reach the field.
+    var passesOptionKeys: (() -> Bool)?
     var isPasswordsTab: (() -> Bool)?
 
     /// Set while the ⌥E editor is open. The picker's own shortcuts stand
@@ -1742,6 +1807,7 @@ final class TabKeyInterceptor: ObservableObject {
         onOptionL = nil
         onOptionR = nil
         isPasswordsTab = nil
+        passesOptionKeys = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
@@ -1749,6 +1815,10 @@ final class TabKeyInterceptor: ObservableObject {
 
         if let onEditorKey {
             return interceptForEditor(event, flags: flags, handler: onEditorKey)
+        }
+
+        if passesOptionKeys?() == true, event.keyCode != Self.tabKeyCode {
+            return event
         }
 
         // ⌥← / ⌥→, with or without ⇧ (no Control/Command).

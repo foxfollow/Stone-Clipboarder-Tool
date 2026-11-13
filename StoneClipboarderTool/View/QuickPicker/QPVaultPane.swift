@@ -34,22 +34,26 @@ struct QPVaultPane: View {
 
     private var lockScreen: some View {
         VStack(spacing: 14) {
-            Image(systemName: vaultManager.isAuthenticating ? "touchid" : "lock.fill")
+            Image(systemName: lockSymbol)
                 .font(.system(size: 44))
                 .foregroundStyle(Color.accentColor)
             Text("Passwords are locked")
                 .font(.headline)
-            Button(action: onUnlock) {
-                Label("Unlock with Touch ID", systemImage: "touchid")
+            if vaultManager.usesPassword {
+                passwordPrompt
+            } else {
+                Button(action: onUnlock) {
+                    Label("Unlock with Touch ID", systemImage: "touchid")
+                }
+                .controlSize(.large)
+                .disabled(vaultManager.isAuthenticating)
+                .focusable(false)
+                Text("⏎ to unlock. They lock again when the screen locks or after a while unused.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
             }
-            .controlSize(.large)
-            .disabled(vaultManager.isAuthenticating)
-            .focusable(false)
-            Text("⏎ to unlock. They lock again when the screen locks or after a while unused.")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
             if let message = vaultManager.statusMessage {
                 Text(message)
                     .font(.system(size: 11))
@@ -57,6 +61,27 @@ struct QPVaultPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var lockSymbol: String {
+        if vaultManager.isAuthenticating { return vaultManager.usesPassword ? "hourglass" : "touchid" }
+        return vaultManager.usesPassword ? "lock.rectangle" : "lock.fill"
+    }
+
+    /// The field itself is the search bar above (it has the cursor).
+    @ViewBuilder
+    private var passwordPrompt: some View {
+        Text("Type your Passwords password in the field above and press ⏎.")
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 40)
+        if let hint = vaultManager.settingsManager?.vaultPasswordHint, !hint.isEmpty {
+            Label("Hint: \(hint)", systemImage: "lightbulb")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 40)
+        }
     }
 
     private var emptyState: some View {

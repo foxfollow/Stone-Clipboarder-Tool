@@ -352,6 +352,18 @@ final class SettingsManager: ObservableObject {
         }
     }
 
+    /// The vault key is wrapped with a password the user chose, which
+    /// unlocks the Passwords tab instead of Touch ID. Mirrors what
+    /// VaultManager finds in the Keychain.
+    @Published var vaultUsesPassword: Bool {
+        didSet { defaults.set(vaultUsesPassword, forKey: "vaultUsesPassword") }
+    }
+
+    /// Shown on the lock screen next to the password field; may be empty.
+    @Published var vaultPasswordHint: String {
+        didSet { defaults.set(vaultPasswordHint, forKey: "vaultPasswordHint") }
+    }
+
     /// Seconds after pasting a password before the clipboard is cleared, if
     /// it still holds that password; 0 = never.
     @Published var vaultClipboardClearSeconds: Int {
@@ -524,6 +536,8 @@ final class SettingsManager: ObservableObject {
         self.vaultRelockMinutes = max(
             1, defaults.object(forKey: "vaultRelockMinutes") as? Int ?? VaultLockPolicy.defaultTimeoutMinutes)
         self.vaultClipboardClearSeconds = max(0, defaults.object(forKey: "vaultClipboardClearSeconds") as? Int ?? 30)
+        self.vaultUsesPassword = defaults.object(forKey: "vaultUsesPassword") as? Bool ?? false
+        self.vaultPasswordHint = defaults.string(forKey: "vaultPasswordHint") ?? ""
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = defaults.string(forKey: "clipboardCaptureMode"),

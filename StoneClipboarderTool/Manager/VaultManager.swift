@@ -109,8 +109,9 @@ final class VaultManager: ObservableObject {
         settingsManager?.vaultRelockMinutes ?? VaultLockPolicy.defaultTimeoutMinutes
     }
 
-    /// Unlocks with Touch ID or the password; true when unlocked. An unlocked
-    /// vault only counts as used again.
+    /// Unlocks with Touch ID (or the login password); true when unlocked. An
+    /// unlocked vault only counts as used again. With a Passwords password
+    /// set, use `unlock(password:)`.
     @discardableResult
     func unlock(reason: String = "unlock your saved passwords") async -> Bool {
         checkExpiry()
@@ -119,6 +120,11 @@ final class VaultManager: ObservableObject {
             return true
         }
         guard !isAuthenticating else { return false }
+        // The password is the gate then; Touch ID alone can't open the key.
+        if usesPassword {
+            statusMessage = "Enter your Passwords password."
+            return false
+        }
 
         isAuthenticating = true
         let confirmed = await authenticator.authenticate(reason: reason)
@@ -127,16 +133,59 @@ final class VaultManager: ObservableObject {
             return false
         }
 
-        // A keychain access prompt blocks the call; keep it off the main thread.
+        return await loadKeyAndUnlock(password: nil)
+    }
+
+    /// Unlocks a vault whose key is wrapped with the Passwords password
+    /// (`usesPassword`). Touch ID isn't asked: the password is the gate.
+    @discardableResult
+    func unlock(password: String) async -> Bool {
+        checkExpiry()
+        if isUnlocked {
+            noteUse()
+            return true
+        }
+        guard !isAuthenticating, !password.isEmpty else { return false }
+        isAuthenticating = true
+        return await loadKeyAndUnlock(password: password)
+    }
+
+    /// Whether unlocking takes the Passwords password instead of Touch ID.
+    var usesPassword: Bool {
+        settingsManager?.vaultUsesPassword ?? false
+    }
+
+    private enum KeyLoadFailure: Error {
+        case needsPassword
+    }
+
+    /// Reads the key off the main thread (a Keychain prompt blocks, and so
+    /// does PBKDF2), unwrapping it with `password` when it is wrapped.
+    /// Clears `isAuthenticating`.
+    private func loadKeyAndUnlock(password: String?) async -> Bool {
         let provider = keyProvider
         let fingerprintProvider = fingerprintKeyProvider
         let loaded: Result<(SymmetricKey, SymmetricKey?), Error> = await Task.detached(priority: .userInitiated) {
-            Result { (try provider.loadOrCreateKey(), try? fingerprintProvider.loadOrCreateKey()) }
+            Result {
+                let key: SymmetricKey
+                if let data = try provider.readKeyData(), VaultKeyWrapper.isWrapped(data) {
+                    guard let password else { throw KeyLoadFailure.needsPassword }
+                    key = try VaultKeyWrapper.unwrap(data, password: password)
+                } else {
+                    // A raw key (or none yet): a password typed anyway isn't needed.
+                    key = try provider.loadOrCreateKey()
+                }
+                return (key, try? fingerprintProvider.loadOrCreateKey())
+            }
         }.value
         isAuthenticating = false
 
         switch loaded {
         case .success(let (loadedKey, loadedFingerprintKey)):
+            // The setting follows what is really stored.
+            if password == nil, usesPassword {
+                settingsManager?.vaultUsesPassword = false
+            }
             key = loadedKey
             fingerprintKey = loadedFingerprintKey ?? fingerprintKey
             isUnlocked = true
@@ -147,9 +196,61 @@ final class VaultManager: ObservableObject {
             startExpiryTimer()
             onUnlocked?(entries)
             return true
+        case .failure(KeyLoadFailure.needsPassword):
+            settingsManager?.vaultUsesPassword = true
+            statusMessage = "Enter your Passwords password."
+            return false
+        case .failure(VaultKeyWrapper.Failure.wrongPassword):
+            statusMessage = "Wrong password."
+            return false
         case .failure(let error):
             ErrorLogger.shared.log("Could not read the vault key", category: "Vault", error: error)
             statusMessage = "Couldn't read the key from the Keychain."
+            return false
+        }
+    }
+
+    // MARK: - Passwords password
+
+    /// Wraps the vault key with `password` (the Keychain then holds only the
+    /// wrapped key) and stores the optional hint. Needs an unlocked vault.
+    /// `rounds` is lowered only by tests.
+    @discardableResult
+    func setPassword(_ password: String, hint: String?, rounds: UInt32 = VaultKeyWrapper.defaultRounds) async -> Bool {
+        guard isUnlocked, let key, !password.isEmpty else { return false }
+        let provider = keyProvider
+        let result: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
+            Result { try provider.writeKeyData(VaultKeyWrapper.wrap(key, password: password, rounds: rounds)) }
+        }.value
+        switch result {
+        case .success:
+            let trimmedHint = hint?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            settingsManager?.vaultPasswordHint = trimmedHint
+            settingsManager?.vaultUsesPassword = true
+            noteUse()
+            return true
+        case .failure(let error):
+            ErrorLogger.shared.log("Failed to set the Passwords password", category: "Vault", error: error)
+            return false
+        }
+    }
+
+    /// Back to Touch ID: stores the key unwrapped again. Needs an unlocked vault.
+    @discardableResult
+    func removePassword() async -> Bool {
+        guard isUnlocked, let key else { return false }
+        let provider = keyProvider
+        let result: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
+            Result { try provider.writeKeyData(VaultCrypto.keyData(key)) }
+        }.value
+        switch result {
+        case .success:
+            settingsManager?.vaultUsesPassword = false
+            settingsManager?.vaultPasswordHint = ""
+            noteUse()
+            return true
+        case .failure(let error):
+            ErrorLogger.shared.log("Failed to remove the Passwords password", category: "Vault", error: error)
             return false
         }
     }
@@ -358,6 +459,8 @@ final class VaultManager: ObservableObject {
             try fingerprintKeyProvider.deleteKey()
             fingerprints = []
             fingerprintKey = nil
+            settingsManager?.vaultUsesPassword = false
+            settingsManager?.vaultPasswordHint = ""
             unreadableCount = 0
             statusMessage = nil
         } catch {
