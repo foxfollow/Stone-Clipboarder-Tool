@@ -19,6 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var hotkeyManager: HotkeyManager?
     var quickPickerManager: QuickPickerWindowManager?
     var pinManager: PinManager?
+    var vaultManager: VaultManager?
     var clipboardContainer: ModelContainer?
     var settingsContainer: ModelContainer?
 
@@ -130,6 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let hotkeyManager,
             let quickPickerManager,
             let pinManager,
+            let vaultManager,
             let clipboardContainer,
             let settingsContainer
         else {
@@ -143,6 +145,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // monitor. Tests build the objects they need themselves.
         if AppEnvironment.isRunningUnitTests { return }
         if AppEnvironment.isDemo {
+            vaultManager.settingsManager = settingsManager
+            quickPickerManager.setVaultManager(vaultManager)
             setUpDemo(cbViewModel: cbViewModel, settingsManager: settingsManager, hotkeyManager: hotkeyManager,
                       quickPickerManager: quickPickerManager, pinManager: pinManager,
                       settingsContainer: settingsContainer, clipboardContainer: clipboardContainer)
@@ -172,6 +176,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         quickPickerManager.setSettingsManager(settingsManager)
         quickPickerManager.setPinManager(pinManager)
         hotkeyManager.quickPickerDelegate = quickPickerManager
+
+        // The Passwords vault: locked until Touch ID, re-locks with the screen.
+        vaultManager.settingsManager = settingsManager
+        vaultManager.startObservingSystemLocks()
+        quickPickerManager.setVaultManager(vaultManager)
 
         // PinManager shares the settings container (PinnedItemConfig lives there)
         pinManager.viewModel = cbViewModel
@@ -520,6 +529,7 @@ struct StoneClipboarderToolApp: App {
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var quickPickerManager = QuickPickerWindowManager()
     @StateObject private var pinManager = PinManager()
+    @StateObject private var vaultManager = VaultManager.makeForApp()
 
     private let updaterController: SPUStandardUpdaterController
 
@@ -600,6 +610,7 @@ struct StoneClipboarderToolApp: App {
         appDelegate.hotkeyManager = hotkeyManager
         appDelegate.quickPickerManager = quickPickerManager
         appDelegate.pinManager = pinManager
+        appDelegate.vaultManager = vaultManager
         appDelegate.clipboardContainer = clipboardContainer
         appDelegate.settingsContainer = settingsContainer
 

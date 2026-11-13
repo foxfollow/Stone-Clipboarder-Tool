@@ -74,6 +74,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     private weak var cbViewModel: CBViewModel?
     private weak var settingsManager: SettingsManager?
     private weak var pinManager: PinManager?
+    private weak var vaultManager: VaultManager?
     nonisolated(unsafe) private var eventMonitor: Any?
     nonisolated(unsafe) private var keyMonitor: Any?
     nonisolated(unsafe) private var localKeyMonitor: Any?
@@ -99,6 +100,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     func setPinManager(_ manager: PinManager) {
         self.pinManager = manager
+    }
+
+    func setVaultManager(_ manager: VaultManager) {
+        self.vaultManager = manager
     }
 
     func setMenuBarRefreshCallback(_ callback: @escaping () -> Void) {

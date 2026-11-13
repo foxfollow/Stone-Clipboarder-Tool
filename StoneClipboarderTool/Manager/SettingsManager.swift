@@ -334,6 +334,36 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(showRowBadges, forKey: "showRowBadges") }
     }
 
+    // MARK: - Passwords vault
+
+    /// The Quick Picker shows the Passwords tab.
+    @Published var showPasswordsTab: Bool {
+        didSet { defaults.set(showPasswordsTab, forKey: "showPasswordsTab") }
+    }
+
+    /// Minutes an unlocked vault stays unlocked after its last use.
+    @Published var vaultRelockMinutes: Int {
+        didSet {
+            if vaultRelockMinutes < 1 {
+                vaultRelockMinutes = 1  // re-enters didSet once, then persists
+                return
+            }
+            defaults.set(vaultRelockMinutes, forKey: "vaultRelockMinutes")
+        }
+    }
+
+    /// Seconds after pasting a password before the clipboard is cleared, if
+    /// it still holds that password; 0 = never.
+    @Published var vaultClipboardClearSeconds: Int {
+        didSet {
+            if vaultClipboardClearSeconds < 0 {
+                vaultClipboardClearSeconds = 0
+                return
+            }
+            defaults.set(vaultClipboardClearSeconds, forKey: "vaultClipboardClearSeconds")
+        }
+    }
+
     /// Store the frontmost app's name and bundle id with each capture.
     @Published var recordSourceApp: Bool {
         didSet { defaults.set(recordSourceApp, forKey: "recordSourceApp") }
@@ -490,6 +520,10 @@ final class SettingsManager: ObservableObject {
         self.recognizeTextInNewImages = defaults.object(forKey: "recognizeTextInNewImages") as? Bool ?? true
         self.showImageTextInRows = defaults.object(forKey: "showImageTextInRows") as? Bool ?? true
         self.showRowBadges = defaults.object(forKey: "showRowBadges") as? Bool ?? true
+        self.showPasswordsTab = defaults.object(forKey: "showPasswordsTab") as? Bool ?? true
+        self.vaultRelockMinutes = max(
+            1, defaults.object(forKey: "vaultRelockMinutes") as? Int ?? VaultLockPolicy.defaultTimeoutMinutes)
+        self.vaultClipboardClearSeconds = max(0, defaults.object(forKey: "vaultClipboardClearSeconds") as? Int ?? 30)
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = defaults.string(forKey: "clipboardCaptureMode"),
