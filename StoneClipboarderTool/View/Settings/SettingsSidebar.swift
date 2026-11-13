@@ -19,12 +19,16 @@ struct SettingsSidebar: View {
                 SettingsSearchResults(results: searchResults, onPick: onPickResult)
             } else {
                 List(selection: $selectedSection) {
-                    ForEach(SettingsSection.allCases) { section in
-                        SettingsSidebarRow(
-                            section: section,
-                            accessibilityGranted: accessibilityGranted
-                        )
-                        .tag(section)
+                    ForEach(SettingsGroup.allCases) { group in
+                        Section(group.title) {
+                            ForEach(group.sections) { section in
+                                SettingsSidebarRow(
+                                    section: section,
+                                    accessibilityGranted: accessibilityGranted
+                                )
+                                .tag(section)
+                            }
+                        }
                     }
                 }
                 .listStyle(.sidebar)

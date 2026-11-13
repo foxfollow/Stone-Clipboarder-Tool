@@ -36,8 +36,8 @@ enum SettingsSearchIndex {
     // MARK: - Catalog
 
     /// The fixed settings, in the order the pages show them.
-    static let staticEntries: [SettingsSearchEntry] = general + hotkeys + quickPicker + categories + pins
-        + excludedApps + accessibility + about
+    static let staticEntries: [SettingsSearchEntry] = general + hotkeys + accessibility + quickPicker
+        + categories + pins + passwords + excludedApps + about
 
     /// Everything searchable: the fixed settings, every hotkey action and
     /// the given categories (built-in, custom rules, app groups).
@@ -80,8 +80,8 @@ enum SettingsSearchIndex {
 
     // MARK: - Search
 
-    /// Entries matching every word of `query` in their title, group, page or
-    /// keywords (case and accents ignored). Titles that start with or contain
+    /// Entries matching every word of `query` in their title, group, page,
+    /// sidebar heading or keywords (case and accents ignored). Titles that start with or contain
     /// the query come first; otherwise the catalog order is kept.
     static func search(_ query: String, in entries: [SettingsSearchEntry]) -> [SettingsSearchEntry] {
         let words = normalize(query).split(separator: " ").map(String.init)
@@ -91,7 +91,8 @@ enum SettingsSearchIndex {
         let ranked: [(rank: Int, index: Int, entry: SettingsSearchEntry)] = entries.enumerated().compactMap {
             index, entry in
             let title = normalize(entry.title)
-            let haystack = ([title, entry.group, entry.section.title, entry.note ?? ""] + entry.keywords)
+            let haystack = ([title, entry.group, entry.section.title, entry.section.group.title, entry.note ?? ""]
+                + entry.keywords)
                 .map(normalize).joined(separator: " ")
             guard words.allSatisfy(haystack.contains) else { return nil }
             let rank: Int
@@ -182,18 +183,21 @@ enum SettingsSearchIndex {
               keywords: ["ocr", "option return", "vision", "text recognition"]),
         entry("quickPicker.typeOutDelay", "Type-out delay per character", .quickPicker, "Type-Out Paste",
               keywords: ["type out", "⌘⇧⏎", "remote desktop", "speed", "keystrokes"]),
-        entry("passwords.show", "Show the Passwords tab", .quickPicker, "Passwords",
+    ]
+
+    private static let passwords: [SettingsSearchEntry] = [
+        entry("passwords.show", "Show the Passwords tab", .passwords, "Passwords",
               keywords: ["vault", "secret", "keychain", "touch id", "encrypted"]),
-        entry("passwords.password", "Require a password for Passwords", .quickPicker, "Passwords",
+        entry("passwords.password", "Require a password for Passwords", .passwords, "Passwords",
               keywords: ["master password", "vault password", "hint", "change password", "remove password",
                          "protect", "security"]),
-        entry("passwords.relock", "Lock passwords again after", .quickPicker, "Passwords",
+        entry("passwords.relock", "Lock passwords again after", .passwords, "Passwords",
               keywords: ["timeout", "auto-lock", "idle", "touch id"]),
-        entry("passwords.clearClipboard", "Clear the clipboard after pasting a password", .quickPicker, "Passwords",
+        entry("passwords.clearClipboard", "Clear the clipboard after pasting a password", .passwords, "Passwords",
               keywords: ["clipboard", "seconds", "secret"]),
-        entry("passwords.lockNow", "Lock Passwords Now", .quickPicker, "Passwords",
+        entry("passwords.lockNow", "Lock Passwords Now", .passwords, "Passwords",
               keywords: ["vault", "lock"], anchor: "passwords.actions"),
-        entry("passwords.deleteAll", "Delete All Passwords", .quickPicker, "Passwords",
+        entry("passwords.deleteAll", "Delete All Passwords", .passwords, "Passwords",
               keywords: ["vault", "reset", "keychain key", "erase"], anchor: "passwords.actions"),
     ]
 

@@ -48,6 +48,13 @@ final class SettingsSearchIndexTests: XCTestCase {
         XCTAssertTrue(SettingsSearchIndex.search("pins default size", in: entries).contains { $0.id == "pins.textSize" })
     }
 
+    func testSidebarHeadingFindsItsPages() {
+        let security = SettingsSearchIndex.search("security", in: entries)
+        XCTAssertTrue(security.contains { $0.section == .passwords })
+        XCTAssertTrue(security.contains { $0.section == .excludedApps })
+        XCTAssertFalse(security.contains { $0.section == .pins })
+    }
+
     func testEveryWordMustMatch() {
         XCTAssertTrue(SettingsSearchIndex.search("shadow zebra", in: entries).isEmpty)
     }
@@ -82,5 +89,14 @@ final class SettingsSearchIndexTests: XCTestCase {
         let maxItems = entries.first { $0.id == "general.maxItems" }
         XCTAssertEqual(maxItems?.parentAnchor, "general.autoCleanup")
         XCTAssertNotNil(maxItems?.note)
+    }
+}
+
+final class SettingsSectionTests: XCTestCase {
+
+    func testEveryPageBelongsToOneGroupInSidebarOrder() {
+        let flattened = SettingsGroup.allCases.flatMap(\.sections)
+        XCTAssertEqual(flattened, SettingsSection.allCases)
+        XCTAssertEqual(SettingsGroup.security.sections, [.passwords, .excludedApps])
     }
 }

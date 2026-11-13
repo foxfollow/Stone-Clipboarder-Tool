@@ -5,8 +5,8 @@
 
 import SwiftUI
 
-/// Quick Picker settings for the Passwords tab: auto-lock, clipboard
-/// clearing, Lock Now and Delete All.
+/// The Passwords page: the tab, the optional password, auto-lock,
+/// clipboard clearing, Lock Now and Delete All.
 struct PasswordsSettingsSection: View {
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var vaultManager: VaultManager

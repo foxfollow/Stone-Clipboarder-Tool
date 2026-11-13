@@ -10,7 +10,6 @@ struct QuickPickerSettingsView: View {
         Form {
             QuickLookSection()
             TypeOutPasteSection()
-            PasswordsSettingsSection()
         }
         .formStyle(.grouped)
     }
