@@ -55,6 +55,10 @@ global hotkeys and CGEvent posts the paste keystrokes.
    tests and demo mode use `InMemoryVaultKeyProvider` and a scratch folder.
    History cleanup, Delete All and the corrupt-store recovery
    (`ModelContainerFactory.recoveryFiles`) never touch `Vault/`.
+   A locked vault answers nothing about its content by default
+   (`vaultCopyDetection` = while unlocked); a lock always wins over an
+   unlock in flight (`lockGeneration`); a key is never created while
+   entry files exist.
 9. **Pins render from snapshots.** Never read `PinnedItemConfig`'s
    external-storage fields in a SwiftUI body; `PinViewState` copies them
    once.
