@@ -498,10 +498,9 @@ enum ModelContainerFactory {
             do {
                 // Remove the main store file and its WAL/SHM companions
                 let storeDir = storeURL.deletingLastPathComponent()
-                let storeFileName = storeURL.lastPathComponent
                 let fm = FileManager.default
                 if let files = try? fm.contentsOfDirectory(atPath: storeDir.path) {
-                    for file in files where file.hasPrefix(storeFileName) {
+                    for file in recoveryFiles(of: storeURL.lastPathComponent, among: files) {
                         try? fm.removeItem(at: storeDir.appendingPathComponent(file))
                     }
                 }
@@ -513,6 +512,18 @@ enum ModelContainerFactory {
                 // Last resort: in-memory container so the app doesn't crash
                 return makeInMemoryContainer(schema: schema, name: "\(storeName)Memory")
             }
+        }
+    }
+
+    /// The files the recovery deletes: the store and its `-wal` / `-shm`
+    /// companions, nothing else in the folder. The Passwords vault
+    /// (`Vault/`), the error log and the other store live next to them and
+    /// must survive a corrupt history store.
+    static func recoveryFiles(of storeFileName: String, among files: [String]) -> [String] {
+        let protected: Set<String> = [VaultStore.defaultRoot.lastPathComponent]
+        return files.filter { file in
+            !protected.contains(file)
+                && (file == storeFileName || file == storeFileName + "-wal" || file == storeFileName + "-shm")
         }
     }
 

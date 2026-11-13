@@ -52,6 +52,8 @@ global hotkeys and CGEvent posts the paste keystrokes.
    wrapped when the user sets a Passwords password; nothing can recover a
    forgotten one, so never add a "reset" that claims to;
    tests and demo mode use `InMemoryVaultKeyProvider` and a scratch folder.
+   History cleanup, Delete All and the corrupt-store recovery
+   (`ModelContainerFactory.recoveryFiles`) never touch `Vault/`.
 9. **Pins render from snapshots.** Never read `PinnedItemConfig`'s
    external-storage fields in a SwiftUI body; `PinViewState` copies them
    once.

@@ -189,6 +189,9 @@ enum SettingsSearchIndex {
     ]
 
     private static let passwords: [SettingsSearchEntry] = [
+        entry("passwords.notice", "Passwords are extra storage, not synced", .passwords, "Passwords",
+              keywords: ["backup", "sync", "lost", "reinstall", "another mac", "keychain", "main password manager",
+                         "cleanup", "clear history"]),
         entry("passwords.show", "Show the Passwords tab", .passwords, "Passwords",
               keywords: ["vault", "secret", "keychain", "touch id", "encrypted"]),
         entry("passwords.password", "Require a password for Passwords", .passwords, "Passwords",

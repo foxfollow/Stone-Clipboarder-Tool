@@ -21,6 +21,21 @@ struct PasswordsSettingsSection: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
 
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Not your main password manager")
+                        .font(.callout.weight(.semibold))
+                    Text("Keep a copy of every password somewhere else too. Passwords are stored only on this Mac and are never synced or backed up by this app. They can be lost when the app is deleted or reinstalled, when you switch between builds (a release, a Homebrew or a self-built copy use different Keychain access and data folders), when you move to another Mac, or when the Keychain item is removed or conflicts. Clearing or cleaning up the clipboard history never touches them.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+            }
+            .settingsAnchor("passwords.notice")
+
             Toggle("Show the Passwords tab", isOn: $settingsManager.showPasswordsTab)
                 .settingsAnchor("passwords.show")
 

@@ -118,6 +118,9 @@ all pins.
 - [ ] Copying a saved password again (another app, a site), with the tab
       locked or not: it doesn't appear in the history. After an unlock, old
       history copies of saved entries are gone.
+- [ ] Clean Up Now, auto-cleanup and Delete All History leave Passwords
+      as they were; the Passwords page shows the "Not your main password
+      manager" notice.
 - [ ] Settings → Security → Passwords → Require a Password: Save stays off
       until the passwords match, are 6+ characters, the hint doesn't contain
       it and the warning is confirmed. Then the locked tab's search field
