@@ -187,7 +187,8 @@ struct QuickPickerView: View {
                 QPItemEditorView(
                     model: itemEditor,
                     onSave: { closeItemEditor(saving: true) },
-                    onCancel: { closeItemEditor(saving: false) }
+                    onCancel: { closeItemEditor(saving: false) },
+                    onMoveToVault: visibleTabs.contains(.passwords) ? { moveEditedItemToVault() } : nil
                 )
             }
             if let vaultEditor {
@@ -211,9 +212,16 @@ struct QuickPickerView: View {
             if vaultIndex >= newCount { vaultIndex = max(0, newCount - 1) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .clipboardItemDeleted)) { note in
+            let deletedID = note.object as? PersistentIdentifier
+            // The rows must let go of the item before it leaves the context
+            // on the next turn ("backing data was detached").
+            if let deletedID {
+                quickPickerItems.removeAll { $0.persistentModelID == deletedID }
+            } else {
+                quickPickerItems = []
+            }
             // The item is about to leave the context: close without saving.
             guard let editor = itemEditor else { return }
-            let deletedID = note.object as? PersistentIdentifier
             if deletedID == nil || deletedID == editor.itemID {
                 closeItemEditor(saving: false)
             }
@@ -936,6 +944,10 @@ struct QuickPickerView: View {
                 }
             case .delete:
                 break  // history items are deleted elsewhere
+            case .moveToVault:
+                if !editor.isConfirmingUnfavorite, visibleTabs.contains(.passwords) {
+                    moveEditedItemToVault()
+                }
             }
         }
         isSearchFocused = false
@@ -953,6 +965,61 @@ struct QuickPickerView: View {
         // still point at the editor's (now gone) field.
         DispatchQueue.main.async {
             isSearchFocused = true
+        }
+    }
+
+    /// ⌥K / Move to Passwords: unlock if needed, seal a copy into the vault
+    /// (or find the same content there already), delete the history item,
+    /// then show it on the Passwords tab.
+    private func moveEditedItemToVault() {
+        guard let editor = itemEditor, !editor.isMovingToVault,
+              let item = quickPickerItems.first(where: { $0.persistentModelID == editor.itemID })
+        else { return }
+        editor.vaultMessage = nil
+        editor.isMovingToVault = true
+        Task { @MainActor in
+            let unlocked = await vaultManager.unlock(reason: "move this item to your passwords")
+            onVaultAuthenticationEnded()
+            editor.isMovingToVault = false
+            // The editor closed, or the item was deleted, while Touch ID was up.
+            guard itemEditor === editor,
+                  quickPickerItems.contains(where: { $0.persistentModelID == editor.itemID })
+            else { return }
+            guard unlocked else {
+                editor.vaultMessage = "Passwords stayed locked."
+                return
+            }
+            guard var payload = VaultPayload(item: item) else {
+                editor.vaultMessage = "This item has nothing to save."
+                return
+            }
+            let typedTitle = editor.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            payload.title = typedTitle.isEmpty ? nil : typedTitle
+
+            let vaultID: UUID
+            switch vaultManager.add(payload) {
+            case .added(let id):
+                vaultID = id
+            case .duplicate(let id):
+                // Same content already there: keep that one, name it if it has no name.
+                if vaultManager.entry(withID: id)?.title == nil, !typedTitle.isEmpty {
+                    vaultManager.rename(id, to: typedTitle)
+                }
+                vaultID = id
+            case .nothingToAdd:
+                editor.vaultMessage = "This item has nothing to save."
+                return
+            case .locked, .failed:
+                editor.vaultMessage = "Couldn't save it to Passwords."
+                return
+            }
+
+            closeItemEditor(saving: false)
+            viewModel.deleteItem(item)
+            searchText = ""
+            activeTab = .passwords
+            // After the tab switch has reset the cursor.
+            DispatchQueue.main.async { selectVaultEntry(vaultID) }
         }
     }
 
@@ -1427,8 +1494,8 @@ struct QuickPickerView: View {
                 } else {
                     editor.isConfirmingDelete = true
                 }
-            case .toggleFavorite:
-                break  // passwords have no favorites
+            case .toggleFavorite, .moveToVault:
+                break  // passwords have no favorites and are in the vault already
             }
         }
         revealedVaultID = nil
@@ -1540,6 +1607,8 @@ final class TabKeyInterceptor: ObservableObject {
         case save, cancel, moveUp, moveDown, toggleFavorite
         /// ⌥⌫ in the Passwords editor.
         case delete
+        /// ⌥K in the history editor: Move to Passwords.
+        case moveToVault
     }
 
     /// ⌥L locks the vault; taken only while the Passwords tab is active.
@@ -1557,6 +1626,7 @@ final class TabKeyInterceptor: ObservableObject {
     private static let eKeyCode: UInt16 = 14
     private static let fKeyCode: UInt16 = 3
     private static let lKeyCode: UInt16 = 37
+    private static let kKeyCode: UInt16 = 40
     private static let deleteKeyCode: UInt16 = 51
     private static let escapeKeyCode: UInt16 = 53
     private static let upArrowKeyCode: UInt16 = 126
@@ -1697,6 +1767,8 @@ final class TabKeyInterceptor: ObservableObject {
             key = .moveDown
         case Self.deleteKeyCode where option && !commandOrControl:
             key = .delete
+        case Self.kKeyCode where option && !commandOrControl:
+            key = .moveToVault
         case Self.tabKeyCode:
             return nil  // the title field is the only field; keep focus in it
         default:

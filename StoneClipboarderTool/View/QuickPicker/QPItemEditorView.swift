@@ -9,13 +9,15 @@ import SwiftUI
 /// from the favorites, move it within the favorites.
 ///
 /// Keys reach it through `TabKeyInterceptor`'s editor mode (⏎ save, Esc
-/// cancel, ⌥↑ / ⌥↓ move, ⌥F favorite), matched by key code so they work on
+/// cancel, ⌥↑ / ⌥↓ move, ⌥F favorite, ⌥K Move to Passwords), matched by key code so they work on
 /// any keyboard layout and never type into the title field. Favorite changes
 /// apply at once; only the title waits for ⏎.
 struct QPItemEditorView: View {
     @ObservedObject var model: QPItemEditorModel
     let onSave: () -> Void
     let onCancel: () -> Void
+    /// Nil hides the Passwords section (the tab is turned off).
+    var onMoveToVault: (() -> Void)?
 
     @FocusState private var isTitleFocused: Bool
 
@@ -42,6 +44,10 @@ struct QPItemEditorView: View {
             titleField
             Divider()
             favoriteSection
+            if onMoveToVault != nil {
+                Divider()
+                vaultSection
+            }
             Divider()
             footer
         }
@@ -148,6 +154,29 @@ struct QPItemEditorView: View {
         }
     }
 
+    private var vaultSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .foregroundStyle(Color.accentColor)
+                Text("Encrypt it and remove it from the history")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Move to Passwords") { onMoveToVault?() }
+                    .help("Move to Passwords (⌥K)")
+                    .focusable(false)
+                    .disabled(model.isMovingToVault || model.isConfirmingUnfavorite)
+            }
+            .controlSize(.small)
+            if let message = model.vaultMessage {
+                Text(message)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
     private var footer: some View {
         HStack(spacing: 10) {
             if model.isConfirmingUnfavorite {
@@ -157,6 +186,9 @@ struct QPItemEditorView: View {
                 keyHint("⏎", "Save")
                 keyHint("ESC", "Cancel")
                 keyHint("⌥F", model.isFavorite ? "Unfavorite" : "Favorite")
+                if onMoveToVault != nil {
+                    keyHint("⌥K", "Passwords")
+                }
                 if model.isFavorite {
                     keyHint("⌥↑↓", "Move")
                 }
