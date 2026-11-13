@@ -569,16 +569,31 @@ struct QuickPickerView: View {
 
     @ViewBuilder
     private var tabBar: some View {
-        HStack(spacing: 8) {
-            ForEach(visibleTabs) { tab in
-                tabPill(tab)
-            }
-            Spacer()
-            tabSwitchHint
+        // Six tabs don't fit 500 pt at full size: the first layout that fits
+        // wins, each a little tighter, so no pill is ever cut off.
+        ViewThatFits(in: .horizontal) {
+            tabRow(density: 0)
+            tabRow(density: 1)
+            tabRow(density: 2)
+            tabRow(density: 3)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color(NSColor.controlBackgroundColor))
+    }
+
+    /// 0: full pills and the ⇥ hint. 1: tighter, no hint. 2: an inactive
+    /// Passwords pill shows only its lock. 3: inactive pills drop their counts.
+    private func tabRow(density: Int) -> some View {
+        HStack(spacing: density == 0 ? 8 : 5) {
+            ForEach(visibleTabs) { tab in
+                tabPill(tab, density: density)
+            }
+            Spacer(minLength: 0)
+            if density == 0 {
+                tabSwitchHint
+            }
+        }
     }
 
     // Discoverability hint: Tab cycles forward, Shift+Tab cycles backward.
@@ -596,18 +611,17 @@ struct QuickPickerView: View {
                     RoundedRectangle(cornerRadius: 3)
                         .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
                 )
-            // Six tabs leave room for the key only.
-            if !visibleTabs.contains(.passwords) {
-                Text("switch")
-                    .font(.system(size: 10))
-            }
+            Text("switch")
+                .font(.system(size: 10))
         }
         .foregroundStyle(.tertiary)
         .help("Tab to switch tabs forward, Shift+Tab backward")
     }
 
-    private func tabPill(_ tab: QPTab) -> some View {
+    private func tabPill(_ tab: QPTab, density: Int) -> some View {
         let isActive = activeTab == tab
+        let showsTitle = isActive || tab != .passwords || density < 2
+        let showsCount = (isActive || density < 3) && (tab != .passwords || vaultManager.isUnlocked)
         return Button {
             activeTab = tab
             // Click must NOT steal focus from the search field — otherwise
@@ -629,11 +643,13 @@ struct QuickPickerView: View {
                         .font(.system(size: 9))
                         .foregroundStyle(isActive ? Color.white : Color.accentColor)
                 }
-                Text(tabTitle(tab))
-                    .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
+                if showsTitle {
+                    Text(tabTitle(tab))
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                }
                 // A locked vault doesn't say how much it holds.
-                if tab != .passwords || vaultManager.isUnlocked {
+                if showsCount {
                     Text("\(tabCount(tab))")
                         .font(.system(size: 10))
                         .lineLimit(1)
@@ -644,7 +660,7 @@ struct QuickPickerView: View {
             }
             .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(isActive ? Color.white : Color.primary)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, density == 0 ? 10 : 7)
             .padding(.vertical, 4)
             .background(
                 Capsule()
@@ -660,6 +676,7 @@ struct QuickPickerView: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .help(tabTitle(tab))
     }
 
     private func tabTitle(_ tab: QPTab) -> String {
