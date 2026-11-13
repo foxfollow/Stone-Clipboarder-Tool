@@ -29,8 +29,10 @@ class QuickPickerHostingView: NSHostingView<QuickPickerView> {
 class KeyCapturingPanel: NSPanel {
     weak var quickPickerDelegate: QuickPickerWindowManager?
 
+    /// Not while the Touch ID / password prompt is up: that prompt must keep
+    /// the keyboard, or ⏎ / typing goes to the picker behind it.
     override var canBecomeKey: Bool {
-        return true
+        return !(quickPickerDelegate?.isVaultAuthenticating ?? false)
     }
     // canBecomeMain intentionally not overridden — NSPanel's default is false,
     // which is what we want so .nonactivatingPanel + canJoinAllSpaces can
@@ -43,8 +45,11 @@ class KeyCapturingPanel: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         super.sendEvent(event)
 
-        // Force focus for any keyboard events
-        if (event.type == .keyDown || event.type == .keyUp), !self.isKeyWindow {
+        // Force focus for any keyboard events — except while the Touch ID
+        // prompt is up: the ⏎ that opened it is released after it appears,
+        // and taking key back on that keyUp left the prompt unfocused.
+        if (event.type == .keyDown || event.type == .keyUp), !self.isKeyWindow,
+           !(quickPickerDelegate?.isVaultAuthenticating ?? false) {
             self.makeKey()
         }
     }
@@ -104,6 +109,11 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     func setVaultManager(_ manager: VaultManager) {
         self.vaultManager = manager
+    }
+
+    /// The Touch ID / password prompt is up (asked by the picker's panel).
+    var isVaultAuthenticating: Bool {
+        vaultManager?.isAuthenticating == true
     }
 
     func setMenuBarRefreshCallback(_ callback: @escaping () -> Void) {

@@ -106,6 +106,8 @@ all pins.
 - [ ] Fresh launch: the Passwords tab is locked. ⏎ or the button shows
       Touch ID (password fallback); the picker stays open behind it and the
       cursor is back in the search afterwards. Cancel keeps it locked.
+      Press and release ⏎ slowly several times: the prompt keeps the
+      keyboard every time (typing the login password goes into it).
 - [ ] ⌥E on a history item, then ⌥K (or Move to Passwords): asks Touch ID
       if locked, the item disappears from the history (and its pin closes)
       and shows on the Passwords tab with the typed title.
