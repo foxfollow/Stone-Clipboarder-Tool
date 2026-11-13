@@ -30,6 +30,7 @@ tour gives up on that screen after 30 seconds.
 | `AppEnvironment.isDemo` | True with `--demo` or `--screenshots <dir>` on the command line. |
 | `AppEnvironment.settingsDefaults` | A fresh `d3f0ld.StoneClipboarderTool.demo` UserDefaults suite in a demo (wiped at launch, preset by `DemoData.presetSettings`), `.standard` otherwise. `SettingsManager` reads it. |
 | `ModelContainerFactory` | In-memory clipboard and settings stores in a demo. |
+| `VaultManager.makeForApp` | An empty Passwords vault in a throwaway folder with in-memory keys (`makeInert`): the demo never reads or writes the Keychain or the real vault. |
 | `AppDelegate.setUpDemo` | Fills the store with `DemoData.fill`, adds the demo categories, wires only what the screens need, and starts the tour for `--screenshots`. |
 | `Helper/DemoData.swift` | The made-up history: text, links, code, a document number, two titled favorites, an image with recognized text, a QR code, a file, a Ukrainian note, 120 older filler rows, source apps (Apple apps, so their icons show), the "Documents" regex rule and the "Browsers" app group. Image results are given, not computed, so the demo starts instantly and looks the same every run. |
 | `Helper/ScreenshotTour.swift` | For each of dark and light: the main window (800×600, the image item selected), the Quick Picker, the menu bar view and Settings → Categories. For each it writes `<name>.wid` with the window number and waits for `<name>` to appear, then quits the app. |

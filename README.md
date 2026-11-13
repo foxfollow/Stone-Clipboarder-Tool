@@ -59,16 +59,17 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 - **Clipboard Capture Modes**: Choose to capture only text, only images, or both (useful for Microsoft Word text-only paste)
 - **OCR Text Recognition**: Extract text from images using Apple Vision framework (Added in v1.2.0)
 - **Combined Clipboard Items**: Save text and image as a single item (BETA - Added in v1.2.0)
-- **Global Hotkeys**: System-wide keyboard shortcuts for instant clipboard access (⌃⌥1-0, ⌃⇧1-0)
-- **Quick Picker Window**: Spotlight-like floating panel (⌃⌥Space) for fast item selection
+- **Global Hotkeys**: System-wide keyboard shortcuts for instant clipboard access (⌃⌥1-0, ⌃⇧1-0, ⌃⌥L locks Passwords)
+- **Quick Picker Window**: Spotlight-like floating panel (⌃⌥Space) for fast item selection; ⌘1…⌘6 switch tabs, in an order you choose
+- **Passwords**: ⌥E then ⌥K moves an item (text, image, file) into an encrypted vault on your Mac (AES-256, key in your Keychain) and out of the history. Unlocks with Touch ID or an optional password of its own, locks with the screen, on sleep, when idle or with ⌃⌥L; pasting clears the clipboard after 30 seconds. Extra local storage, not a replacement for your password manager: it is never synced or backed up
 - **Favorites System**: Keep frequently-used items; favorites are never auto-deleted. Reorder them with ⌥E in the Quick Picker
 - **Item Titles**: Name any item (⌥E in the Quick Picker) so items that start the same way are easy to tell apart
 - **Categories**: The Quick Picker sorts items into chips: links, emails, phone numbers, addresses, dates, code, JSON, file paths, languages, text/QR codes/faces/transparency in images (Apple Vision, and the text in images is searchable), your own regex rules and groups of source apps. ⌥←/⌥→ switch chips (⇧ for several); `is:link`, `app:Safari` and `lang:uk` work in the search field. Icons, colors and on/off in Settings → Categories; detection runs on your Mac
 - **Pinned Windows**: Pin any item to the screen as a floating, always-on-top window (⌃⌥P pins the latest item)
 - **Type-Out Paste**: ⌘⇧Return in the Quick Picker types text key by key, for fields and remote desktops that block pasting
 - **Menu Bar Integration**: Quick access to your most recent items (5–50, configurable) from the menu bar
-- **Native Settings**: Access settings through macOS app menu (⌘,) or menu bar
-- **Persistent Storage**: Uses SwiftData to store clipboard history locally
+- **Native Settings**: Access settings through macOS app menu (⌘,) or menu bar; pages grouped under General, Quick Picker, Security and About, with a search that finds any setting
+- **Persistent Storage**: Uses SwiftData to store clipboard history locally; Passwords are separate AES-GCM sealed files that history cleanup never touches
 - **Easy Access**: Browse and search your clipboard history in a clean interface
 - **Quick Copy**: Click any item to copy it back to your clipboard
 - **Smart Timestamp Update**: Reused items move to the top with updated timestamp

@@ -121,6 +121,7 @@ html:not(.dark) .hero-title .hw { background-image: linear-gradient(to bottom, #
 }
 .qp-chip b { font-weight: 500; color: #a1a1aa; margin-left: 2px; font-variant-numeric: tabular-nums; }
 .qp-chip i { color: #f43f5e; font-size: 10px; }
+.qp-chip.qp-vault i { color: #3b82f6; }
 .qp-chip.on { background: #3b82f6; border-color: #3b82f6; color: #fff; }
 .qp-chip.on b { color: rgba(255, 255, 255, 0.85); }
 .qp-chip.bump b, .qp-cat.bump b { display: inline-block; animation: countBump 0.6s var(--ease-spring); }

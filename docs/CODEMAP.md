@@ -213,7 +213,7 @@ app's container for sandboxed Debug builds).
   Passwords section and `TabKeyInterceptor`. Test with
   `InMemoryVaultKeyProvider`, a stub `VaultAuthenticator` and a scratch
   `VaultStore(root:)`.
-- **A Quick Picker tab.** `QPTab` case (new raw value, `itemTypes`, title, count; stored orders get it at the end) →
+- **A Quick Picker tab.** `QPTab` case (new raw value, `itemTypes`, title, count; stored orders get it at the end; the landing's hero demo in `docs/resources/motion.js` mirrors the tab row) →
   `QuickPickerView.reloadForActiveTab` → a CBViewModel query if the tab
   needs one.
 - **A built-in category.** `ItemCategory.BuiltIn` case and an entry in
