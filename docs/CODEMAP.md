@@ -13,6 +13,7 @@ StoneClipboarderToolApp (App)
 ├── @StateObject HotkeyManager
 ├── @StateObject QuickPickerWindowManager  owns TypePaster, QPQuickLookCoordinator, QPCustomPreviewManager
 ├── @StateObject PinManager ............. one PinWindowController (NSPanel) per pin
+├── @StateObject VaultManager ........... the Passwords vault (VaultManager.makeForApp)
 ├── clipboardContainer / settingsContainer (ModelContainerFactory)
 └── body → registerWithAppDelegate() → AppDelegate.performSetup()  (runs once)
 ```
@@ -26,6 +27,7 @@ StoneClipboarderToolApp (App)
 | HotkeyManager | settings `mainContext`, CBViewModel, SettingsManager, PinManager; its `quickPickerDelegate` is QuickPickerWindowManager |
 | QuickPickerWindowManager | CBViewModel, SettingsManager, PinManager, a menu bar refresh callback |
 | PinManager | CBViewModel, SettingsManager, settings `mainContext`; then observes deletes and restores saved pins |
+| VaultManager | SettingsManager, ClipboardManager (for pasting); then observes screen lock / sleep; handed to QuickPickerWindowManager |
 
 Then it cleans old Quick Look sessions, loads hotkeys, applies menu bar and
 window visibility, installs the ⌘Q monitor, and on the next main-queue turn
@@ -49,6 +51,9 @@ item or pins, and the `ScreenshotTour` when asked (docs/DEMO_MODE.md).
 | PinWindowController | One floating `PinPanel`: lock, click-through (⌘-hold), opacity, collapse, edge snap; debounced saves of its config | PinManager, PasteboardFileStore, ExternalOpener |
 | MenuBarManager | NSStatusItem and the popover hosting MenuBarView; icon follows pause state | CBViewModel, SettingsManager, ClipboardManager |
 | SettingsManager | Every user setting (`@Published` + `didSet` → injected UserDefaults); visibility invariant; migrations; login item | — |
+| VaultManager | The Passwords vault: lock state, decrypted entries (`VaultPayload`), add with dedupe / rename / move / delete / delete all, sliding unlock window (`VaultLockPolicy`, `vaultRelockMinutes`), locks on screen lock, screen saver, sleep, display sleep, session switch; paste through `ClipboardManager.copySecret` | VaultStore, VaultKeyProvider, VaultAuthenticator, ClipboardManager, SettingsManager |
+| VaultKeyProvider | `KeychainVaultKeyProvider`: the 256-bit key as a generic password (service `d3f0ld.StoneClipboarderTool.vault`) in the login keychain; `InMemoryVaultKeyProvider` for tests and demo | Security |
+| VaultAuthenticator | `LocalAuthenticationAuthenticator`: Touch ID with password fallback before the key is read | LocalAuthentication |
 | ErrorLogger | The only singleton: unified log, optional plaintext file with 5 MB rotation | — |
 
 ### Model/
@@ -64,6 +69,7 @@ item or pins, and the `ScreenshotTour` when asked (docs/DEMO_MODE.md).
 | HotkeyShortcut | Parses and formats shortcut strings; the key table; reserved system shortcuts; Carbon modifier mask |
 | PinnedItemConfig | `@Model` pin: content snapshot plus layout and flags, settings container; `contentKey` |
 | ExcludedApp | `@Model` bundle id whose copies are ignored, settings container |
+| Vault/ | `VaultPayload` (one entry: type, title, content, image, file; dedupe, search, order), `VaultCrypto` ("SCTV" + version + AES-GCM, header and entry id authenticated), `VaultStore` (`<root>/<uuid>.sctv`, owner-only, atomic writes; a file that won't open is counted and kept), `VaultLockPolicy` (sliding unlock window) |
 | Types/ | Persisted enums (`CBItemType`, `ClipboardCaptureMode`, `QuickLookMode`, `QuickLookTriggerKey`, `TimeUnit`) and `ClipboardContent`, the ClipboardManager → CBViewModel handoff |
 
 ### ViewModel/CBViewModel.swift
@@ -110,9 +116,9 @@ user's OCR result (⌥⏎, Extract Text) on the image.
 | ContentView | Main window: Recent / Favorites, whole-history search, `DetailedCardView` rows, `ClipboardHeader` |
 | ZoomView/, Small/ActionsBottomButtonView | Detail pane: text/image/file preview, zoom, copy, edit, open, OCR, delete |
 | Menu/ | MenuBarView (popover list of `SwipeableRow`s), MenuBarItemView, PauseTimerView |
-| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order; renders from a snapshot), QPCategoryBar + `QPCategoryChip.chips` (category chips of the active tab), QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel, also used over full-screen apps) |
+| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order, ⌥K Move to Passwords; renders from a snapshot), QPVaultPane + QPVaultRow (the Passwords tab: lock screen, masked rows, reveal), QPVaultEditorView + QPVaultEditorModel (⌥E on an entry: rename, ⌥↑/⌥↓, ⌥⌫ delete), QPCategoryBar + `QPCategoryChip.chips` (category chips of the active tab), QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel, also used over full-screen apps) |
 | Pins/ | PinContentView, PinChromeView (+ PinDragArea to move the pin), PinImageView; all render from `PinViewState` |
-| Settings/ | Sidebar + General, Hotkeys, Quick Picker, Categories (CategoriesSettingsView, CategorySettingsRow, CategoryEditorView sheet, CategoryIconPicker), Pins, Excluded Apps (`@Query` is fine here), Accessibility, About. AppPickerView is shared by Excluded Apps and app groups |
+| Settings/ | Sidebar + General, Hotkeys, Quick Picker (with PasswordsSettingsSection), Categories (CategoriesSettingsView, CategorySettingsRow, CategoryEditorView sheet, CategoryIconPicker), Pins, Excluded Apps (`@Query` is fine here), Accessibility, About. AppPickerView is shared by Excluded Apps and app groups |
 | Components/, Small/, Cells/ | Shared pieces: search bar, swipeable row, alerts, buttons, list cell, CategoryIconView, CategoryChipView |
 
 ## Cross-cutting
@@ -127,7 +133,8 @@ user's OCR result (⌥⏎, Extract Text) on the image.
 | `.pinBehaviorSettingsChanged` | SettingsManager (full screen, shadow, corner radius) | PinWindowController |
 
 QuickPickerWindowManager also observes `NSApplication.willResignActiveNotification`
-to close the picker when another app takes over.
+to close the picker when another app takes over, except while the Touch ID
+prompt is up (`VaultManager.isAuthenticating`).
 
 ### Persistent state
 
@@ -138,6 +145,7 @@ app's container for sandboxed Debug builds).
 | --- | --- |
 | Clipboard history | `ClipboardHistory.store`, blobs in `.ClipboardHistory_SUPPORT/` |
 | Hotkeys, excluded apps, pins | `Settings.store` |
+| Passwords | `Vault/<uuid>.sctv`, sealed; the key in the login keychain (service `d3f0ld.StoneClipboarderTool.vault`) |
 | Settings | UserDefaults through SettingsManager; keys are the property names. `enableErrorFileLogging` is also read by ErrorLogger; `itemCategories` is a JSON array of `ItemCategory` (fields a newer version wrote are written back unless edited here) |
 | Error log | `StoneClipboarder_errors.log` (+ `.old.log`) |
 
@@ -145,7 +153,7 @@ app's container for sandboxed Debug builds).
 
 | Purpose | Location | Lifetime |
 | --- | --- | --- |
-| File items put on the pasteboard | `$TMPDIR/StoneClipboarderTool/Pasteboard/<uuid>/` | until the next file copy |
+| File items put on the pasteboard | `$TMPDIR/StoneClipboarderTool/Pasteboard/<uuid>/` | until the next file copy; a pasted password file also when the clipboard is cleared |
 | Open in Preview / TextEdit / default app | `$TMPDIR/StoneClipboarderTool/Open/<uuid>/` | 60 s |
 | Quick Look previews | `Application Support/StoneClipboarderTool/Previews/Session_<uuid>/` | 10 min; all removed at quit |
 
@@ -159,6 +167,8 @@ app's container for sandboxed Debug builds).
 | Activation-policy re-checks | AppDelegate | 1, 3, 6, 10 and 20 s after launch |
 | ⌘Q hold / double tap | AppDelegate | 1.0 s / 0.4 s |
 | Pin save debounce | PinWindowController | 0.25 s |
+| Vault expiry check | VaultManager | 30 s, while unlocked |
+| Clear a pasted password | ClipboardManager | `vaultClipboardClearSeconds` (30 s) |
 | Accessibility status refresh | AccessibilitySettingsView | 2 s, while shown |
 
 ### Event monitors
@@ -168,7 +178,8 @@ app's container for sandboxed Debug builds).
 | ⌘Q down / up (local) | AppDelegate | app lifetime / while ⌘Q is held |
 | Esc cancels type-out (global + local) | TypePaster | while typing |
 | Click outside, Esc (global); key re-routing (local) | QuickPickerWindowManager | while the picker is open |
-| Tab, ⇧Tab, ⌥P, ⌥⏎, ⌥E, ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editor ⏎, Esc, ⌥F, ⌥↑/⌥↓ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
+| Tab, ⇧Tab, ⌥P, ⌥⏎, ⌥E, ⌥L (Passwords tab), ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editors ⏎, Esc, ⌥F, ⌥K, ⌥↑/⌥↓, ⌥⌫ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
+| Screen lock, screen saver (distributed); sleep, display sleep, session switch (workspace) | VaultManager | app lifetime |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
 | ⌘C / ⌘W in a pin (local) | PinContentView `CommandKeyHandler` | while the pin is in a window |
 | Pinch zoom (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
@@ -189,6 +200,12 @@ app's container for sandboxed Debug builds).
   `defaultShortcut`, `index`) → the switch in
   `HotkeyManager.registerHotkey(_:for:)` → a row in HotkeySettingsView.
   Existing installs get the new row from `ensureMissingHotkeyConfigs`.
+- **The Passwords vault.** Format in `VaultCrypto` (bump `version` and keep
+  reading the old one), entry fields in `VaultPayload` (optional, so old
+  files decode), behavior in `VaultManager`, keys in QuickPickerView's
+  Passwords section and `TabKeyInterceptor`. Test with
+  `InMemoryVaultKeyProvider`, a stub `VaultAuthenticator` and a scratch
+  `VaultStore(root:)`.
 - **A Quick Picker tab.** `QPTab` case (`itemTypes`, title, count) →
   `QuickPickerView.reloadForActiveTab` → a CBViewModel query if the tab
   needs one.

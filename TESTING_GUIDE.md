@@ -70,7 +70,8 @@ all pins.
       also over a full-screen app without switching Spaces.
 - [ ] ↑/↓ select, ⏎ pastes into the previous app, Esc closes, clicking
       outside closes.
-- [ ] Tab / ⇧Tab cycle All, Favs, Text, Images, Files; counts are right.
+- [ ] Tab / ⇧Tab cycle All, Favs, Text, Images, Files, Passwords; counts
+      are right (Passwords shows no count while locked).
 - [ ] Scrolling All keeps loading past 150 items.
 - [ ] Search finds old items; switching tabs keeps the search.
 - [ ] ⇧↑/⇧↓ multi-select: ⏎ pastes texts joined by newlines (and doesn't
@@ -90,6 +91,37 @@ all pins.
 - [ ] In the editor on a favorite, ⌥↑/⌥↓ move it (the Favs list behind
       follows, and so do ⌃⇧1…0); ⌥F asks before removing, ⏎ confirms, Esc
       keeps it. On a non-favorite ⌥F adds it at once.
+
+## Passwords (Quick Picker tab, Settings → Quick Picker)
+
+- [ ] Fresh launch: the Passwords tab is locked. ⏎ or the button shows
+      Touch ID (password fallback); the picker stays open behind it and the
+      cursor is back in the search afterwards. Cancel keeps it locked.
+- [ ] ⌥E on a history item, then ⌥K (or Move to Passwords): asks Touch ID
+      if locked, the item disappears from the history (and its pin closes)
+      and shows on the Passwords tab with the typed title.
+- [ ] Moving the same content again adds no second entry; the history copy
+      still goes.
+- [ ] Text rows are masked; Space / → reveals the selected row, moving the
+      cursor hides it again. Images stay hidden until revealed.
+- [ ] ⏎ pastes text, an image, a file and text + image; nothing of it shows
+      up in the history. After 30 s the clipboard is empty, unless something
+      else was copied in the meantime.
+- [ ] ⌘⇧⏎ types a password into a field that blocks paste.
+- [ ] ⌥E on an entry: rename, ⌥↑/⌥↓ reorder, ⌥⌫ then ⏎ deletes. ⌥L locks.
+- [ ] Locking the screen (⌃⌘Q), sleep and the screen saver lock the tab.
+      Reopening the picker within the relock time (default 1 h after the
+      last use) needs no Touch ID; after it, it does. Quit and relaunch:
+      locked.
+- [ ] ⌥P, ⌥Space and OCR do nothing on the Passwords tab.
+- [ ] Settings: hiding the tab removes it from the Tab cycle and the ⌥K
+      option; Delete All Passwords empties it and asks Touch ID for a new
+      key next time.
+- [ ] After installing an update, macOS may ask once to let the new build
+      use the "Stone Clipboarder Passwords" Keychain item; Always Allow.
+- [ ] Keychain Access shows the item `d3f0ld.StoneClipboarderTool.vault`;
+      `Application Support/StoneClipboarderTool/Vault/*.sctv` files contain
+      no readable text.
 
 ## Categories (Quick Picker chips, Settings → Categories)
 

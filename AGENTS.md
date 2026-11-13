@@ -42,7 +42,14 @@ global hotkeys and CGEvent posts the paste keystrokes.
    from every array a view renders, and only on the next main-queue turn
    delete it from the context (see `CBViewModel.deleteItem`). A view that
    still holds a deleted model crashes with "backing data was detached".
-8. **Pins render from snapshots.** Never read `PinnedItemConfig`'s
+8. **Passwords stay sealed.** Vault content (`VaultPayload`) never becomes a
+   `CBItem`, never goes through CBViewModel, pins, Quick Look, OCR,
+   categories, the log or any file except its sealed `Vault/<uuid>.sctv`
+   and the pasteboard temp file of a pasted file entry. The vault is not
+   SwiftData on purpose: `ModelContainerFactory` deletes a store it can't
+   open. Its key lives only in the Keychain (`KeychainVaultKeyProvider`);
+   tests and demo mode use `InMemoryVaultKeyProvider` and a scratch folder.
+9. **Pins render from snapshots.** Never read `PinnedItemConfig`'s
    external-storage fields in a SwiftUI body; `PinViewState` copies them
    once.
 
@@ -88,7 +95,8 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
 - Unit tests cover models and enums, `HotkeyShortcut`, the capture rules,
   CBViewModel (list paging, deduplication, queries, cleanup, categories),
   the content classifier and category filters, pin linking, settings and
-  the type-out key tables. Clipboard, windows, hotkeys and
+  the type-out key tables, and the Passwords vault (format, store, lock
+  policy, VaultManager with a stub authenticator). Clipboard, windows, hotkeys and
   synthetic key events are checked by hand with TESTING_GUIDE.md.
 
 ## Architecture in one screen
@@ -99,9 +107,11 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   calls and starts it. That is the single wiring point: no singletons
   besides `ErrorLogger`.
 - Views receive four shared objects through `.environmentObject`:
-  `CBViewModel`, `SettingsManager`, `HotkeyManager`, `PinManager`.
+  `CBViewModel`, `SettingsManager`, `HotkeyManager`, `PinManager`; the
+  Settings windows also get `VaultManager`.
 - Two SwiftData containers: clipboard history (high churn, reset if the
-  store is corrupt) and settings (must survive).
+  store is corrupt) and settings (must survive). Passwords are a third
+  store outside SwiftData: one AES-GCM sealed file per entry.
 - The Dock icon follows "Show Main Window". `applicationDidFinishLaunching`
   re-applies the activation policy and `startGuardingActivationPolicy`
   undoes late LaunchServices resets during login-item launches. Keep both,
