@@ -114,6 +114,9 @@ struct QuickPickerView: View {
     @State private var revealedVaultID: UUID?
     /// The open ⌥E editor on the Passwords tab.
     @State private var vaultEditor: QPVaultEditorModel?
+    /// The selected Passwords hit above another tab's search results; nil =
+    /// the cursor is on the history list.
+    @State private var vaultHitIndex: Int?
     /// The Passwords password, typed where the search field usually is.
     @State private var vaultPasswordInput = ""
     @FocusState private var isSearchFocused: Bool
@@ -267,6 +270,11 @@ struct QuickPickerView: View {
         .onChange(of: vaultEntries.count) { _, newCount in
             if vaultIndex >= newCount { vaultIndex = max(0, newCount - 1) }
         }
+        .onChange(of: vaultSearchHits.count) { _, newCount in
+            if let index = vaultHitIndex, index >= newCount {
+                vaultHitIndex = newCount == 0 ? nil : newCount - 1
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .clipboardItemDeleted)) { note in
             let deletedID = note.object as? PersistentIdentifier
             // The rows must let go of the item before it leaves the context
@@ -287,12 +295,17 @@ struct QuickPickerView: View {
     private var pickerContent: some View {
         mainContent
             .onKeyPress(.escape) {
-                if isPasswordsTab, vaultPreview.isVisible() {
+                if isPasswordsTab || vaultHitIndex != nil, vaultPreview.isVisible() {
                     vaultPreview.hide()
                     return .handled
                 }
                 if isPreviewVisible() {
-                    onPreviewToggle(filteredItems[safe: selectedIndex] ?? filteredItems[0])
+                    // The list may be empty (only a Passwords hit matched).
+                    if let item = filteredItems[safe: selectedIndex] ?? filteredItems.first {
+                        onPreviewToggle(item)
+                    } else {
+                        vaultPreview.hide()
+                    }
                 } else {
                     onClose()
                 }
@@ -303,6 +316,7 @@ struct QuickPickerView: View {
                     moveVaultSelection(by: -1)
                     return .handled
                 }
+                if moveVaultHitSelection(by: -1) { return .handled }
                 moveSelection(by: -1, extendingWith: keyPress.modifiers.contains(.shift))
                 return .handled
             }
@@ -311,6 +325,7 @@ struct QuickPickerView: View {
                     moveVaultSelection(by: 1)
                     return .handled
                 }
+                if moveVaultHitSelection(by: 1) { return .handled }
                 moveSelection(by: +1, extendingWith: keyPress.modifiers.contains(.shift))
                 return .handled
             }
@@ -320,6 +335,8 @@ struct QuickPickerView: View {
                 if keyPress.modifiers.contains(.command) && keyPress.modifiers.contains(.shift) {
                     if isPasswordsTab {
                         typeOutVaultEntry()
+                    } else if let hit = selectedVaultHit {
+                        useVaultHit(hit, typeOut: true)
                     } else {
                         performTypePaste()
                     }
@@ -345,6 +362,8 @@ struct QuickPickerView: View {
                     // preview there, as in Finder.
                     if isPasswordsTab {
                         toggleVaultPreview(expanded: true)
+                    } else if let hit = selectedVaultHit {
+                        vaultPreview.toggle(hit, true)
                     } else {
                         toggleFavoriteForSelected()
                     }
@@ -373,6 +392,8 @@ struct QuickPickerView: View {
             .onChange(of: searchText) { _, newValue in
                 selectedIndex = 0
                 selectionAnchor = nil
+                // A label typed on another tab: its Passwords hit comes first.
+                vaultHitIndex = vaultSearchHits.isEmpty ? nil : 0
                 // Passwords are filtered in memory (vaultEntries).
                 if isPasswordsTab {
                     vaultIndex = 0
@@ -408,6 +429,7 @@ struct QuickPickerView: View {
                 vaultIndex = 0
                 revealedVaultID = nil
                 vaultPasswordInput = ""
+                vaultHitIndex = vaultSearchHits.isEmpty ? nil : 0
                 // Neither a decrypted entry nor a history item stays in
                 // the preview across the Passwords boundary.
                 if (oldTab == .passwords || newTab == .passwords),
@@ -484,12 +506,15 @@ struct QuickPickerView: View {
                     onToggleReveal: { entry in toggleVaultReveal(entry.id) }
                 )
             } else {
-            if let match = vaultLabelMatches {
-                vaultMatchesBar(count: match.count, titles: match.titles)
+            if !vaultSearchHits.isEmpty {
+                vaultHitsSection
             }
             QPItemList(
                 filteredItems: filteredItems,
-                selectedIndex: $selectedIndex,
+                // No history row is highlighted while a Passwords hit is.
+                selectedIndex: Binding(
+                    get: { vaultHitIndex == nil ? selectedIndex : Int.max },
+                    set: { selectedIndex = $0; vaultHitIndex = nil }),
                 searchText: $searchText,
                 isLoading: isLoadingItems,
                 hasMoreItems: hasMoreItems,
@@ -564,7 +589,7 @@ struct QuickPickerView: View {
             }
             tabInterceptor.onOptionP = {
                 // Passwords are never pinned: a pin is stored in plaintext.
-                guard !isPasswordsTab else { return }
+                guard !isPasswordsTab, vaultHitIndex == nil else { return }
                 togglePinForSelection()
             }
             // ⌥⏎ is intercepted too: with the search field focused, the field
@@ -606,7 +631,7 @@ struct QuickPickerView: View {
                     openVaultEditor()
                     return
                 }
-                guard let item = filteredItems[safe: selectedIndex] else { return }
+                guard vaultHitIndex == nil, let item = filteredItems[safe: selectedIndex] else { return }
                 openItemEditor(for: item)
             }
             tabInterceptor.start()
@@ -1225,6 +1250,10 @@ struct QuickPickerView: View {
             performVaultAction()
             return
         }
+        if let hit = selectedVaultHit {
+            useVaultHit(hit, typeOut: false)
+            return
+        }
         if let range = selectedRange(), range.count > 1 {
             performMultiPaste(range: range)
             return
@@ -1348,6 +1377,11 @@ struct QuickPickerView: View {
             toggleVaultPreview(expanded: false)
             return
         }
+        if let hit = selectedVaultHit {
+            vaultManager.noteUse()
+            vaultPreview.toggle(hit, false)
+            return
+        }
         guard selectedIndex < filteredItems.count else { return }
         onPreviewToggle(filteredItems[selectedIndex])
     }
@@ -1358,6 +1392,10 @@ struct QuickPickerView: View {
     private func performOptionReturn() {
         if isPasswordsTab {
             performVaultAction()
+            return
+        }
+        if let hit = selectedVaultHit {
+            useVaultHit(hit, typeOut: false)
             return
         }
         let hasMultiSelection = (selectedRange()?.count ?? 0) > 1
@@ -1601,41 +1639,104 @@ struct QuickPickerView: View {
     }
 
     /// Searching another tab: Passwords entries whose label or file name
-    /// matches (unlocked only: the labels are sealed too). nil = none.
-    private var vaultLabelMatches: (count: Int, titles: [String])? {
-        guard visibleTabs.contains(.passwords), vaultManager.isUnlocked,
-              !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        let matches = vaultManager.entries.filter { $0.matchesLabel(searchText) }
-        guard !matches.isEmpty else { return nil }
-        return (matches.count, matches.prefix(3).map(\.displayName))
+    /// matches, listed above the history results. Only while unlocked (the
+    /// labels are sealed too), never by the secret itself.
+    private var vaultSearchHits: [VaultPayload] {
+        guard !isPasswordsTab, visibleTabs.contains(.passwords), vaultManager.isUnlocked,
+              !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+        return Array(vaultManager.entries.filter { $0.matchesLabel(searchText) }.prefix(Self.maxVaultSearchHits))
     }
 
-    /// "3 in Passwords: …" above the results; a click (or ⌘ and the tab's
-    /// number) opens the Passwords tab with the same search.
-    private func vaultMatchesBar(count: Int, titles: [String]) -> some View {
-        Button {
-            activeTab = .passwords
-            isSearchFocused = false
-            DispatchQueue.main.async { isSearchFocused = true }
-        } label: {
-            HStack(spacing: 8) {
+    private static let maxVaultSearchHits = 5
+
+    /// The Passwords hit under the cursor; nil when it is on the history.
+    private var selectedVaultHit: VaultPayload? {
+        vaultHitIndex.flatMap { vaultSearchHits[safe: $0] }
+    }
+
+    /// The hits above the history list: a heading, then masked rows.
+    private var vaultHitsSection: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
                 Image(systemName: "key.fill")
+                    .font(.system(size: 9))
                     .foregroundStyle(Color.accentColor)
-                Text("\(count) in Passwords: \(titles.joined(separator: ", "))\(count > titles.count ? "…" : "")")
-                    .font(.system(size: 12))
-                    .lineLimit(1)
+                Text("Passwords")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if let index = visibleTabs.firstIndex(of: .passwords), index < 9 {
-                    shortcutBadge("⌘\(index + 1)", label: "Show")
+                    Button {
+                        activeTab = .passwords
+                    } label: {
+                        Text("All in Passwords  ⌘\(index + 1)")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .focusable(false)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Color.accentColor.opacity(0.08))
-            .contentShape(Rectangle())
+            .padding(.horizontal, 14)
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+            ForEach(Array(vaultSearchHits.enumerated()), id: \.element.id) { index, entry in
+                QPVaultRow(entry: entry, isSelected: vaultHitIndex == index, isRevealed: false, showsEye: false)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        vaultHitIndex = index
+                        performAction()
+                    }
+            }
+            Divider()
+                .padding(.top, 4)
         }
-        .buttonStyle(.plain)
-        .focusable(false)
+    }
+
+    /// ↑ / ↓ across the hits and into or out of the history list. True when
+    /// the key was used here.
+    private func moveVaultHitSelection(by delta: Int) -> Bool {
+        let hits = vaultSearchHits
+        guard !hits.isEmpty else { return false }
+        if let index = vaultHitIndex {
+            let next = index + delta
+            if next < 0 { return true }
+            if next >= hits.count {
+                vaultHitIndex = nil
+                selectedIndex = 0
+                selectionAnchor = nil
+                if vaultPreview.isVisible() { vaultPreview.hide() }
+                return true
+            }
+            vaultHitIndex = next
+            if vaultPreview.isVisible() { vaultPreview.update(hits[next]) }
+            return true
+        }
+        guard delta < 0, selectedIndex == 0 else { return false }
+        vaultHitIndex = hits.count - 1
+        selectionAnchor = nil
+        if isPreviewVisible() { vaultPreview.hide() }
+        return true
+    }
+
+    /// ⏎ / ⌘⇧⏎ on a hit. The lock is checked again first: an expired or
+    /// locked vault pastes nothing.
+    private func useVaultHit(_ entry: VaultPayload, typeOut: Bool) {
+        vaultManager.checkExpiry()
+        guard vaultManager.isUnlocked else {
+            vaultHitIndex = nil
+            return
+        }
+        if typeOut {
+            guard let text = vaultManager.typeableText(of: entry.id),
+                  PasteSimulator.ensureAccessibility() else { return }
+            onClose()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { onTypePaste(text) }
+        } else {
+            guard vaultManager.copyToPasteboard(entry.id) else { return }
+            onClose()
+            PasteSimulator.paste()
+        }
     }
 
     /// Unlocked entries matching the search; empty while locked.

@@ -138,10 +138,13 @@ all pins.
       lock the tab. ⌃⌥L locks it from any app with the picker closed; it
       can be changed or turned off in Settings → Hotkeys → Passwords, and
       an existing install gets the new row.
-- [ ] Searching on another tab (vault unlocked) shows "N in Passwords: …"
-      for matching titles or file names, never for the secret itself; a
-      click or its ⌘ number opens Passwords with the same search. Locked:
-      no bar.
+- [ ] Searching on another tab (vault unlocked) lists matching Passwords
+      entries (by title or file name, never by the secret) above the
+      history, the first one selected: ⏎ pastes it, ⌘⇧⏎ types it, Space /
+      ⌥Space preview it, ↑/↓ move between them and the history; ⌥E, ⌥P and
+      ⌥Space-favorite do nothing on them. Locked or expired: no hits, and a
+      paste after the vault locked does nothing. Esc with only a hit and its
+      preview open closes the preview without a crash.
 - [ ] ⌥E on an entry: the icon button opens SF Symbols / emoji, the color
       well changes the color, Default goes back; the row shows it after ⏎
       and after a relaunch. Entries from before keep the type's icon.

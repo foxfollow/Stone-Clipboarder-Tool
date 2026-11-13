@@ -12,6 +12,8 @@ struct QPVaultRow: View {
     let isSelected: Bool
     let isRevealed: Bool
     var onToggleReveal: () -> Void = {}
+    /// Off for the hits listed on other tabs (no eye, no ⌥E there).
+    var showsEye = true
 
     var body: some View {
         HStack(spacing: 12) {
@@ -31,16 +33,20 @@ struct QPVaultRow: View {
 
             Spacer()
 
-            Button(action: onToggleReveal) {
-                QPEyeIcon(isRevealed: isRevealed, size: 14)
+            if showsEye {
+                Button(action: onToggleReveal) {
+                    QPEyeIcon(isRevealed: isRevealed, size: 14)
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+                .help(isRevealed ? "Hide (⌥R)" : "Show (⌥R)")
             }
-            .buttonStyle(.plain)
-            .focusable(false)
-            .help(isRevealed ? "Hide (⌥R)" : "Show (⌥R)")
 
             if isSelected {
                 HStack(spacing: 4) {
-                    rowKeyBadge("⌥E", help: "Rename, reorder or delete")
+                    if showsEye {
+                        rowKeyBadge("⌥E", help: "Rename, reorder or delete")
+                    }
                     rowKeyBadge("⏎", help: "Paste")
                 }
             }
