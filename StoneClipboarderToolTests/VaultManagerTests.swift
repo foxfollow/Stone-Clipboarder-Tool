@@ -231,3 +231,28 @@ final class VaultSettingsTests: XCTestCase {
         XCTAssertFalse(reloaded.showPasswordsTab)
     }
 }
+
+@MainActor
+final class VaultPasteTests: XCTestCase {
+
+    func testLockedOrUnknownEntriesAreNotPasted() async {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("VaultPasteTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authenticator = StubAuthenticator()
+        let manager = VaultManager(
+            store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(), authenticator: authenticator)
+
+        // No ClipboardManager is attached: the test never writes the real pasteboard.
+        XCTAssertFalse(manager.copyToPasteboard(UUID()))
+        XCTAssertNil(manager.typeableText(of: UUID()))
+
+        await manager.unlock()
+        guard case .added(let textID) = manager.add(VaultPayload(itemType: .text, content: "pw")),
+              case .added(let imageID) = manager.add(VaultPayload(itemType: .image, imageData: Data([1])))
+        else { return XCTFail("expected added entries") }
+        XCTAssertEqual(manager.typeableText(of: textID), "pw")
+        XCTAssertNil(manager.typeableText(of: imageID))
+        XCTAssertFalse(manager.copyToPasteboard(textID))
+    }
+}

@@ -43,6 +43,8 @@ final class VaultManager: ObservableObject {
     }
 
     weak var settingsManager: SettingsManager?
+    /// Writes pasted entries; never adds them to the history.
+    weak var clipboardManager: ClipboardManager?
 
     private let store: VaultStore
     private let keyProvider: VaultKeyProvider
@@ -195,6 +197,21 @@ final class VaultManager: ObservableObject {
     }
 
     // MARK: - Entries
+
+    /// Puts an entry on the pasteboard for ⏎ (concealed, cleared after
+    /// `vaultClipboardClearSeconds`). False when locked or nothing to copy.
+    func copyToPasteboard(_ id: UUID) -> Bool {
+        guard isUnlocked, let entry = entry(withID: id), let clipboardManager else { return false }
+        noteUse()
+        return clipboardManager.copySecret(entry, clearAfter: settingsManager?.vaultClipboardClearSeconds ?? 30)
+    }
+
+    /// The text ⌘⇧⏎ types out; nil for images, files or a locked vault.
+    func typeableText(of id: UUID) -> String? {
+        guard isUnlocked, let text = entry(withID: id)?.typeableText else { return nil }
+        noteUse()
+        return text
+    }
 
     func entry(withID id: UUID) -> VaultPayload? {
         entries.first { $0.id == id }

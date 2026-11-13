@@ -146,6 +146,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if AppEnvironment.isRunningUnitTests { return }
         if AppEnvironment.isDemo {
             vaultManager.settingsManager = settingsManager
+            vaultManager.clipboardManager = cbViewModel.getClipboardManager()
             quickPickerManager.setVaultManager(vaultManager)
             setUpDemo(cbViewModel: cbViewModel, settingsManager: settingsManager, hotkeyManager: hotkeyManager,
                       quickPickerManager: quickPickerManager, pinManager: pinManager,
@@ -179,6 +180,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // The Passwords vault: locked until Touch ID, re-locks with the screen.
         vaultManager.settingsManager = settingsManager
+        vaultManager.clipboardManager = cbViewModel.getClipboardManager()
         vaultManager.startObservingSystemLocks()
         quickPickerManager.setVaultManager(vaultManager)
 

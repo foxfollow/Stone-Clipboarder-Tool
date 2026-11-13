@@ -350,6 +350,82 @@ final class ClipboardManager: ObservableObject {
         }
     }
 
+    // MARK: - Passwords
+
+    /// nspasteboard.org markers: other clipboard managers skip concealed and
+    /// transient content instead of recording it.
+    static let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
+    static let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
+
+    /// The pending clear of a pasted password.
+    private var secretClearWork: DispatchWorkItem?
+
+    /// Puts a vault entry on the pasteboard, marked concealed and transient.
+    /// Like every write here it records `changeCount`, so the history never
+    /// captures it. After `clearAfter` seconds (0 = never) the pasteboard is
+    /// emptied, but only if it still holds this entry. Returns false when
+    /// there is nothing to copy.
+    @discardableResult
+    func copySecret(_ payload: VaultPayload, clearAfter seconds: Int) -> Bool {
+        secretClearWork?.cancel()
+        secretClearWork = nil
+
+        var objects: [NSPasteboardWriting] = []
+        switch payload.itemType {
+        case .text, .combined:
+            if let content = payload.content, !content.isEmpty {
+                objects.append(content as NSString)
+            }
+            if payload.itemType == .combined, let data = payload.imageData, let image = NSImage(data: data) {
+                objects.append(image)
+            }
+        case .image:
+            if let data = payload.imageData, let image = NSImage(data: data) {
+                objects.append(image)
+            }
+        case .file:
+            guard let data = payload.fileData, let name = payload.fileName else { return false }
+            do {
+                objects.append(try PasteboardFileStore.write(data, fileName: name) as NSURL)
+            } catch {
+                ErrorLogger.shared.log("Failed to create temp file for a vault entry", category: "Vault", error: error)
+                return false
+            }
+        }
+        guard !objects.isEmpty else { return false }
+
+        pasteboard.clearContents()
+        pasteboard.writeObjects(objects)
+        pasteboard.addTypes([Self.concealedType, Self.transientType], owner: nil)
+        pasteboard.setData(Data(), forType: Self.concealedType)
+        pasteboard.setData(Data(), forType: Self.transientType)
+        lastChangeCount = pasteboard.changeCount
+
+        if seconds > 0 {
+            let written = pasteboard.changeCount
+            let isFile = payload.itemType == .file
+            let work = DispatchWorkItem { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.clearSecret(ifChangeCountIs: written, removeFile: isFile)
+                }
+            }
+            secretClearWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(seconds), execute: work)
+        }
+        return true
+    }
+
+    /// Empties the pasteboard if nothing was copied since the password.
+    private func clearSecret(ifChangeCountIs written: Int, removeFile: Bool) {
+        secretClearWork = nil
+        guard pasteboard.changeCount == written else { return }
+        pasteboard.clearContents()
+        lastChangeCount = pasteboard.changeCount
+        if removeFile {
+            PasteboardFileStore.removeAll()
+        }
+    }
+
     // MARK: - Pause Timer Methods
 
     /// Pause clipboard monitoring for a specified duration
