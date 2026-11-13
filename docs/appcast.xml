@@ -10,6 +10,17 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
+        <new>
+            <li>🛡️ NEW: Passwords in the Quick Picker: ⌥E then ⌥K moves an item into an encrypted vault on your Mac (AES-256, the key in your Keychain) and out of the history. The Passwords tab unlocks with Touch ID and locks again with the screen, on sleep, after an hour unused, with its lock button or with ⌃⌥L from anywhere.</li>
+            <li>🛡️ NEW: Pasting from Passwords never adds to the history, marks the clipboard as concealed for other clipboard managers and clears it after 30 seconds. A saved password copied again elsewhere stays out of the history while Passwords is unlocked (or always, if you choose), and its history copies are removed.</li>
+            <li>✨ NEW: Passwords hold text, images, files or both: the eye (⌥R) shows an entry, Space previews it and ⌥Space makes the preview large, ⌘⇧↩ types it out, ⌥E renames, reorders or deletes it and gives it an SF Symbol or emoji and a color. Searching any tab lists matching Passwords entries, ready to paste, while the vault is unlocked.</li>
+            <li>🛡️ NEW: An optional password for Passwords instead of Touch ID, with a hint (Settings → Security → Passwords). A forgotten password can't be recovered by anyone.</li>
+            <li>✨ NEW: Search in Settings finds any setting, hotkey or category, opens its page and highlights it.</li>
+            <li>✨ NEW: Delete an item from the ⌥E editor: Delete… or ⌃⌥⌫, then ⏎ to confirm.</li>
+            <li>⌨️ NEW: ⌘1…⌘6 switch Quick Picker tabs; change their order in Settings → Quick Picker → Tabs.</li>
+            <li>🎨 IMPROVED: Settings pages are grouped under General, Quick Picker, Security and About.</li>
+        </new>
+
     <item>
         <title>Version 1.10.1</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>

@@ -49,8 +49,15 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
 
 ## Features
 
-### 🆕 New in Version 1.10.1
-- **🛠️ Type-Out over Remote Desktop**: Type-out paste (⌘⇧↩) keeps Shift over Remote Desktop: capitals and symbols such as # and $ no longer arrive as lowercase letters and digits on the Windows side
+### 🆕 New in Version 1.11.0
+- **🛡️ Passwords**: ⌥E then ⌥K in the Quick Picker moves an item into an encrypted vault on your Mac (AES-256, the key in your Keychain) and out of the history. The Passwords tab unlocks with Touch ID and locks again with the screen, on sleep, after an hour unused, with its lock button or with ⌃⌥L from anywhere
+- **🛡️ Safe Pasting**: Pasting from Passwords never adds to the history, marks the clipboard as concealed for other clipboard managers and clears it after 30 seconds. A saved password copied again elsewhere stays out of the history while Passwords is unlocked (or always, if you choose), and its history copies are removed
+- **✨ Any Kind of Secret**: Text, images, files or both: the eye (⌥R) shows an entry, Space previews it and ⌥Space makes the preview large, ⌘⇧↩ types it out, ⌥E renames, reorders or deletes it and gives it an SF Symbol or emoji and a color. Searching any tab lists matching Passwords entries, ready to paste, while the vault is unlocked
+- **🛡️ Optional Password**: Lock Passwords with a password of its own instead of Touch ID, with a hint (Settings → Security → Passwords). A forgotten password can't be recovered by anyone
+- **✨ Search in Settings**: Finds any setting, hotkey or category, opens its page and highlights it
+- **✨ Delete from ⌥E**: Delete… or ⌃⌥⌫ in the item editor, then ⏎ to confirm
+- **⌨️ ⌘1…⌘6 Tabs**: Switch Quick Picker tabs with ⌘ and a number; change their order in Settings → Quick Picker → Tabs
+- **🎨 Grouped Settings**: Pages are grouped under General, Quick Picker, Security and About
 
 **📖 [See the full changelog →](https://foxfollow.github.io/Stone-Clipboarder-Tool/version-history.html)**
 
