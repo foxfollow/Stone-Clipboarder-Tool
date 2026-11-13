@@ -586,6 +586,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
                     .environmentObject(pinManager)
+                    .environmentObject(vaultManager)
                     .frame(minWidth: 720, minHeight: 540)
             }
             .modelContainer(settingsContainer)
@@ -598,6 +599,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
                     .environmentObject(pinManager)
+                    .environmentObject(vaultManager)
             }
             .modelContainer(settingsContainer)
         }
