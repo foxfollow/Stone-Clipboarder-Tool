@@ -194,6 +194,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             viewModel: cbViewModel,
             pinManager: pinManager,
             settingsManager: settingsManager,
+            vaultManager: vaultManager,
             onClose: { [weak self] in
                 self?.hideQuickPicker()
             },
@@ -209,6 +210,9 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             onTypePaste: { [weak self] text in
                 guard let self else { return }
                 self.typePaster.type(text, charDelayMs: self.settingsManager?.typePasteCharDelayMs ?? 5)
+            },
+            onVaultAuthenticationEnded: { [weak self] in
+                self?.reclaimFocusAfterAuthentication()
             }
         )
 
@@ -363,6 +367,14 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         reclaimKeyFocus()
     }
 
+    /// After the Touch ID prompt the picker is no longer key, and the app
+    /// may not be active: take both back and put the cursor in the search.
+    private func reclaimFocusAfterAuthentication() {
+        guard window?.isVisible == true else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        reclaimKeyFocus()
+    }
+
     private func reclaimKeyFocus() {
         // Re-take key on our panel after QuickLook steals it and put the
         // cursor back into the search field. Without this, arrow keys and
@@ -443,6 +455,11 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
                 return
             }
 
+            // Nor for clicks on the Touch ID / password prompt.
+            if self.vaultManager?.isAuthenticating == true {
+                return
+            }
+
             // When native QL is visible, ANY click outside the QuickPicker could be on
             // the QL panel body OR its detached toolbar/HUD ("Open with" button lives there).
             // Frame-checking is unreliable because that button is in a separate NSWindow.
@@ -483,7 +500,9 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             guard let self = self,
                 let window = self.window,
                 window.isVisible,
-                event.keyCode == 53  // Only handle escape key
+                event.keyCode == 53,  // Only handle escape key
+                // Esc in the Touch ID prompt cancels only the prompt.
+                self.vaultManager?.isAuthenticating != true
             else { return }
 
             self.hideQuickPicker()
@@ -555,8 +574,12 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
                 ) { [weak self] _ in
                     MainActor.assumeIsolated {
                         guard let self = self, self.window?.isVisible == true else { return }
+                        // The Touch ID / password prompt is another process:
+                        // the picker waits for it.
+                        if self.vaultManager?.isAuthenticating == true { return }
                         // Delay slightly so "Open with" button action fires and temp files survive
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            guard self.vaultManager?.isAuthenticating != true else { return }
                             self.hideQuickPicker()
                         }
                     }
