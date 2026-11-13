@@ -32,11 +32,7 @@ struct QPVaultRow: View {
             Spacer()
 
             Button(action: onToggleReveal) {
-                Image(systemName: isRevealed ? "eye.slash" : "eye")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
+                QPEyeIcon(isRevealed: isRevealed, size: 14)
             }
             .buttonStyle(.plain)
             .focusable(false)

@@ -74,13 +74,9 @@ struct QPVaultEditorView: View {
             }
             Spacer()
             Button { model.isRevealed.toggle() } label: {
-                Image(systemName: model.isRevealed ? "eye.slash" : "eye")
-                    .font(.system(size: 14))
-                    .frame(width: 24, height: 24)
-                    .contentShape(Rectangle())
+                QPEyeIcon(isRevealed: model.isRevealed, size: 15)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
             .focusable(false)
             .help(model.isRevealed ? "Hide (⌥R)" : "Show (⌥R)")
         }
