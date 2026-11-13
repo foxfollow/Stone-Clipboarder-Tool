@@ -49,6 +49,8 @@ struct QPItemEditorView: View {
                 vaultSection
             }
             Divider()
+            deleteSection
+            Divider()
             footer
         }
         .padding(16)
@@ -177,9 +179,37 @@ struct QPItemEditorView: View {
         }
     }
 
+    /// Delete from the history, after confirming (⌃⌥⌫, ⏎ confirms).
+    @ViewBuilder
+    private var deleteSection: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "trash")
+                .foregroundStyle(model.isConfirmingDelete ? Color.red : Color.secondary)
+            Text(model.isConfirmingDelete ? "Delete this item from the history?" : "Delete from the history")
+                .font(.system(size: 12, weight: model.isConfirmingDelete ? .medium : .regular))
+                .foregroundStyle(model.isConfirmingDelete ? Color.primary : Color.secondary)
+            Spacer()
+            if model.isConfirmingDelete {
+                Button("Cancel") { model.isConfirmingDelete = false }
+                    .focusable(false)
+                Button("Delete", role: .destructive) { model.confirmDelete() }
+                    .focusable(false)
+            } else {
+                Button("Delete…", role: .destructive) { model.requestDelete() }
+                    .help("Delete from the history (⌃⌥⌫)")
+                    .focusable(false)
+                    .disabled(model.isConfirmingUnfavorite)
+            }
+        }
+        .controlSize(.small)
+    }
+
     private var footer: some View {
         HStack(spacing: 10) {
-            if model.isConfirmingUnfavorite {
+            if model.isConfirmingDelete {
+                keyHint("⏎", "Delete")
+                keyHint("ESC", "Keep")
+            } else if model.isConfirmingUnfavorite {
                 keyHint("⏎", "Remove")
                 keyHint("ESC", "Keep")
             } else {
@@ -198,7 +228,7 @@ struct QPItemEditorView: View {
                 .keyboardShortcut(.defaultAction)
                 .controlSize(.small)
                 .focusable(false)
-                .disabled(model.isConfirmingUnfavorite)
+                .disabled(model.isConfirmingUnfavorite || model.isConfirmingDelete)
         }
     }
 

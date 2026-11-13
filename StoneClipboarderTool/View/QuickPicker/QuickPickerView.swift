@@ -612,10 +612,16 @@ struct QuickPickerView: View {
             tabInterceptor.onOptionR = {
                 toggleVaultReveal()
             }
-            // Opens the editor already asking: ⏎ deletes, Esc keeps it.
+            // ⌃⌥⌫ opens the selected row's editor already asking: ⏎
+            // deletes, Esc keeps it. Passwords entry or history item.
             tabInterceptor.onDeleteEntry = {
-                openVaultEditor()
-                vaultEditor?.isConfirmingDelete = true
+                if isPasswordsTab {
+                    openVaultEditor()
+                    vaultEditor?.isConfirmingDelete = true
+                } else if vaultHitIndex == nil, let item = filteredItems[safe: selectedIndex] {
+                    openItemEditor(for: item)
+                    itemEditor?.requestDelete()
+                }
             }
             // ⌘1…⌘9: the tab at that place in the bar.
             tabInterceptor.onCommandDigit = { number in
@@ -1093,31 +1099,39 @@ struct QuickPickerView: View {
             guard let editor else { return }
             switch key {
             case .save:
-                if editor.isConfirmingUnfavorite {
+                if editor.isConfirmingDelete {
+                    editor.confirmDelete()
+                } else if editor.isConfirmingUnfavorite {
                     editor.confirmUnfavorite()
                 } else {
                     closeItemEditor(saving: true)
                 }
             case .cancel:
-                if editor.isConfirmingUnfavorite {
+                if editor.isConfirmingDelete {
+                    editor.isConfirmingDelete = false
+                } else if editor.isConfirmingUnfavorite {
                     editor.isConfirmingUnfavorite = false
                 } else {
                     closeItemEditor(saving: false)
                 }
             case .moveUp:
+                guard !editor.isConfirmingDelete else { return }
                 editor.moveFavorite(by: -1)
             case .moveDown:
+                guard !editor.isConfirmingDelete else { return }
                 editor.moveFavorite(by: 1)
             case .toggleFavorite:
+                guard !editor.isConfirmingDelete else { return }
                 if editor.isConfirmingUnfavorite {
                     editor.confirmUnfavorite()
                 } else {
                     editor.requestFavoriteToggle()
                 }
             case .delete:
-                break  // history items are deleted elsewhere
+                // Never confirms: a repeated key press mustn't delete.
+                editor.requestDelete()
             case .moveToVault:
-                if !editor.isConfirmingUnfavorite, visibleTabs.contains(.passwords) {
+                if !editor.isConfirmingUnfavorite, !editor.isConfirmingDelete, visibleTabs.contains(.passwords) {
                     moveEditedItemToVault()
                 }
             case .reveal:
@@ -1980,7 +1994,7 @@ final class TabKeyInterceptor: ObservableObject {
     var onOptionR: (() -> Void)?
     /// True while a password is typed: ⌥ letters reach the field.
     var passesOptionKeys: (() -> Bool)?
-    /// ⌃⌥⌫ on the unlocked Passwords tab: delete the selected entry (asks).
+    /// ⌃⌥⌫: delete the selected Passwords entry or history item (asks).
     var onDeleteEntry: (() -> Void)?
     /// ⌘1…⌘9 with the number.
     var onCommandDigit: ((Int) -> Void)?
@@ -2062,10 +2076,9 @@ final class TabKeyInterceptor: ObservableObject {
             return event
         }
 
-        // ⌃⌥⌫ / ⌃⌥⌦ on the unlocked Passwords tab.
+        // ⌃⌥⌫ / ⌃⌥⌦: delete the selected row, after confirming.
         if Self.deleteKeyCodes.contains(event.keyCode),
-           flags.contains([.control, .option]), !flags.contains(.command),
-           isPasswordsTab?() ?? false {
+           flags.contains([.control, .option]), !flags.contains(.command) {
             DispatchQueue.main.async { [weak self] in
                 self?.onDeleteEntry?()
             }

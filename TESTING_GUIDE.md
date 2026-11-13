@@ -94,6 +94,9 @@ all pins.
       (the list and preview don't react), ⏎ saves, Esc discards. The title
       shows above the content in the picker, menu bar and main window, and
       search finds it. Clearing it removes it.
+- [ ] In the editor, Delete… (or ⌃⌥⌫, also straight from the list) asks
+      first: ⏎ or Delete removes the item, Esc or Cancel keeps it, a second
+      ⌃⌥⌫ only asks again; ⌥⌫ still deletes a word of the title.
 - [ ] In the editor on a favorite, ⌥↑/⌥↓ move it (the Favs list behind
       follows, and so do ⌃⇧1…0); ⌥F asks before removing, ⏎ confirms, Esc
       keeps it. On a non-favorite ⌥F adds it at once.
@@ -117,9 +120,13 @@ all pins.
       Esc, locking, leaving the tab or closing the picker closes it. With
       Apple Quick Look, `Previews/Secret_…` exists only while the preview is
       open; the custom panel writes nothing.
-- [ ] Copying a saved password again (another app, a site), with the tab
-      locked or not: it doesn't appear in the history. After an unlock, old
-      history copies of saved entries are gone.
+- [ ] Settings → Passwords → Keep copies of saved passwords out of the
+      history: While unlocked (default) skips a copied-again password only
+      while the tab is unlocked; Always also while locked; Never never. No
+      Keychain prompt at launch unless Always.
+- [ ] Remove history copies (on by default): after an unlock, and after
+      pasting or typing an entry from Passwords, every history copy of it
+      is gone, older duplicates included. Off: they stay.
 - [ ] Clean Up Now, auto-cleanup and Delete All History leave Passwords
       as they were; the Passwords page shows the "Not your main password
       manager" notice.

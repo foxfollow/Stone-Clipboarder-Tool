@@ -61,3 +61,36 @@ final class CBViewModelVaultTests: XCTestCase {
         XCTAssertEqual(left, [" 379696", "keep me"])
     }
 }
+
+/// Delete from the ⌥E editor: asking never deletes, only confirming does.
+@MainActor
+final class QPItemEditorDeleteTests: XCTestCase {
+
+    func testDeleteNeedsConfirmation() async throws {
+        let schema = Schema([CBItem.self])
+        let config = ModelConfiguration("QPItemEditorDeleteTests", schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+        let viewModel = CBViewModel()
+        viewModel.setModelContext(context)
+        viewModel.addTextItem(content: "note")
+        let item = try XCTUnwrap(viewModel.existingItem(matching: CBItem.ContentKey(type: .text, content: "note")))
+
+        let editor = QPItemEditorModel(item: item, viewModel: viewModel) {}
+        editor.confirmDelete()  // not asked yet: nothing happens
+        editor.requestDelete()
+        editor.requestDelete()  // a repeated key press only asks again
+        XCTAssertTrue(editor.isConfirmingDelete)
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CBItem>()), 1)
+
+        editor.confirmDelete()
+        XCTAssertFalse(editor.isConfirmingDelete)
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CBItem>()), 0)
+    }
+}
