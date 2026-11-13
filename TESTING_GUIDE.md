@@ -145,7 +145,7 @@ all pins.
 - [ ] ⌥E on an entry: the icon button opens SF Symbols / emoji, the color
       well changes the color, Default goes back; the row shows it after ⏎
       and after a relaunch. Entries from before keep the type's icon.
-- [ ] ⌥E on an entry: rename, ⌥↑/⌥↓ reorder, ⌘⌫ then ⏎ deletes (⌘⌫ twice only asks; ⌥⌫ deletes a word of the title). ⌥L locks.
+- [ ] ⌥E on an entry: rename, ⌥↑/⌥↓ reorder, ⌃⌥⌫ (or ⌃⌥⌦; also straight from the list) asks, ⏎ deletes, Esc keeps it; pressing it twice only asks again, ⌥⌫ deletes a word of the title. ⌥L locks.
 - [ ] Locking the screen (⌃⌘Q), sleep and the screen saver lock the tab.
       Reopening the picker within the relock time (default 1 h after the
       last use) needs no Touch ID; after it, it does. Quit and relaunch:

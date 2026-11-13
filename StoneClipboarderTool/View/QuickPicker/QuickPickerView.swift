@@ -587,6 +587,11 @@ struct QuickPickerView: View {
             tabInterceptor.onOptionR = {
                 toggleVaultReveal()
             }
+            // Opens the editor already asking: ⏎ deletes, Esc keeps it.
+            tabInterceptor.onDeleteEntry = {
+                openVaultEditor()
+                vaultEditor?.isConfirmingDelete = true
+            }
             // ⌘1…⌘9: the tab at that place in the bar.
             tabInterceptor.onCommandDigit = { number in
                 guard let tab = visibleTabs[safe: number - 1] else { return }
@@ -1860,7 +1865,7 @@ final class TabKeyInterceptor: ObservableObject {
 
     enum EditorKey {
         case save, cancel, moveUp, moveDown, toggleFavorite
-        /// ⌘⌫ in the Passwords editor: asks to delete; only ⏎ confirms.
+        /// ⌃⌥⌫ in the Passwords editor: asks to delete; only ⏎ confirms.
         case delete
         /// ⌥K in the history editor: Move to Passwords.
         case moveToVault
@@ -1874,6 +1879,8 @@ final class TabKeyInterceptor: ObservableObject {
     var onOptionR: (() -> Void)?
     /// True while a password is typed: ⌥ letters reach the field.
     var passesOptionKeys: (() -> Bool)?
+    /// ⌃⌥⌫ on the unlocked Passwords tab: delete the selected entry (asks).
+    var onDeleteEntry: (() -> Void)?
     /// ⌘1…⌘9 with the number.
     var onCommandDigit: ((Int) -> Void)?
     /// Key codes of 1…9 on the main row (ANSI positions, any layout).
@@ -1893,7 +1900,8 @@ final class TabKeyInterceptor: ObservableObject {
     private static let lKeyCode: UInt16 = 37
     private static let kKeyCode: UInt16 = 40
     private static let rKeyCode: UInt16 = 15
-    private static let deleteKeyCode: UInt16 = 51
+    /// Delete (⌫) and forward delete (⌦).
+    private static let deleteKeyCodes: Set<UInt16> = [51, 117]
     private static let escapeKeyCode: UInt16 = 53
     private static let upArrowKeyCode: UInt16 = 126
     private static let downArrowKeyCode: UInt16 = 125
@@ -1930,6 +1938,7 @@ final class TabKeyInterceptor: ObservableObject {
         isPasswordsTab = nil
         passesOptionKeys = nil
         onCommandDigit = nil
+        onDeleteEntry = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
@@ -1950,6 +1959,16 @@ final class TabKeyInterceptor: ObservableObject {
 
         if passesOptionKeys?() == true, event.keyCode != Self.tabKeyCode {
             return event
+        }
+
+        // ⌃⌥⌫ / ⌃⌥⌦ on the unlocked Passwords tab.
+        if Self.deleteKeyCodes.contains(event.keyCode),
+           flags.contains([.control, .option]), !flags.contains(.command),
+           isPasswordsTab?() ?? false {
+            DispatchQueue.main.async { [weak self] in
+                self?.onDeleteEntry?()
+            }
+            return nil
         }
 
         // ⌥← / ⌥→, with or without ⇧ (no Control/Command).
@@ -2052,8 +2071,10 @@ final class TabKeyInterceptor: ObservableObject {
             key = .moveUp
         case Self.downArrowKeyCode where option && !commandOrControl:
             key = .moveDown
-        // ⌘⌫ asks to delete (⏎ confirms); ⌥⌫ stays word-delete in the field.
-        case Self.deleteKeyCode where flags.contains(.command) && !option && !flags.contains(.control):
+        // ⌃⌥⌫ / ⌃⌥⌦ ask to delete (⏎ confirms, Esc goes back); ⌥⌫ alone
+        // stays word-delete in the title field.
+        case _ where Self.deleteKeyCodes.contains(event.keyCode)
+            && option && flags.contains(.control) && !flags.contains(.command):
             key = .delete
         case Self.kKeyCode where option && !commandOrControl:
             key = .moveToVault
