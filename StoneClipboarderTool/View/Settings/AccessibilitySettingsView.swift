@@ -18,6 +18,7 @@ struct AccessibilitySettingsView: View {
         Form {
             Section("Launch at Login") {
                 Toggle("Start StoneClipboarder at login", isOn: $settingsManager.startAtLogin)
+                    .settingsAnchor("accessibility.login")
                     .help("Automatically launch StoneClipboarder when you log in to your Mac")
 
                 Text("You can also manage this in System Settings > General > Login Items.")
@@ -39,6 +40,7 @@ struct AccessibilitySettingsView: View {
                             .font(.system(size: 13, weight: .medium))
                     }
                 }
+                .settingsAnchor("accessibility.status")
 
                 if !accessibilityGranted {
                     Text("Accessibility access is required for auto-paste (⌘V simulation) and global hotkeys to work.")
@@ -50,6 +52,7 @@ struct AccessibilitySettingsView: View {
                             NSWorkspace.shared.open(url)
                         }
                     }
+                    .settingsAnchor("accessibility.open")
                 } else {
                     Text("StoneClipboarder has accessibility access. Auto-paste and global hotkeys are fully functional.")
                         .font(.caption)

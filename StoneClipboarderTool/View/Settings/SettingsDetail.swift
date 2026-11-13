@@ -10,9 +10,10 @@ struct SettingsDetail: View {
     let section: SettingsSection
     let updater: SPUUpdater?
     @Binding var accessibilityGranted: Bool
+    var highlight = SettingsHighlight()
 
     var body: some View {
-        SettingsDetailContainer(subtitle: section.subtitle) {
+        SettingsDetailContainer(subtitle: section.subtitle, highlight: highlight) {
             content
         }
     }

@@ -18,6 +18,7 @@ struct HotkeySettingsView: View {
         Form {
             Section("General Hotkey Settings") {
                 Toggle("Enable Global Hotkeys", isOn: $settingsManager.enableHotkeys)
+                    .settingsAnchor("hotkeys.enable")
                     .help("Enable or disable all global hotkeys")
 
                 HStack {
@@ -28,6 +29,7 @@ struct HotkeySettingsView: View {
                     }
                 }
                 .help("Maximum number of last items to show hotkeys for")
+                .settingsAnchor("hotkeys.maxLast")
 
                 HStack {
                     Text("Max Favorite Items")
@@ -37,6 +39,7 @@ struct HotkeySettingsView: View {
                     }
                 }
                 .help("Maximum number of favorite items to show hotkeys for")
+                .settingsAnchor("hotkeys.maxFavorite")
             }
 
             Section("Quick Picker") {
@@ -78,6 +81,7 @@ struct HotkeySettingsView: View {
                     resetToDefaults()
                 }
                 .foregroundStyle(.red)
+                .settingsAnchor("hotkeys.reset")
             }
         }
         .formStyle(.grouped)
@@ -210,6 +214,7 @@ struct HotkeyConfigRow: View {
                 !settingsManager.enableHotkeys
                     || (currentlyRecordingID != nil && currentlyRecordingID != config.id))
         }
+        .settingsAnchor(config.hotkeyAction.map(SettingsAnchor.hotkey) ?? "hotkey.unknown")
         .opacity(rowOpacity)
         .onDisappear {
             stopRecording()

@@ -21,6 +21,7 @@ struct PasswordsSettingsSection: View {
                 .foregroundColor(.secondary)
 
             Toggle("Show the Passwords tab", isOn: $settingsManager.showPasswordsTab)
+                .settingsAnchor("passwords.show")
 
             Picker("Lock again after", selection: $settingsManager.vaultRelockMinutes) {
                 ForEach(relockChoices, id: \.self) { minutes in
@@ -29,6 +30,7 @@ struct PasswordsSettingsSection: View {
             }
             .pickerStyle(.menu)
             .help("Passwords stay unlocked this long after you last used them. Locking the screen or sleep locks them at once.")
+            .settingsAnchor("passwords.relock")
 
             Picker("Clear the clipboard after pasting", selection: $settingsManager.vaultClipboardClearSeconds) {
                 ForEach(clearChoices, id: \.self) { seconds in
@@ -37,6 +39,7 @@ struct PasswordsSettingsSection: View {
             }
             .pickerStyle(.menu)
             .help("Only if the clipboard still holds the pasted password.")
+            .settingsAnchor("passwords.clearClipboard")
 
             HStack {
                 Label(
@@ -48,6 +51,7 @@ struct PasswordsSettingsSection: View {
                     .disabled(!vaultManager.isUnlocked)
                 Button("Delete All Passwords…", role: .destructive) { isConfirmingDeleteAll = true }
             }
+            .settingsAnchor("passwords.actions")
         }
         .confirmationDialog(
             "Delete all saved passwords?", isPresented: $isConfirmingDeleteAll, titleVisibility: .visible

@@ -9,19 +9,26 @@ struct SettingsSidebar: View {
     @Binding var selectedSection: SettingsSection
     let accessibilityGranted: Bool
     let appVersion: String
+    /// Non-nil while searching: shown instead of the pages.
+    var searchResults: [SettingsSearchEntry]? = nil
+    var onPickResult: (SettingsSearchEntry) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 0) {
-            List(selection: $selectedSection) {
-                ForEach(SettingsSection.allCases) { section in
-                    SettingsSidebarRow(
-                        section: section,
-                        accessibilityGranted: accessibilityGranted
-                    )
-                    .tag(section)
+            if let searchResults {
+                SettingsSearchResults(results: searchResults, onPick: onPickResult)
+            } else {
+                List(selection: $selectedSection) {
+                    ForEach(SettingsSection.allCases) { section in
+                        SettingsSidebarRow(
+                            section: section,
+                            accessibilityGranted: accessibilityGranted
+                        )
+                        .tag(section)
+                    }
                 }
+                .listStyle(.sidebar)
             }
-            .listStyle(.sidebar)
 
             Divider()
             SettingsSidebarFooter(appVersion: appVersion)
