@@ -134,6 +134,13 @@ all pins.
       up in the history. After 30 s the clipboard is empty, unless something
       else was copied in the meantime.
 - [ ] ⌘⇧⏎ types a password into a field that blocks paste.
+- [ ] Searching on another tab (vault unlocked) shows "N in Passwords: …"
+      for matching titles or file names, never for the secret itself; a
+      click or its ⌘ number opens Passwords with the same search. Locked:
+      no bar.
+- [ ] ⌥E on an entry: the icon button opens SF Symbols / emoji, the color
+      well changes the color, Default goes back; the row shows it after ⏎
+      and after a relaunch. Entries from before keep the type's icon.
 - [ ] ⌥E on an entry: rename, ⌥↑/⌥↓ reorder, ⌥⌫ then ⏎ deletes. ⌥L locks.
 - [ ] Locking the screen (⌃⌘Q), sleep and the screen saver lock the tab.
       Reopening the picker within the relock time (default 1 h after the

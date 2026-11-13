@@ -85,6 +85,33 @@ final class VaultPayloadTests: XCTestCase {
         XCTAssertTrue(VaultPayload(itemType: .file, fileData: Data([1]), fileName: "id_rsa").matches("RSA"))
     }
 
+    func testLabelSearchNeverLooksAtTheSecret() {
+        let entry = VaultPayload(itemType: .text, title: "test-asd", content: "hunter2")
+        XCTAssertTrue(entry.matchesLabel("TEST-a"))
+        XCTAssertFalse(entry.matchesLabel("hunter"))
+        XCTAssertFalse(entry.matchesLabel("  "))
+        XCTAssertTrue(VaultPayload(itemType: .file, fileData: Data([1]), fileName: "id_rsa").matchesLabel("rsa"))
+    }
+
+    func testEntriesFromBeforeIconsStillDecode() throws {
+        // JSON as sealed by the first version: no icon, no colorHex.
+        let old = #"{"id":"6F9619FF-8B86-D011-B42D-00CF4FC964FF","itemType":"text","content":"pw","createdAt":1000,"orderIndex":0}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let payload = try decoder.decode(VaultPayload.self, from: Data(old.utf8))
+        XCTAssertEqual(payload.content, "pw")
+        XCTAssertNil(payload.icon)
+        XCTAssertNil(payload.colorHex)
+    }
+
+    func testIconAndColorSurviveSealing() throws {
+        let key = VaultCrypto.makeKey()
+        let entry = VaultPayload(itemType: .text, content: "pw", icon: .symbol("creditcard"), colorHex: "#FF0000")
+        let opened = try VaultCrypto.open(VaultCrypto.seal(entry, with: key), id: entry.id, with: key)
+        XCTAssertEqual(opened.icon, .symbol("creditcard"))
+        XCTAssertEqual(opened.colorHex, "#FF0000")
+    }
+
     func testSortedByOrderThenAge() {
         let old = VaultPayload(itemType: .text, content: "1", createdAt: Date(timeIntervalSince1970: 1), orderIndex: 1)
         let new = VaultPayload(itemType: .text, content: "2", createdAt: Date(timeIntervalSince1970: 2), orderIndex: 1)

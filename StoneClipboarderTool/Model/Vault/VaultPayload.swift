@@ -25,6 +25,11 @@ struct VaultPayload: Codable, Equatable, Identifiable, Sendable {
     var createdAt: Date
     /// Place in the Passwords list, 0 = first.
     var orderIndex: Int
+    /// The row's own SF Symbol or emoji (⌥E); nil = the type's icon.
+    /// Optional, so entries sealed before 1.11 still decode.
+    var icon: CategoryIcon?
+    /// "#RRGGBB" for the icon; nil = the type's color.
+    var colorHex: String?
 
     init(
         id: UUID = UUID(),
@@ -36,7 +41,9 @@ struct VaultPayload: Codable, Equatable, Identifiable, Sendable {
         fileName: String? = nil,
         fileUTI: String? = nil,
         createdAt: Date = Date(),
-        orderIndex: Int = 0
+        orderIndex: Int = 0,
+        icon: CategoryIcon? = nil,
+        colorHex: String? = nil
     ) {
         self.id = id
         self.itemType = itemType
@@ -48,6 +55,8 @@ struct VaultPayload: Codable, Equatable, Identifiable, Sendable {
         self.fileUTI = fileUTI
         self.createdAt = createdAt
         self.orderIndex = orderIndex
+        self.icon = icon
+        self.colorHex = colorHex
     }
 
     /// Copies a history item's content and title. Returns nil when the item
@@ -129,6 +138,16 @@ struct VaultPayload: Codable, Equatable, Identifiable, Sendable {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return true }
         return [title, fileName, content].contains { field in
+            field?.localizedCaseInsensitiveContains(needle) == true
+        }
+    }
+
+    /// Search from the other Quick Picker tabs: the label and the file name
+    /// only, never the secret itself.
+    func matchesLabel(_ query: String) -> Bool {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return false }
+        return [title, fileName].contains { field in
             field?.localizedCaseInsensitiveContains(needle) == true
         }
     }

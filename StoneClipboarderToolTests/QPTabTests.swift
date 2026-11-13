@@ -49,8 +49,20 @@ final class QPVaultEditorModelTests: XCTestCase {
         XCTAssertEqual(manager.entries.first?.id, second.id)
 
         model.title = "Deploy key"
-        model.saveTitle()
+        model.save()
         XCTAssertEqual(manager.entry(withID: second.id)?.title, "Deploy key")
+        XCTAssertNil(manager.entry(withID: second.id)?.icon, "no icon chosen: the type's")
+
+        model.icon = .emoji("🔑")
+        model.color = .red
+        model.save()
+        XCTAssertEqual(manager.entry(withID: second.id)?.icon, .emoji("🔑"))
+        XCTAssertNotNil(manager.entry(withID: second.id)?.colorHex)
+
+        model.resetAppearance()
+        model.save()
+        XCTAssertNil(manager.entry(withID: second.id)?.icon)
+        XCTAssertNil(manager.entry(withID: second.id)?.colorHex)
 
         model.isConfirmingDelete = true
         XCTAssertTrue(model.confirmDelete())

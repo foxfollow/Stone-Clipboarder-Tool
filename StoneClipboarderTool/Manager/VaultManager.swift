@@ -421,6 +421,15 @@ final class VaultManager: ObservableObject {
         return update(id) { $0.title = trimmed.isEmpty ? nil : trimmed }
     }
 
+    /// Sets the row's icon and color; nil goes back to the type's.
+    @discardableResult
+    func setAppearance(_ id: UUID, icon: CategoryIcon?, colorHex: String?) -> Bool {
+        update(id) {
+            $0.icon = icon
+            $0.colorHex = icon == nil ? nil : colorHex
+        }
+    }
+
     @discardableResult
     func delete(_ id: UUID) -> Bool {
         guard isUnlocked, entries.contains(where: { $0.id == id }) else { return false }

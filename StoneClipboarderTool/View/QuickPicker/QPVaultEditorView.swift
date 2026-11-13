@@ -58,13 +58,11 @@ struct QPVaultEditorView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: model.typeSymbol)
-                .font(.system(size: 14))
-                .foregroundStyle(model.typeColor)
+            CategoryIconView(icon: model.iconForPicker, color: model.color, size: 14)
                 .frame(width: 28, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(model.typeColor.opacity(0.12))
+                        .fill(model.color.opacity(0.12))
                 )
             VStack(alignment: .leading, spacing: 2) {
                 Text("Encrypted password")
@@ -131,6 +129,56 @@ struct QPVaultEditorView: View {
             Text("Shown instead of the hidden content. Leave empty to remove.")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
+            appearanceRow
+        }
+    }
+
+    /// The row's icon (SF Symbol or emoji, in a popover) and its color.
+    private var appearanceRow: some View {
+        HStack(spacing: 8) {
+            Text("Icon")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Button { model.isPickingIcon = true } label: {
+                CategoryIconView(icon: model.iconForPicker, color: model.color, size: 14)
+                    .frame(width: 26, height: 26)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.primary.opacity(0.2), lineWidth: 1)
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .focusable(false)
+            .help("Choose an SF Symbol or an emoji")
+            .popover(isPresented: $model.isPickingIcon, arrowEdge: .bottom) {
+                CategoryIconPicker(
+                    icon: Binding(get: { model.iconForPicker }, set: { model.icon = $0 }),
+                    color: model.color
+                )
+                .padding(12)
+                .frame(width: 300)
+            }
+            ColorPicker(
+                "Color",
+                selection: Binding(
+                    get: { model.color },
+                    set: { newColor in
+                        model.color = newColor
+                        // A color needs an icon to show on.
+                        if model.icon == nil { model.icon = model.iconForPicker }
+                    }),
+                supportsOpacity: false
+            )
+            .labelsHidden()
+            .help("Icon color")
+            if model.icon != nil {
+                Button("Default") { model.resetAppearance() }
+                    .controlSize(.small)
+                    .focusable(false)
+                    .help("Back to the type's icon and color")
+            }
+            Spacer()
         }
     }
 

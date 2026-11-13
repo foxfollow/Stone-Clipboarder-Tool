@@ -87,6 +87,11 @@ struct QPVaultRow: View {
         }
     }
 
+    /// The entry's own color, else its type's.
+    private var iconColor: Color {
+        entry.colorHex.flatMap(ItemCategory.nsColor(hex:)).map { Color(nsColor: $0) } ?? entry.itemType.sybmolColor
+    }
+
     @ViewBuilder
     private var iconView: some View {
         if isRevealed, let data = entry.imageData, let image = NSImage(data: data) {
@@ -95,6 +100,13 @@ struct QPVaultRow: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 40, height: 40)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+        } else if let icon = entry.icon {
+            CategoryIconView(icon: icon, color: iconColor, size: 18)
+                .frame(width: 40, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(iconColor.opacity(0.12))
+                )
         } else {
             Image(systemName: entry.itemType == .text ? "key.horizontal.fill" : entry.itemType.sfSybmolName)
                 .font(.system(size: 18))

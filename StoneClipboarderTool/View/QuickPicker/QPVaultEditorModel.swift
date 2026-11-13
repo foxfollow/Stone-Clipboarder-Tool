@@ -19,6 +19,12 @@ final class QPVaultEditorModel: ObservableObject {
     @Published private(set) var count: Int
     /// Deleting asks first.
     @Published var isConfirmingDelete = false
+    /// The row's icon; nil = the type's.
+    @Published var icon: CategoryIcon?
+    @Published var color: Color
+    /// The picker popover.
+    @Published var isPickingIcon = false
+
     /// The eye (⌥R): the content shows in the card.
     @Published var isRevealed = false
     /// What the eye shows; text and image copied once from the entry.
@@ -39,6 +45,9 @@ final class QPVaultEditorModel: ObservableObject {
         case .combined: kindDescription = "Text and image"
         }
         title = entry.title ?? ""
+        icon = entry.icon
+        color = entry.colorHex.flatMap(ItemCategory.nsColor(hex:)).map { Color(nsColor: $0) }
+            ?? entry.itemType.sybmolColor
         revealText = entry.content
         revealImageData = entry.imageData
         position = nil
@@ -52,8 +61,20 @@ final class QPVaultEditorModel: ObservableObject {
         return position < count - 1
     }
 
-    func saveTitle() {
+    /// The default the icon picker starts from.
+    var iconForPicker: CategoryIcon {
+        icon ?? .symbol(typeSymbol)
+    }
+
+    /// Title, icon and color (⏎ / Save).
+    func save() {
         vaultManager.rename(entryID, to: title)
+        vaultManager.setAppearance(entryID, icon: icon, colorHex: icon == nil ? nil : ItemCategory.hex(from: color))
+    }
+
+    func resetAppearance() {
+        icon = nil
+        color = typeColor
     }
 
     func move(by offset: Int) {

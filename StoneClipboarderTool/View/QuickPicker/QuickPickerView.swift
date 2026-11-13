@@ -480,6 +480,9 @@ struct QuickPickerView: View {
                     onToggleReveal: { entry in toggleVaultReveal(entry.id) }
                 )
             } else {
+            if let match = vaultLabelMatches {
+                vaultMatchesBar(count: match.count, titles: match.titles)
+            }
             QPItemList(
                 filteredItems: filteredItems,
                 selectedIndex: $selectedIndex,
@@ -1548,6 +1551,44 @@ struct QuickPickerView: View {
 
     // MARK: - Passwords tab
 
+    /// Searching another tab: Passwords entries whose label or file name
+    /// matches (unlocked only: the labels are sealed too). nil = none.
+    private var vaultLabelMatches: (count: Int, titles: [String])? {
+        guard visibleTabs.contains(.passwords), vaultManager.isUnlocked,
+              !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        let matches = vaultManager.entries.filter { $0.matchesLabel(searchText) }
+        guard !matches.isEmpty else { return nil }
+        return (matches.count, matches.prefix(3).map(\.displayName))
+    }
+
+    /// "3 in Passwords: …" above the results; a click (or ⌘ and the tab's
+    /// number) opens the Passwords tab with the same search.
+    private func vaultMatchesBar(count: Int, titles: [String]) -> some View {
+        Button {
+            activeTab = .passwords
+            isSearchFocused = false
+            DispatchQueue.main.async { isSearchFocused = true }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "key.fill")
+                    .foregroundStyle(Color.accentColor)
+                Text("\(count) in Passwords: \(titles.joined(separator: ", "))\(count > titles.count ? "…" : "")")
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+                Spacer()
+                if let index = visibleTabs.firstIndex(of: .passwords), index < 9 {
+                    shortcutBadge("⌘\(index + 1)", label: "Show")
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color.accentColor.opacity(0.08))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+    }
+
     /// Unlocked entries matching the search; empty while locked.
     private var vaultEntries: [VaultPayload] {
         vaultManager.entries.filter { $0.matches(searchText) }
@@ -1679,7 +1720,7 @@ struct QuickPickerView: View {
     private func closeVaultEditor(saving: Bool) {
         guard let editor = vaultEditor else { return }
         if saving {
-            editor.saveTitle()
+            editor.save()
         }
         tabInterceptor.onEditorKey = nil
         vaultEditor = nil
