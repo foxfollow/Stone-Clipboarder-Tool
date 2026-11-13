@@ -338,12 +338,12 @@
         </section>
 
         <!-- Screenshot Showcase -->
-        <section class="max-w-6xl mx-auto px-4 mb-32" id="screenshots">
+        <section class="max-w-7xl mx-auto px-4 mb-32" id="screenshots">
             <div class="reveal text-center mb-12">
                 <h2 class="section-title text-3xl font-bold mb-4">App Preview</h2>
                 <p class="section-sub text-gray-400">Fits perfectly into your macOS workflow.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-stretch">
                 <div class="reveal">
                     <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Main Window')">
                         <img alt="Main Window" class="theme-image"
@@ -358,6 +358,14 @@
                             data-light-src="resources/index/sct-light-quickpicker.png"
                             data-dark-src="resources/index/sct-dark-quickpicker.png"
                             src="resources/index/sct-dark-quickpicker.png" />
+                    </div>
+                </div>
+                <div class="reveal" style="transition-delay: 150ms">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Passwords')">
+                        <img alt="Passwords" class="theme-image"
+                            data-light-src="resources/index/sct-light-passwords.png"
+                            data-dark-src="resources/index/sct-dark-passwords.png"
+                            src="resources/index/sct-dark-passwords.png" />
                     </div>
                 </div>
                 <div class="reveal" style="transition-delay: 200ms">

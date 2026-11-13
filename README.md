@@ -100,6 +100,10 @@ xattr -d com.apple.quarantine /Applications/StoneClipboarderTool.app
       <sub><b>Quick Picker</b><br>Spotlight-like access (⌃⌥Space)</sub>
     </td>
     <td align="center">
+      <img src="docs/resources/index/sct-dark-passwords.png" width="250" alt="Passwords"><br>
+      <sub><b>Passwords</b><br>Encrypted, unlocked with Touch ID</sub>
+    </td>
+    <td align="center">
       <img src="docs/resources/index/sct-dark-menubar.png" width="250" alt="Menu Bar"><br>
       <sub><b>Menu Bar</b><br>Quick access to recent items</sub>
     </td>
