@@ -7,7 +7,7 @@ import SwiftUI
 
 /// The ⌥E card on the Passwords tab: name the entry, move it, delete it.
 /// Keys arrive through `TabKeyInterceptor`'s editor mode: ⏎ save, Esc
-/// cancel, ⌥↑ / ⌥↓ move, ⌥⌫ delete (⏎ confirms), ⌥R show or hide the
+/// cancel, ⌥↑ / ⌥↓ move, ⌘⌫ delete (only ⏎ confirms), ⌥R show or hide the
 /// content (the eye).
 struct QPVaultEditorView: View {
     @ObservedObject var model: QPVaultEditorModel
@@ -210,7 +210,7 @@ struct QPVaultEditorView: View {
                     .help("Move down (⌥↓)")
                     .focusable(false)
                 Button("Delete…", role: .destructive) { model.isConfirmingDelete = true }
-                    .help("Delete (⌥⌫)")
+                    .help("Delete (⌘⌫)")
                     .focusable(false)
             }
             .controlSize(.small)
@@ -226,7 +226,7 @@ struct QPVaultEditorView: View {
                 keyHint("⏎", "Save")
                 keyHint("ESC", "Cancel")
                 keyHint("⌥↑↓", "Move")
-                keyHint("⌥⌫", "Delete")
+                keyHint("⌘⌫", "Delete")
                 keyHint("⌥R", model.isRevealed ? "Hide" : "Show")
             }
             Spacer()

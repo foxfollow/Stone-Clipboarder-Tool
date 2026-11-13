@@ -71,8 +71,10 @@ enum QPTab: String, Hashable, CaseIterable, Identifiable {
     }
 }
 
-/// The Passwords preview, run by QuickPickerWindowManager in its custom
-/// panel (never Quick Look, which would need a decrypted file on disk).
+/// The Passwords preview, run by QuickPickerWindowManager the way the
+/// Quick Look setting says: Apple Quick Look (a decrypted copy in an
+/// owner-only `Previews/Secret_` folder, deleted when the preview closes)
+/// or the custom panel (from memory).
 struct QPVaultPreviewActions {
     /// Opens the preview of the entry, or closes it; `expanded` (⌥Space)
     /// opens it large, or switches size when it is open.
@@ -152,7 +154,9 @@ struct QuickPickerView: View {
         self.onTypePaste = onTypePaste
         self.onVaultAuthenticationEnded = onVaultAuthenticationEnded
         self.vaultPreview = vaultPreview
-        self.vaultManager = vaultManager ?? VaultManager.makeForApp()
+        // Previews and a missing manager get an inert in-memory vault, never
+        // a second one on the real Keychain.
+        self.vaultManager = vaultManager ?? VaultManager.makeInert()
     }
 
     /// The tabs shown, in the order set in Settings; Passwords can be hidden.
@@ -1740,11 +1744,8 @@ struct QuickPickerView: View {
                 editor.move(by: 1)
                 selectVaultEntry(editor.entryID)
             case .delete:
-                if editor.isConfirmingDelete {
-                    deleteInVaultEditor()
-                } else {
-                    editor.isConfirmingDelete = true
-                }
+                // Never confirms: a repeated key press mustn't delete an entry.
+                editor.isConfirmingDelete = true
             case .reveal:
                 editor.isRevealed.toggle()
             case .toggleFavorite, .moveToVault:
@@ -1859,7 +1860,7 @@ final class TabKeyInterceptor: ObservableObject {
 
     enum EditorKey {
         case save, cancel, moveUp, moveDown, toggleFavorite
-        /// ⌥⌫ in the Passwords editor.
+        /// ⌘⌫ in the Passwords editor: asks to delete; only ⏎ confirms.
         case delete
         /// ⌥K in the history editor: Move to Passwords.
         case moveToVault
@@ -2051,7 +2052,8 @@ final class TabKeyInterceptor: ObservableObject {
             key = .moveUp
         case Self.downArrowKeyCode where option && !commandOrControl:
             key = .moveDown
-        case Self.deleteKeyCode where option && !commandOrControl:
+        // ⌘⌫ asks to delete (⏎ confirms); ⌥⌫ stays word-delete in the field.
+        case Self.deleteKeyCode where flags.contains(.command) && !option && !flags.contains(.control):
             key = .delete
         case Self.kKeyCode where option && !commandOrControl:
             key = .moveToVault

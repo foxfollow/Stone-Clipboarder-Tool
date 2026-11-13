@@ -69,8 +69,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         guard !AppEnvironment.isRunningUnitTests else { return }
-        // Quick Look copies of clipboard items shouldn't outlive the app.
+        // Quick Look copies of clipboard items shouldn't outlive the app,
+        // nor the decrypted file of a pasted Passwords entry.
         QPQuickLookCoordinator.removeAllPreviewSessions()
+        cbViewModel?.getClipboardManager().removeSecretFile(clearingPasteboard: true)
     }
 
     /// Keeps Dock / Cmd+Tab presence matching `showMainWindow` after launch.
@@ -517,15 +519,13 @@ enum ModelContainerFactory {
     }
 
     /// The files the recovery deletes: the store and its `-wal` / `-shm`
-    /// companions, nothing else in the folder. The Passwords vault
-    /// (`Vault/`), the error log and the other store live next to them and
-    /// must survive a corrupt history store.
+    /// companions, matched by exact name and nothing else in the folder.
+    /// The Passwords vault (`Vault/`), the error log and the other store
+    /// live next to them and must survive a corrupt history store: never
+    /// loosen this to a prefix match.
     static func recoveryFiles(of storeFileName: String, among files: [String]) -> [String] {
-        let protected: Set<String> = [VaultStore.defaultRoot.lastPathComponent]
-        return files.filter { file in
-            !protected.contains(file)
-                && (file == storeFileName || file == storeFileName + "-wal" || file == storeFileName + "-shm")
-        }
+        let names: Set<String> = [storeFileName, storeFileName + "-wal", storeFileName + "-shm"]
+        return files.filter(names.contains)
     }
 
     private static func makeInMemoryContainer(schema: Schema, name: String) -> ModelContainer {

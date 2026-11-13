@@ -24,7 +24,9 @@ final class VaultSurvivesCleanupTests: XCTestCase {
     func testVaultNeverMatchesARecoveryFile() {
         let vault = VaultStore.defaultRoot.lastPathComponent
         XCTAssertEqual(vault, "Vault")
-        XCTAssertTrue(ModelContainerFactory.recoveryFiles(of: vault, among: [vault]).isEmpty)
+        for store in ["ClipboardHistory.store", "Settings.store"] {
+            XCTAssertFalse(ModelContainerFactory.recoveryFiles(of: store, among: [vault, vault + ".store"]).contains(vault))
+        }
     }
 
     func testDeletingAndCleaningUpTheHistoryKeepsPasswords() async throws {

@@ -6,9 +6,12 @@ import XCTest
 private final class StubAuthenticator: VaultAuthenticator {
     var answer = true
     private(set) var calls = 0
+    /// Runs while the prompt would be up (a lock pressed meanwhile).
+    var whileAsking: (() -> Void)?
 
     func authenticate(reason: String) async -> Bool {
         calls += 1
+        whileAsking?()
         return answer
     }
 }
@@ -191,16 +194,43 @@ final class VaultManagerTests: XCTestCase {
         XCTAssertFalse(keyProvider.hasKey)
     }
 
-    func testEntriesSealedWithALostKeyAreCounted() async {
+    func testAMissingKeyIsNotReplacedWhileEntriesExist() async {
         let manager = makeManager()
         await manager.unlock()
         _ = manager.add(VaultPayload(itemType: .text, content: "pw"))
         manager.lock()
-        try? keyProvider.deleteKey()  // a new key is made on the next unlock
+        try? keyProvider.deleteKey()
+
+        let unlocked = await manager.unlock()
+        XCTAssertFalse(unlocked)
+        XCTAssertFalse(keyProvider.hasKey, "no new key that would orphan the entries")
+        XCTAssertNotNil(manager.statusMessage)
+        XCTAssertTrue(manager.hasStoredEntries)
+    }
+
+    func testEntriesSealedWithAnotherKeyAreCounted() async {
+        let manager = makeManager()
+        await manager.unlock()
+        _ = manager.add(VaultPayload(itemType: .text, content: "pw"))
+        manager.lock()
+        try? keyProvider.writeKeyData(VaultCrypto.keyData(VaultCrypto.makeKey()))
 
         await manager.unlock()
         XCTAssertTrue(manager.entries.isEmpty)
         XCTAssertEqual(manager.unreadableCount, 1)
+    }
+
+    func testALockDuringUnlockingWins() async {
+        let manager = makeManager()
+        authenticator.whileAsking = { manager.lock() }
+        let unlocked = await manager.unlock()
+        XCTAssertFalse(unlocked)
+        XCTAssertFalse(manager.isUnlocked)
+        XCTAssertFalse(manager.isAuthenticating)
+
+        authenticator.whileAsking = nil
+        let again = await manager.unlock()
+        XCTAssertTrue(again)
     }
 
     func testCopiesOfSavedEntriesAreRecognizedWhileLocked() async {

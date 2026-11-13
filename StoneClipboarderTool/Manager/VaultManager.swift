@@ -59,6 +59,9 @@ final class VaultManager: ObservableObject {
     private var fingerprintKey: SymmetricKey?
     private var fingerprints: Set<String> = []
     private var policy = VaultLockPolicy()
+    /// Bumped by every `lock()`: an unlock that was in flight when the user
+    /// locked (Touch ID up, Keychain prompt, PBKDF2) is dropped, not applied.
+    private var lockGeneration = 0
 
     nonisolated(unsafe) private var expiryTimer: Timer?
     nonisolated(unsafe) private var workspaceObservers: [NSObjectProtocol] = []
@@ -83,6 +86,12 @@ final class VaultManager: ObservableObject {
     /// folder and an in-memory key, never the real vault or keychain.
     static func makeForApp() -> VaultManager {
         guard AppEnvironment.isRunningUnitTests || AppEnvironment.isDemo else { return VaultManager() }
+        return makeInert()
+    }
+
+    /// A vault in a throwaway folder with in-memory keys: tests, demo mode,
+    /// previews and fallbacks. Never touches the real vault or Keychain.
+    static func makeInert() -> VaultManager {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("StoneClipboarderTool-Vault-\(UUID().uuidString)", isDirectory: true)
         return VaultManager(
@@ -127,13 +136,14 @@ final class VaultManager: ObservableObject {
         }
 
         isAuthenticating = true
+        let generation = lockGeneration
         let confirmed = await authenticator.authenticate(reason: reason)
-        guard confirmed else {
+        guard confirmed, generation == lockGeneration else {
             isAuthenticating = false
             return false
         }
 
-        return await loadKeyAndUnlock(password: nil)
+        return await loadKeyAndUnlock(password: nil, generation: generation)
     }
 
     /// Unlocks a vault whose key is wrapped with the Passwords password
@@ -147,7 +157,7 @@ final class VaultManager: ObservableObject {
         }
         guard !isAuthenticating, !password.isEmpty else { return false }
         isAuthenticating = true
-        return await loadKeyAndUnlock(password: password)
+        return await loadKeyAndUnlock(password: password, generation: lockGeneration)
     }
 
     /// Whether the lock screen asks for the Passwords password instead of
@@ -163,18 +173,23 @@ final class VaultManager: ObservableObject {
         /// A password was given, but the key isn't wrapped with one: only
         /// Touch ID may open it.
         case needsTouchID
+        /// Entries exist but their key is gone from the Keychain. A new key
+        /// would leave them unreadable for good, so none is made.
+        case keyMissing
     }
 
     /// Reads the key off the main thread (a Keychain prompt blocks, and so
     /// does PBKDF2), unwrapping it with `password` when it is wrapped.
-    /// Clears `isAuthenticating`.
-    private func loadKeyAndUnlock(password: String?) async -> Bool {
+    /// Clears `isAuthenticating`. Gives up when `lock()` ran meanwhile.
+    private func loadKeyAndUnlock(password: String?, generation: Int) async -> Bool {
         let provider = keyProvider
         let fingerprintProvider = fingerprintKeyProvider
+        let hasEntries = store.hasEntries
         let loaded: Result<(SymmetricKey, SymmetricKey?), Error> = await Task.detached(priority: .userInitiated) {
             Result {
                 let key: SymmetricKey
-                if let data = try provider.readKeyData(), VaultKeyWrapper.isWrapped(data) {
+                let data = try provider.readKeyData()
+                if let data, VaultKeyWrapper.isWrapped(data) {
                     guard let password else { throw KeyLoadFailure.needsPassword }
                     key = try VaultKeyWrapper.unwrap(data, password: password)
                 } else {
@@ -182,12 +197,18 @@ final class VaultManager: ObservableObject {
                     // password path skips Touch ID, so it must never open it,
                     // whatever the settings say.
                     guard password == nil else { throw KeyLoadFailure.needsTouchID }
-                    key = try provider.loadOrCreateKey()
+                    if let data {
+                        key = try VaultCrypto.key(from: data)
+                    } else {
+                        guard !hasEntries else { throw KeyLoadFailure.keyMissing }
+                        key = try provider.loadOrCreateKey()
+                    }
                 }
                 return (key, try? fingerprintProvider.loadOrCreateKey())
             }
         }.value
         isAuthenticating = false
+        guard generation == lockGeneration else { return false }
 
         switch loaded {
         case .success(let (loadedKey, loadedFingerprintKey)):
@@ -205,6 +226,10 @@ final class VaultManager: ObservableObject {
             startExpiryTimer()
             onUnlocked?(entries)
             return true
+        case .failure(KeyLoadFailure.keyMissing):
+            ErrorLogger.shared.log("The vault key is missing while entries exist", category: "Vault")
+            statusMessage = "The key of your saved passwords is missing from the Keychain, so they can't be opened. Delete All Passwords in Settings starts over."
+            return false
         case .failure(KeyLoadFailure.needsTouchID):
             settingsManager?.vaultUsesPassword = false
             statusMessage = "Passwords has no password: unlock it with Touch ID."
@@ -270,6 +295,7 @@ final class VaultManager: ObservableObject {
 
     /// Drops the key and the decrypted entries.
     func lock() {
+        lockGeneration += 1
         expiryTimer?.invalidate()
         expiryTimer = nil
         key = nil
