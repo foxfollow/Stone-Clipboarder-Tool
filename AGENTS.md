@@ -45,7 +45,8 @@ global hotkeys and CGEvent posts the paste keystrokes.
 8. **Passwords stay sealed.** Vault content (`VaultPayload`) never becomes a
    `CBItem`, never goes through CBViewModel, pins, Quick Look, OCR,
    categories, the log or any file except its sealed `Vault/<uuid>.sctv`
-   and the pasteboard temp file of a pasted file entry (`Vault/fingerprints`
+   the pasteboard temp file of a pasted file entry and the `Secret_` Quick
+   Look copy that lives only while its preview is open (`Vault/fingerprints`
    holds only keyed HMACs). The vault is not
    SwiftData on purpose: `ModelContainerFactory` deletes a store it can't
    open. Its key lives only in the Keychain (`KeychainVaultKeyProvider`),

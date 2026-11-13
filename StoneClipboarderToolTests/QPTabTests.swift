@@ -122,3 +122,36 @@ final class QPTabOrderTests: XCTestCase {
         XCTAssertEqual(SettingsManager(defaults: isolated.defaults).quickPickerTabOrder, ["passwords", "all"])
     }
 }
+
+@MainActor
+final class QPQuickLookSecretFileTests: XCTestCase {
+
+    func testWhatQuickLookGetsForAnEntry() throws {
+        let text = try XCTUnwrap(QPQuickLookCoordinator.secretFile(
+            for: QPPreviewContent(entry: VaultPayload(itemType: .text, title: "Bank", content: "pw"))))
+        XCTAssertEqual(text.1, "Bank.txt")
+        XCTAssertEqual(text.0, Data("pw".utf8))
+
+        let untitled = try XCTUnwrap(QPQuickLookCoordinator.secretFile(
+            for: QPPreviewContent(entry: VaultPayload(itemType: .text, content: "pw"))))
+        XCTAssertEqual(untitled.1, "Password.txt")
+
+        let file = try XCTUnwrap(QPQuickLookCoordinator.secretFile(
+            for: QPPreviewContent(entry: VaultPayload(itemType: .file, fileData: Data([1]), fileName: "id_rsa")))
+        )
+        XCTAssertEqual(file.1, "id_rsa")
+
+        // Text + image without an image falls back to the text.
+        let combined = try XCTUnwrap(QPQuickLookCoordinator.secretFile(
+            for: QPPreviewContent(entry: VaultPayload(itemType: .combined, content: "note"))))
+        XCTAssertEqual(combined.1, "Password.txt")
+
+        XCTAssertNil(QPQuickLookCoordinator.secretFile(for: QPPreviewContent(entry: VaultPayload(itemType: .image))))
+    }
+
+    func testATitleCannotLeaveTheFolder() throws {
+        let escaped = try XCTUnwrap(QPQuickLookCoordinator.secretFile(
+            for: QPPreviewContent(entry: VaultPayload(itemType: .text, title: "../../x", content: "pw"))))
+        XCTAssertEqual(escaped.1, "x.txt")
+    }
+}

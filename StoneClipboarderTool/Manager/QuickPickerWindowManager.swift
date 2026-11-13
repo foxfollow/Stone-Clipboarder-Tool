@@ -218,7 +218,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
                 toggle: { [weak self] entry, expanded in self?.toggleVaultPreview(for: entry, expanded: expanded) },
                 update: { [weak self] entry in self?.updateVaultPreview(for: entry) },
                 hide: { [weak self] in self?.hideVaultPreview() },
-                isVisible: { [weak self] in self?.customPreviewManager.isPreviewVisible ?? false }
+                isVisible: { [weak self] in self?.isVaultPreviewVisible ?? false }
             )
         )
 
@@ -376,43 +376,69 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     // MARK: - Passwords preview
 
-    /// The Passwords tab always uses the custom panel, whatever the Quick
-    /// Look setting: Quick Look needs a file, and a decrypted entry must not
-    /// be written to disk. `expanded` (⌥Space) opens it, or switches size
-    /// when it is open.
+    /// Space / → on the Passwords tab follow the Quick Look setting like the
+    /// other tabs. Apple Quick Look needs a file, so the entry is decrypted
+    /// into an owner-only folder that goes as soon as the preview closes;
+    /// the custom panel shows it from memory. `expanded` (⌥Space) opens it
+    /// large, or switches size when it is open.
     private func toggleVaultPreview(for entry: VaultPayload, expanded: Bool) {
-        hidePreviewPanelIfQuickLook()
-        if customPreviewManager.isPreviewVisible {
+        if isVaultPreviewVisible {
             if expanded {
-                customPreviewManager.toggleExpanded()
+                if quickLookCoordinator.isPreviewVisible {
+                    quickLookCoordinator.toggleFullScreen()
+                } else {
+                    customPreviewManager.toggleExpanded()
+                }
             } else {
                 hideVaultPreview()
             }
             return
         }
-        let triggerKey = settingsManager?.quickLookTriggerKey ?? .space
-        customPreviewManager.triggerKeyHint = triggerKey == .space ? "⎵ to close" : "→ to close"
-        customPreviewManager.allowsExpanding = true
-        customPreviewManager.showPreview(content: QPPreviewContent(entry: entry), relativeTo: window, expanded: expanded)
+        showVaultPreview(for: entry, expanded: expanded)
+    }
+
+    private var isVaultPreviewVisible: Bool {
+        quickLookCoordinator.isPreviewVisible || customPreviewManager.isPreviewVisible
+    }
+
+    private func showVaultPreview(for entry: VaultPayload, expanded: Bool) {
+        let content = QPPreviewContent(entry: entry)
+        let configuredMode = settingsManager?.quickLookMode ?? .native
+        let mode: QuickLookMode =
+            configuredMode == .native && Self.isInOtherAppFullscreenSpace() ? .custom : configuredMode
+        switch mode {
+        case .native:
+            customPreviewManager.hidePreview()
+            guard quickLookCoordinator.prepareSecret(content) else { return }
+            quickLookCoordinator.showPreview()
+            if expanded {
+                DispatchQueue.main.async { [weak self] in self?.quickLookCoordinator.toggleFullScreen() }
+            }
+        case .custom:
+            let triggerKey = settingsManager?.quickLookTriggerKey ?? .space
+            customPreviewManager.triggerKeyHint = triggerKey == .space ? "⎵ to close" : "→ to close"
+            customPreviewManager.allowsExpanding = true
+            customPreviewManager.showPreview(content: content, relativeTo: window, expanded: expanded)
+        case .disabled:
+            return
+        }
         reclaimKeyFocus()
     }
 
     private func updateVaultPreview(for entry: VaultPayload) {
-        guard customPreviewManager.isPreviewVisible else { return }
-        customPreviewManager.showPreview(content: QPPreviewContent(entry: entry), relativeTo: window)
+        if quickLookCoordinator.isPreviewVisible {
+            guard quickLookCoordinator.prepareSecret(QPPreviewContent(entry: entry)) else { return }
+            quickLookCoordinator.showPreview()
+            reclaimKeyFocus()
+        } else if customPreviewManager.isPreviewVisible {
+            customPreviewManager.showPreview(content: QPPreviewContent(entry: entry), relativeTo: window)
+        }
     }
 
     private func hideVaultPreview() {
         hidePreviewPanel()
         customPreviewManager.allowsExpanding = false
         reclaimKeyFocus()
-    }
-
-    /// A history item's Quick Look panel left open when switching to Passwords.
-    private func hidePreviewPanelIfQuickLook() {
-        if quickLookCoordinator.isPreviewVisible {
-            quickLookCoordinator.hidePreview()
-        }
     }
 
     /// After the Touch ID prompt the picker is no longer key, and the app
@@ -482,6 +508,8 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     func hidePreviewPanel() {
         quickLookCoordinator.hidePreview()
+        // A decrypted Passwords entry never outlives its preview.
+        quickLookCoordinator.removeSecretFiles()
         customPreviewManager.hidePreview()
     }
 

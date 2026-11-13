@@ -111,10 +111,12 @@ all pins.
 - [ ] Text rows are masked; the eye (or ⌥R) reveals a row, moving the
       cursor hides it again. Images stay hidden until revealed. The ⌥E
       editor has the eye too.
-- [ ] Space / → opens the preview panel beside the picker (whatever the
-      Quick Look setting); ↑/↓ follow; ⌥Space or its button makes it 85 %
-      of the screen and back; Esc, locking or leaving the tab closes it. No
-      file appears in `$TMPDIR` or `Previews/`.
+- [ ] Space / → previews the entry the way Settings → Quick Picker says:
+      Apple Quick Look (⌥Space: full screen), the custom panel (⌥Space or
+      its button: 85 % of the screen) or nothing when disabled. ↑/↓ follow;
+      Esc, locking, leaving the tab or closing the picker closes it. With
+      Apple Quick Look, `Previews/Secret_…` exists only while the preview is
+      open; the custom panel writes nothing.
 - [ ] Copying a saved password again (another app, a site), with the tab
       locked or not: it doesn't appear in the history. After an unlock, old
       history copies of saved entries are gone.
