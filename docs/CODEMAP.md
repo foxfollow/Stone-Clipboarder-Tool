@@ -51,8 +51,8 @@ item or pins, and the `ScreenshotTour` when asked (docs/DEMO_MODE.md).
 | PinWindowController | One floating `PinPanel`: lock, click-through (⌘-hold), opacity, collapse, edge snap; debounced saves of its config | PinManager, PasteboardFileStore, ExternalOpener |
 | MenuBarManager | NSStatusItem and the popover hosting MenuBarView; icon follows pause state | CBViewModel, SettingsManager, ClipboardManager |
 | SettingsManager | Every user setting (`@Published` + `didSet` → injected UserDefaults); visibility invariant; migrations; login item | — |
-| VaultManager | The Passwords vault: lock state, decrypted entries (`VaultPayload`), add with dedupe / rename / move / delete / delete all, sliding unlock window (`VaultLockPolicy`, `vaultRelockMinutes`), locks on screen lock, screen saver, sleep, display sleep, session switch; paste through `ClipboardManager.copySecret` | VaultStore, VaultKeyProvider, VaultAuthenticator, ClipboardManager, SettingsManager |
-| VaultKeyProvider | `KeychainVaultKeyProvider`: the 256-bit key as a generic password (service `d3f0ld.StoneClipboarderTool.vault`) in the login keychain; `InMemoryVaultKeyProvider` for tests and demo | Security |
+| VaultManager | The Passwords vault: lock state, decrypted entries (`VaultPayload`), add with dedupe / rename / move / delete / delete all, sliding unlock window (`VaultLockPolicy`, `vaultRelockMinutes`), locks on screen lock, screen saver, sleep, display sleep, session switch; paste through `ClipboardManager.copySecret`; Touch ID or the Passwords password (`unlock(password:)`, `setPassword`, `removePassword`); fingerprints for `isStoredSecret` (CBViewModel skips such captures) and `onUnlocked` (history copies of entries are deleted) | VaultStore, VaultKeyProvider, VaultAuthenticator, ClipboardManager, SettingsManager |
+| VaultKeyProvider | One blob per Keychain item (read / write / delete): the vault key, raw or wrapped (account `vault-key`), and the fingerprint key (account `vault-fingerprint-key`), service `d3f0ld.StoneClipboarderTool.vault`, login keychain; `InMemoryVaultKeyProvider` for tests and demo | Security |
 | VaultAuthenticator | `LocalAuthenticationAuthenticator`: Touch ID with password fallback before the key is read | LocalAuthentication |
 | ErrorLogger | The only singleton: unified log, optional plaintext file with 5 MB rotation | — |
 
@@ -69,7 +69,7 @@ item or pins, and the `ScreenshotTour` when asked (docs/DEMO_MODE.md).
 | HotkeyShortcut | Parses and formats shortcut strings; the key table; reserved system shortcuts; Carbon modifier mask |
 | PinnedItemConfig | `@Model` pin: content snapshot plus layout and flags, settings container; `contentKey` |
 | ExcludedApp | `@Model` bundle id whose copies are ignored, settings container |
-| Vault/ | `VaultPayload` (one entry: type, title, content, image, file; dedupe, search, order), `VaultCrypto` ("SCTV" + version + AES-GCM, header and entry id authenticated), `VaultStore` (`<root>/<uuid>.sctv`, owner-only, atomic writes; a file that won't open is counted and kept), `VaultLockPolicy` (sliding unlock window) |
+| Vault/ | `VaultPayload` (one entry: type, title, content, image, file; dedupe, search, order), `VaultCrypto` ("SCTV" + version + AES-GCM, header and entry id authenticated), `VaultStore` (`<root>/<uuid>.sctv`, owner-only, atomic writes; a file that won't open is counted and kept), `VaultLockPolicy` (sliding unlock window), `VaultFingerprint` (HMAC of an entry's content under its own Keychain key: recognizes a copy of a saved entry while locked), `VaultKeyWrapper` (the vault key wrapped with the optional Passwords password: PBKDF2-HMAC-SHA256 600 000 rounds + AES-GCM), `VaultPasswordRules` |
 | Types/ | Persisted enums (`CBItemType`, `ClipboardCaptureMode`, `QuickLookMode`, `QuickLookTriggerKey`, `TimeUnit`) and `ClipboardContent`, the ClipboardManager → CBViewModel handoff |
 
 ### ViewModel/CBViewModel.swift
@@ -103,6 +103,7 @@ user's OCR result (⌥⏎, Extract Text) on the image.
 | ScreenshotTour | `--screenshots`: shows each screen in dark and light and waits for `scripts/screenshots.sh` to capture it |
 | AppIconCache | App icons by bundle id for source-app badges |
 | AppNotifications | Every `Notification.Name` the app posts |
+| SettingsSearchIndex | Every setting the Settings search finds (page, heading, keywords, the `.settingsAnchor` id of its row), plus each hotkey action and category; `search` ranks title matches first |
 | ExternalOpener | Temp file + open in Preview / TextEdit / the default app |
 | MainWindow | Find and bring forward the "Clipboard History" window |
 | PasteSimulator | ⌘V after a delay, or the Accessibility alert |
@@ -116,9 +117,9 @@ user's OCR result (⌥⏎, Extract Text) on the image.
 | ContentView | Main window: Recent / Favorites, whole-history search, `DetailedCardView` rows, `ClipboardHeader` |
 | ZoomView/, Small/ActionsBottomButtonView | Detail pane: text/image/file preview, zoom, copy, edit, open, OCR, delete |
 | Menu/ | MenuBarView (popover list of `SwipeableRow`s), MenuBarItemView, PauseTimerView |
-| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order, ⌥K Move to Passwords; renders from a snapshot), QPVaultPane + QPVaultRow (the Passwords tab: lock screen, masked rows, reveal), QPVaultEditorView + QPVaultEditorModel (⌥E on an entry: rename, ⌥↑/⌥↓, ⌥⌫ delete), QPCategoryBar + `QPCategoryChip.chips` (category chips of the active tab), QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel, also used over full-screen apps) |
+| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order, ⌥K Move to Passwords; renders from a snapshot), QPVaultPane + QPVaultRow (the Passwords tab: lock screen, masked rows, the eye), QPVaultEditorView + QPVaultEditorModel (⌥E on an entry: rename, ⌥↑/⌥↓, ⌥⌫ delete, ⌥R the eye), `QPTab` (raw values stored in `quickPickerTabOrder`, `ordered(_:)`), QPCategoryBar + `QPCategoryChip.chips` (category chips of the active tab), QPQuickLookCoordinator (native Quick Look through temp files), QPCustomPreviewPanel (own panel from a `QPPreviewContent` snapshot, also used over full-screen apps and always for Passwords entries, never written to disk; ⌥Space makes it 85 % of the screen) |
 | Pins/ | PinContentView, PinChromeView (+ PinDragArea to move the pin), PinImageView; all render from `PinViewState` |
-| Settings/ | Sidebar + General, Hotkeys, Quick Picker (with PasswordsSettingsSection), Categories (CategoriesSettingsView, CategorySettingsRow, CategoryEditorView sheet, CategoryIconPicker), Pins, Excluded Apps (`@Query` is fine here), Accessibility, About. AppPickerView is shared by Excluded Apps and app groups |
+| Settings/ | `SettingsGroup` headings with `SettingsSection` pages: General (General, Hotkeys, Accessibility), Quick Picker (Quick Picker with QuickPickerTabOrderSection, Categories, Pins), Security (Passwords: PasswordsSettingsView + VaultPasswordSheet, Excluded Apps), About. The sidebar's search field lists `SettingsSearchResults`; a pick scrolls the page (SettingsDetailContainer) to the row's `.settingsAnchor` and highlights it. Pages: Categories (CategoriesSettingsView, CategorySettingsRow, CategoryEditorView sheet, CategoryIconPicker), Pins, Excluded Apps (`@Query` is fine here), Accessibility, About. AppPickerView is shared by Excluded Apps and app groups |
 | Components/, Small/, Cells/ | Shared pieces: search bar, swipeable row, alerts, buttons, list cell, CategoryIconView, CategoryChipView |
 
 ## Cross-cutting
@@ -145,7 +146,7 @@ app's container for sandboxed Debug builds).
 | --- | --- |
 | Clipboard history | `ClipboardHistory.store`, blobs in `.ClipboardHistory_SUPPORT/` |
 | Hotkeys, excluded apps, pins | `Settings.store` |
-| Passwords | `Vault/<uuid>.sctv`, sealed; the key in the login keychain (service `d3f0ld.StoneClipboarderTool.vault`) |
+| Passwords | `Vault/<uuid>.sctv`, sealed; `Vault/fingerprints` (one HMAC per entry); the keys in the login keychain (service `d3f0ld.StoneClipboarderTool.vault`, accounts `vault-key`, raw or password-wrapped, and `vault-fingerprint-key`) |
 | Settings | UserDefaults through SettingsManager; keys are the property names. `enableErrorFileLogging` is also read by ErrorLogger; `itemCategories` is a JSON array of `ItemCategory` (fields a newer version wrote are written back unless edited here) |
 | Error log | `StoneClipboarder_errors.log` (+ `.old.log`) |
 
@@ -178,7 +179,7 @@ app's container for sandboxed Debug builds).
 | ⌘Q down / up (local) | AppDelegate | app lifetime / while ⌘Q is held |
 | Esc cancels type-out (global + local) | TypePaster | while typing |
 | Click outside, Esc (global); key re-routing (local) | QuickPickerWindowManager | while the picker is open |
-| Tab, ⇧Tab, ⌥P, ⌥⏎, ⌥E, ⌥L (Passwords tab), ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editors ⏎, Esc, ⌥F, ⌥K, ⌥↑/⌥↓, ⌥⌫ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
+| Tab, ⇧Tab, ⌘1…⌘9 (tabs), ⌥P, ⌥⏎, ⌥E, ⌥L and ⌥R (unlocked Passwords tab; ⌥ letters pass through while its password is typed), ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editors ⏎, Esc, ⌥F, ⌥K, ⌥R, ⌥↑/⌥↓, ⌥⌫ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
 | Screen lock, screen saver (distributed); sleep, display sleep, session switch (workspace) | VaultManager | app lifetime |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
 | ⌘C / ⌘W in a pin (local) | PinContentView `CommandKeyHandler` | while the pin is in a window |
@@ -189,8 +190,13 @@ app's container for sandboxed Debug builds).
 ## Where to change…
 
 - **A setting.** Property in SettingsManager (default read in `init`) →
-  control in the matching Settings view → the code that uses it, reading
-  SettingsManager. Test it with `IsolatedDefaults`.
+  control in the matching Settings view, with `.settingsAnchor("page.name")`
+  → an entry with that anchor in `SettingsSearchIndex` (title, heading,
+  keywords) → the code that uses it, reading SettingsManager. Test it with
+  `IsolatedDefaults`.
+- **A Settings page.** `SettingsSection` case (group, title, subtitle,
+  symbol; cases are in sidebar order) → `SettingsDetail` → its entries in
+  `SettingsSearchIndex`.
 - **A clipboard item type.** `CBItemType` case (symbol, color) →
   `ClipboardManager` capture and `copyItemToClipboard` → CBItem
   (`hasSameContent`, `ContentKey`, `matchesSearch`, `displayContent`,
@@ -206,7 +212,7 @@ app's container for sandboxed Debug builds).
   Passwords section and `TabKeyInterceptor`. Test with
   `InMemoryVaultKeyProvider`, a stub `VaultAuthenticator` and a scratch
   `VaultStore(root:)`.
-- **A Quick Picker tab.** `QPTab` case (`itemTypes`, title, count) →
+- **A Quick Picker tab.** `QPTab` case (new raw value, `itemTypes`, title, count; stored orders get it at the end) →
   `QuickPickerView.reloadForActiveTab` → a CBViewModel query if the tab
   needs one.
 - **A built-in category.** `ItemCategory.BuiltIn` case and an entry in

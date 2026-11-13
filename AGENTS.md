@@ -45,9 +45,12 @@ global hotkeys and CGEvent posts the paste keystrokes.
 8. **Passwords stay sealed.** Vault content (`VaultPayload`) never becomes a
    `CBItem`, never goes through CBViewModel, pins, Quick Look, OCR,
    categories, the log or any file except its sealed `Vault/<uuid>.sctv`
-   and the pasteboard temp file of a pasted file entry. The vault is not
+   and the pasteboard temp file of a pasted file entry (`Vault/fingerprints`
+   holds only keyed HMACs). The vault is not
    SwiftData on purpose: `ModelContainerFactory` deletes a store it can't
-   open. Its key lives only in the Keychain (`KeychainVaultKeyProvider`);
+   open. Its key lives only in the Keychain (`KeychainVaultKeyProvider`),
+   wrapped when the user sets a Passwords password; nothing can recover a
+   forgotten one, so never add a "reset" that claims to;
    tests and demo mode use `InMemoryVaultKeyProvider` and a scratch folder.
 9. **Pins render from snapshots.** Never read `PinnedItemConfig`'s
    external-storage fields in a SwiftUI body; `PinViewState` copies them
@@ -128,7 +131,8 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   `deinit` can release them.
 - **Settings.** Add `@Published var foo: T { didSet { defaults.set(…) } }` to
   `SettingsManager` and read the default in `init`, always through the
-  injected `defaults`. No `@AppStorage` for app settings: the managers
+  injected `defaults`. Every control in Settings gets `.settingsAnchor(…)`
+  and an entry in `SettingsSearchIndex`, so the Settings search finds it. No `@AppStorage` for app settings: the managers
   observe `SettingsManager` and wouldn't see the change.
 - **Persisted enums** (`Model/Types/`) have raw `String` values and a
   `displayName`. Never rename or reorder a shipped raw value.

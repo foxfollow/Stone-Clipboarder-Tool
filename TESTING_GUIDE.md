@@ -71,7 +71,13 @@ all pins.
 - [ ] ↑/↓ select, ⏎ pastes into the previous app, Esc closes, clicking
       outside closes.
 - [ ] Tab / ⇧Tab cycle All, Favs, Text, Images, Files, Passwords; counts
-      are right (Passwords shows no count while locked).
+      are right (Passwords shows no count while locked). No pill is cut
+      off; with six tabs they get tighter and an inactive Passwords pill
+      shows only its lock.
+- [ ] ⌘1…⌘6 jump to the tabs (also on a Ukrainian layout); tooltips name
+      the shortcut. Settings → Quick Picker → Tabs: moving a tab changes the
+      pills, ⌘ numbers, Tab cycling and the tab the picker opens on; Reset
+      Order restores it.
 - [ ] Scrolling All keeps loading past 150 items.
 - [ ] Search finds old items; switching tabs keeps the search.
 - [ ] ⇧↑/⇧↓ multi-select: ⏎ pastes texts joined by newlines (and doesn't
@@ -102,8 +108,23 @@ all pins.
       and shows on the Passwords tab with the typed title.
 - [ ] Moving the same content again adds no second entry; the history copy
       still goes.
-- [ ] Text rows are masked; Space / → reveals the selected row, moving the
-      cursor hides it again. Images stay hidden until revealed.
+- [ ] Text rows are masked; the eye (or ⌥R) reveals a row, moving the
+      cursor hides it again. Images stay hidden until revealed. The ⌥E
+      editor has the eye too.
+- [ ] Space / → opens the preview panel beside the picker (whatever the
+      Quick Look setting); ↑/↓ follow; ⌥Space or its button makes it 85 %
+      of the screen and back; Esc, locking or leaving the tab closes it. No
+      file appears in `$TMPDIR` or `Previews/`.
+- [ ] Copying a saved password again (another app, a site), with the tab
+      locked or not: it doesn't appear in the history. After an unlock, old
+      history copies of saved entries are gone.
+- [ ] Settings → Security → Passwords → Require a Password: Save stays off
+      until the passwords match, are 6+ characters, the hint doesn't contain
+      it and the warning is confirmed. Then the locked tab's search field
+      asks for the password (spaces and ⌥ letters type into it), shows the
+      hint, Touch ID isn't offered; a wrong password says so. Change and
+      Remove ask to unlock first; Remove brings Touch ID back. Delete All
+      clears it.
 - [ ] ⏎ pastes text, an image, a file and text + image; nothing of it shows
       up in the history. After 30 s the clipboard is empty, unless something
       else was copied in the meantime.
@@ -122,6 +143,15 @@ all pins.
 - [ ] Keychain Access shows the item `d3f0ld.StoneClipboarderTool.vault`;
       `Application Support/StoneClipboarderTool/Vault/*.sctv` files contain
       no readable text.
+
+## Settings
+
+- [ ] The sidebar shows General, Quick Picker, Security and About headings
+      with their pages; Passwords and Excluded Apps sit under Security.
+- [ ] The search field filters to settings: "shadow", "touch id", "dock",
+      "regex", "security", a hotkey name, a category name. ⏎ opens the first
+      result. A pick opens the page, scrolls to the row and highlights it;
+      a row behind an off toggle brings the toggle into view.
 
 ## Categories (Quick Picker chips, Settings → Categories)
 
