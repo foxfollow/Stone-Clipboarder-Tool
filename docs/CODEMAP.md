@@ -65,7 +65,7 @@ item or pins, and the `ScreenshotTour` when asked (docs/DEMO_MODE.md).
 | ImageClassifier | Vision on a downscaled (2048 px) image, two independent parts: the visual pass (QR codes and barcodes with payloads, faces, transparency) and OCR. `CBItem.classify(with:image:)` stores the text and runs it through ContentClassifier. Synchronous, off the main thread only |
 | ItemCategory | A chip: built-in (stable ids `link` … `language`, image ones `ocr`, `barcode`, `face`, `transparent`), regex rule or app group, with match mode, SF Symbol or emoji, color. `builtIns`, `merged(stored:)`, `matches(_:)`, `count(in:)`. JSON in UserDefaults, not a `@Model` |
 | ItemFilter | `QPSearchQuery` (is:/app:/lang: tokens + free text, which keeps its spacing), `CategorySelection` and `ChipSelection` (the chips that are on, cursor and anchor for ⌥⇧←/→ and ⇧-click), `ItemFilter.matches`, `FacetCounts` (per-key / language / app counts) |
-| HotkeyConfig | `@Model` per `HotkeyAction` (23 actions and their default shortcuts), settings container |
+| HotkeyConfig | `@Model` per `HotkeyAction` (24 actions and their default shortcuts; Lock Passwords ⌃⌥L), settings container |
 | HotkeyShortcut | Parses and formats shortcut strings; the key table; reserved system shortcuts; Carbon modifier mask |
 | PinnedItemConfig | `@Model` pin: content snapshot plus layout and flags, settings container; `contentKey` |
 | ExcludedApp | `@Model` bundle id whose copies are ignored, settings container |

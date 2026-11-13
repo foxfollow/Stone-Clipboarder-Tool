@@ -51,6 +51,14 @@ struct HotkeySettingsView: View {
                 }
             }
 
+            Section("Passwords") {
+                if let lockConfig = hotkeyManager.hotkeyConfigs.first(where: {
+                    $0.hotkeyAction == .lockPasswords
+                }) {
+                    HotkeyConfigRow(config: lockConfig, currentlyRecordingID: $currentlyRecordingID)
+                }
+            }
+
             Section("Pins") {
                 if let pinConfig = hotkeyManager.hotkeyConfigs.first(where: {
                     $0.hotkeyAction == .togglePinLastItem

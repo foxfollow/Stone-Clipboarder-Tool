@@ -36,6 +36,9 @@ enum HotkeyAction: String, Codable, CaseIterable {
     case togglePinLastItem = "toggle_pin_last_item"
     case dismissAllPins = "dismiss_all_pins"
 
+    /// Locks the Passwords vault from anywhere (1.11.0).
+    case lockPasswords = "lock_passwords"
+
     var displayName: String {
         switch self {
         case .last1: return "Last Item 1"
@@ -61,6 +64,7 @@ enum HotkeyAction: String, Codable, CaseIterable {
         case .mainPanel: return "Quick Picker"
         case .togglePinLastItem: return "Pin Most Recent Item"
         case .dismissAllPins: return "Dismiss All Pins"
+        case .lockPasswords: return "Lock Passwords"
         }
     }
 
@@ -89,6 +93,7 @@ enum HotkeyAction: String, Codable, CaseIterable {
         case .mainPanel: return "⌃⌥Space"
         case .togglePinLastItem: return "⌃⌥P"
         case .dismissAllPins: return "⌃⌥⇧P"
+        case .lockPasswords: return "⌃⌥L"
         }
     }
 
@@ -122,7 +127,7 @@ enum HotkeyAction: String, Codable, CaseIterable {
         case .last8, .fav8: return 7
         case .last9, .fav9: return 8
         case .last0, .fav0: return 9
-        case .mainPanel, .togglePinLastItem, .dismissAllPins: return -1
+        case .mainPanel, .togglePinLastItem, .dismissAllPins, .lockPasswords: return -1
         }
     }
 }

@@ -182,6 +182,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         vaultManager.settingsManager = settingsManager
         vaultManager.clipboardManager = cbViewModel.getClipboardManager()
         vaultManager.startObservingSystemLocks()
+        hotkeyManager.setVaultManager(vaultManager)
         // A password copied again stays out of the history, locked or not.
         cbViewModel.isStoredSecret = { [weak vaultManager] capture in
             vaultManager?.isStoredSecret(capture) ?? false

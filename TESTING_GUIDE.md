@@ -134,6 +134,10 @@ all pins.
       up in the history. After 30 s the clipboard is empty, unless something
       else was copied in the meantime.
 - [ ] ⌘⇧⏎ types a password into a field that blocks paste.
+- [ ] The lock button next to the search field and "⌥L Lock" in the footer
+      lock the tab. ⌃⌥L locks it from any app with the picker closed; it
+      can be changed or turned off in Settings → Hotkeys → Passwords, and
+      an existing install gets the new row.
 - [ ] Searching on another tab (vault unlocked) shows "N in Passwords: …"
       for matching titles or file names, never for the secret itself; a
       click or its ⌘ number opens Passwords with the same search. Locked:

@@ -67,7 +67,11 @@ enum SettingsSearchIndex {
     private static func hotkeyGroup(for action: HotkeyAction) -> String {
         if action.isLastAction { return "Last Items Hotkeys" }
         if action.isFavoriteAction { return "Favorite Items Hotkeys" }
-        return action == .mainPanel ? "Quick Picker" : "Pins"
+        switch action {
+        case .mainPanel: return "Quick Picker"
+        case .lockPasswords: return "Passwords"
+        default: return "Pins"
+        }
     }
 
     private static func categoryGroup(for category: ItemCategory) -> String {

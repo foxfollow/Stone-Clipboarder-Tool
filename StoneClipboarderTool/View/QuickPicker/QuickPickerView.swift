@@ -684,6 +684,9 @@ struct QuickPickerView: View {
                 }
                 .buttonStyle(.plain)
             }
+            if isPasswordsTab && vaultManager.isUnlocked {
+                vaultLockButton(compact: true)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -851,7 +854,7 @@ struct QuickPickerView: View {
                 }
                 shortcutBadge(triggerKey == .space ? "⎵" : "→", label: "Preview")
                 shortcutBadge("⌥R", label: "Show")
-                shortcutBadge("⌥L", label: "Lock")
+                vaultLockButton(compact: false)
             } else {
                 shortcutBadge("⏎", label: "Unlock")
             }
@@ -1550,6 +1553,43 @@ struct QuickPickerView: View {
     }
 
     // MARK: - Passwords tab
+
+    /// Locks the vault now (also ⌥L here, and the global Lock Passwords
+    /// hotkey, ⌃⌥L by default).
+    private func vaultLockButton(compact: Bool) -> some View {
+        Button {
+            vaultManager.lock()
+        } label: {
+            if compact {
+                Image(systemName: "lock.fill")
+                    .foregroundColor(.accentColor)
+            } else {
+                HStack(spacing: 3) {
+                    Text("⌥L")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.accentColor.opacity(0.15))
+                        )
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9))
+                    Text("Lock")
+                        .font(.system(size: 9, weight: .medium))
+                }
+                .foregroundStyle(Color.accentColor)
+                .contentShape(Rectangle())
+            }
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .help(lockHelp)
+    }
+
+    private var lockHelp: String {
+        "Lock Passwords (⌥L here; the Lock Passwords hotkey in Settings → Hotkeys, ⌃⌥L by default, works anywhere)"
+    }
 
     /// Searching another tab: Passwords entries whose label or file name
     /// matches (unlocked only: the labels are sealed too). nil = none.
