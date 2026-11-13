@@ -70,7 +70,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "Behavior, capture, and history retention."
         case .hotkeys: return "Global shortcuts for items, favorites, and the Quick Picker."
-        case .quickPicker: return "Quick Look preview and type-out paste in the Quick Picker."
+        case .quickPicker: return "Tab order, Quick Look preview and type-out paste in the Quick Picker."
         case .categories: return "Group items by what they contain, their language or the app they came from."
         case .pins: return "Floating clipboard windows that stay on top of every Space."
         case .passwords: return "Encrypted passwords in the Quick Picker: unlocking, auto-lock and an optional password."

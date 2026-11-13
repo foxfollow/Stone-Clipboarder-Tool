@@ -175,6 +175,9 @@ enum SettingsSearchIndex {
     ]
 
     private static let quickPicker: [SettingsSearchEntry] = [
+        entry("quickPicker.tabOrder", "Tab order", .quickPicker, "Tabs",
+              keywords: ["reorder tabs", "⌘1", "command 1", "cmd number", "switch tabs", "first tab",
+                         "passwords", "favorites", "text", "images", "files"]),
         entry("quickPicker.previewMode", "Preview mode", .quickPicker, "Quick Look",
               keywords: ["quick look", "preview", "custom", "native"]),
         entry("quickPicker.triggerKey", "Preview trigger key", .quickPicker, "Quick Look",

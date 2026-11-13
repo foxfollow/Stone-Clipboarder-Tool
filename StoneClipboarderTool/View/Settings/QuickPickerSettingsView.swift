@@ -8,6 +8,7 @@ import SwiftUI
 struct QuickPickerSettingsView: View {
     var body: some View {
         Form {
+            QuickPickerTabOrderSection()
             QuickLookSection()
             TypeOutPasteSection()
         }

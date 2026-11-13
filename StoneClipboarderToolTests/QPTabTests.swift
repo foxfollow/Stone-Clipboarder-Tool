@@ -88,3 +88,37 @@ final class QPPreviewContentTests: XCTestCase {
         XCTAssertEqual(preview.title, "Greeting")
     }
 }
+
+final class QPTabOrderTests: XCTestCase {
+
+    func testDefaultOrder() {
+        XCTAssertEqual(QPTab.ordered([]), QPTab.allCases)
+    }
+
+    func testStoredOrderComesFirstAndMissingTabsFollow() {
+        XCTAssertEqual(
+            QPTab.ordered(["passwords", "text"]),
+            [.passwords, .text, .all, .favorites, .images, .files])
+    }
+
+    func testUnknownAndRepeatedIdsAreDropped() {
+        XCTAssertEqual(
+            QPTab.ordered(["files", "bogus", "files", "all"]),
+            [.files, .all, .favorites, .text, .images, .passwords])
+    }
+
+    func testRawValuesAreStable() {
+        // Stored in UserDefaults: renaming one would reset the user's order.
+        XCTAssertEqual(QPTab.allCases.map(\.rawValue), ["all", "favorites", "text", "images", "files", "passwords"])
+    }
+
+    @MainActor
+    func testOrderIsSaved() {
+        let isolated = IsolatedDefaults()
+        defer { isolated.remove() }
+        let settings = SettingsManager(defaults: isolated.defaults)
+        XCTAssertEqual(settings.quickPickerTabOrder, [])
+        settings.quickPickerTabOrder = ["passwords", "all"]
+        XCTAssertEqual(SettingsManager(defaults: isolated.defaults).quickPickerTabOrder, ["passwords", "all"])
+    }
+}

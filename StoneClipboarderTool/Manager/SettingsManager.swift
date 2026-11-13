@@ -334,6 +334,12 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(showRowBadges, forKey: "showRowBadges") }
     }
 
+    /// Quick Picker tab ids (`QPTab` raw values) in the order shown; tabs
+    /// not listed follow in the default order. Empty = default.
+    @Published var quickPickerTabOrder: [String] {
+        didSet { defaults.set(quickPickerTabOrder, forKey: "quickPickerTabOrder") }
+    }
+
     // MARK: - Passwords vault
 
     /// The Quick Picker shows the Passwords tab.
@@ -533,6 +539,7 @@ final class SettingsManager: ObservableObject {
         self.showImageTextInRows = defaults.object(forKey: "showImageTextInRows") as? Bool ?? true
         self.showRowBadges = defaults.object(forKey: "showRowBadges") as? Bool ?? true
         self.showPasswordsTab = defaults.object(forKey: "showPasswordsTab") as? Bool ?? true
+        self.quickPickerTabOrder = defaults.stringArray(forKey: "quickPickerTabOrder") ?? []
         self.vaultRelockMinutes = max(
             1, defaults.object(forKey: "vaultRelockMinutes") as? Int ?? VaultLockPolicy.defaultTimeoutMinutes)
         self.vaultClipboardClearSeconds = max(0, defaults.object(forKey: "vaultClipboardClearSeconds") as? Int ?? 30)

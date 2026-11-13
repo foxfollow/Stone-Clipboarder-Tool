@@ -10,7 +10,9 @@ import ApplicationServices
 import SwiftData
 import SwiftUI
 
-enum QPTab: Hashable, CaseIterable, Identifiable {
+/// A Quick Picker tab. Raw values are stored in
+/// `SettingsManager.quickPickerTabOrder`: never rename them.
+enum QPTab: String, Hashable, CaseIterable, Identifiable {
     case all
     case favorites
     case text
@@ -20,6 +22,31 @@ enum QPTab: Hashable, CaseIterable, Identifiable {
     case passwords
 
     var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .favorites: return "Favs"
+        case .text: return "Text"
+        case .images: return "Images"
+        case .files: return "Files"
+        case .passwords: return "Passwords"
+        }
+    }
+
+    /// The tabs in the user's order: stored ids first (unknown ones
+    /// dropped), then any tab the stored order doesn't name yet, in the
+    /// default order.
+    static func ordered(_ stored: [String]) -> [QPTab] {
+        var result: [QPTab] = []
+        for id in stored {
+            if let tab = QPTab(rawValue: id), !result.contains(tab) {
+                result.append(tab)
+            }
+        }
+        result += allCases.filter { !result.contains($0) }
+        return result
+    }
 
     /// The tab after this one among `tabs` (the ones shown), wrapping.
     func next(in tabs: [QPTab]) -> QPTab {
@@ -128,10 +155,11 @@ struct QuickPickerView: View {
         self.vaultManager = vaultManager ?? VaultManager.makeForApp()
     }
 
-    /// The tabs shown, in order; Passwords can be hidden in Settings.
+    /// The tabs shown, in the order set in Settings; Passwords can be hidden.
     private var visibleTabs: [QPTab] {
         let showPasswords = settingsManager?.showPasswordsTab ?? true
-        return QPTab.allCases.filter { $0 != .passwords || showPasswords }
+        return QPTab.ordered(settingsManager?.quickPickerTabOrder ?? [])
+            .filter { $0 != .passwords || showPasswords }
     }
 
     private var isPasswordsTab: Bool { activeTab == .passwords }
@@ -497,6 +525,10 @@ struct QuickPickerView: View {
         )
         .clipped()
         .onAppear {
+            // The picker opens on the first tab of the user's order.
+            if let first = visibleTabs.first, first != activeTab {
+                activeTab = first
+            }
             loadInitialItems()
             loadTabCounts()
             vaultManager.checkExpiry()
@@ -547,6 +579,15 @@ struct QuickPickerView: View {
             }
             tabInterceptor.onOptionR = {
                 toggleVaultReveal()
+            }
+            // ⌘1…⌘9: the tab at that place in the bar.
+            tabInterceptor.onCommandDigit = { number in
+                guard let tab = visibleTabs[safe: number - 1] else { return }
+                activeTab = tab
+                isSearchFocused = false
+                DispatchQueue.main.async {
+                    isSearchFocused = true
+                }
             }
             tabInterceptor.onOptionE = {
                 if isPasswordsTab {
@@ -723,7 +764,7 @@ struct QuickPickerView: View {
                         .foregroundStyle(isActive ? Color.white : Color.accentColor)
                 }
                 if showsTitle {
-                    Text(tabTitle(tab))
+                    Text(tab.title)
                         .font(.system(size: 11, weight: .medium))
                         .lineLimit(1)
                 }
@@ -755,18 +796,12 @@ struct QuickPickerView: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .help(tabTitle(tab))
+        .help(tabHelp(tab))
     }
 
-    private func tabTitle(_ tab: QPTab) -> String {
-        switch tab {
-        case .all: return "All"
-        case .favorites: return "Favs"
-        case .text: return "Text"
-        case .images: return "Images"
-        case .files: return "Files"
-        case .passwords: return "Passwords"
-        }
+    private func tabHelp(_ tab: QPTab) -> String {
+        guard let index = visibleTabs.firstIndex(of: tab), index < 9 else { return tab.title }
+        return "\(tab.title) (⌘\(index + 1))"
     }
 
     private func tabCount(_ tab: QPTab) -> Int {
@@ -1757,6 +1792,10 @@ final class TabKeyInterceptor: ObservableObject {
     var onOptionR: (() -> Void)?
     /// True while a password is typed: ⌥ letters reach the field.
     var passesOptionKeys: (() -> Bool)?
+    /// ⌘1…⌘9 with the number.
+    var onCommandDigit: ((Int) -> Void)?
+    /// Key codes of 1…9 on the main row (ANSI positions, any layout).
+    private static let digitKeyCodes: [UInt16: Int] = [18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9]
     var isPasswordsTab: (() -> Bool)?
 
     /// Set while the ⌥E editor is open. The picker's own shortcuts stand
@@ -1808,6 +1847,7 @@ final class TabKeyInterceptor: ObservableObject {
         onOptionR = nil
         isPasswordsTab = nil
         passesOptionKeys = nil
+        onCommandDigit = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
@@ -1815,6 +1855,15 @@ final class TabKeyInterceptor: ObservableObject {
 
         if let onEditorKey {
             return interceptForEditor(event, flags: flags, handler: onEditorKey)
+        }
+
+        // ⌘1…⌘9 (no other modifier) switch tabs, also while typing a password.
+        if let number = Self.digitKeyCodes[event.keyCode],
+           flags.intersection([.command, .option, .control, .shift]) == .command {
+            DispatchQueue.main.async { [weak self] in
+                self?.onCommandDigit?(number)
+            }
+            return nil
         }
 
         if passesOptionKeys?() == true, event.keyCode != Self.tabKeyCode {
