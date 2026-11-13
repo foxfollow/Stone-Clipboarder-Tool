@@ -17,6 +17,8 @@ struct QPVaultPane: View {
     let onUnlock: () -> Void
     let onPaste: () -> Void
     let onEdit: (VaultPayload) -> Void
+    /// The row's eye: show or hide its content.
+    var onToggleReveal: (VaultPayload) -> Void = { _ in }
 
     var body: some View {
         if vaultManager.isUnlocked {
@@ -94,7 +96,9 @@ struct QPVaultPane: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                        QPVaultRow(entry: entry, isSelected: index == selectedIndex, isRevealed: entry.id == revealedID)
+                        QPVaultRow(
+                            entry: entry, isSelected: index == selectedIndex, isRevealed: entry.id == revealedID,
+                            onToggleReveal: { onToggleReveal(entry) })
                             .id(entry.id)
                             .contentShape(Rectangle())
                             .onTapGesture {
@@ -105,6 +109,9 @@ struct QPVaultPane: View {
                                 Button("Paste") {
                                     selectedIndex = index
                                     onPaste()
+                                }
+                                Button(entry.id == revealedID ? "Hide  ⌥R" : "Show  ⌥R") {
+                                    onToggleReveal(entry)
                                 }
                                 Button("Rename, Reorder or Delete…  ⌥E") {
                                     selectedIndex = index

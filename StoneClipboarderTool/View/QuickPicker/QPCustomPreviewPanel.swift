@@ -7,12 +7,18 @@
 
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// Custom SwiftUI-based preview panel for clipboard items.
-/// Alternative to native QLPreviewPanel.
+/// Custom SwiftUI-based preview panel for clipboard items and Passwords
+/// entries. Alternative to native QLPreviewPanel; renders from memory, so
+/// nothing is written to disk (the Passwords tab relies on that).
 struct QPCustomPreviewPanel: View {
-    let item: CBItem
+    let item: QPPreviewContent
     var triggerKeyHint: String = "⎵ to close"
+    var size = QPCustomPreviewManager.compactSize
+    var isExpanded = false
+    /// Nil hides the expand button.
+    var onToggleExpanded: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,7 +26,7 @@ struct QPCustomPreviewPanel: View {
             Divider()
             previewContent
         }
-        .frame(width: 420, height: 400)
+        .frame(width: size.width, height: size.height)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
@@ -42,6 +48,14 @@ struct QPCustomPreviewPanel: View {
             Text(triggerKeyHint)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+            if let onToggleExpanded {
+                Button(action: onToggleExpanded) {
+                    Image(systemName: isExpanded
+                          ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                }
+                .buttonStyle(.borderless)
+                .help(isExpanded ? "Smaller (⌥⎵)" : "Larger (⌥⎵)")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -79,7 +93,7 @@ struct QPCustomPreviewPanel: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
         }
-        .frame(maxHeight: 350)
+        .frame(maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -149,7 +163,7 @@ struct QPCustomPreviewPanel: View {
             }
             .padding(12)
         }
-        .frame(maxHeight: 350)
+        .frame(maxHeight: .infinity)
     }
 
     private var iconForType: String {
@@ -162,7 +176,7 @@ struct QPCustomPreviewPanel: View {
     }
 
     private var titleForType: String {
-        if let title = item.displayTitle { return title }
+        if let title = item.title { return title }
         switch item.itemType {
         case .text: return "Text"
         case .image: return "Image"
@@ -172,24 +186,70 @@ struct QPCustomPreviewPanel: View {
     }
 }
 
+/// What the preview shows, copied from a history item or a Passwords
+/// entry so the panel never holds a model (or plaintext on disk).
+struct QPPreviewContent {
+    let itemType: CBItemType
+    let title: String?
+    let content: String?
+    let imageData: Data?
+    let fileData: Data?
+    let fileName: String?
+    let isImageFile: Bool
+
+    init(item: CBItem) {
+        itemType = item.itemType
+        title = item.displayTitle
+        content = item.content
+        imageData = item.imageData
+        fileData = item.fileData
+        fileName = item.fileName
+        isImageFile = item.isImageFile
+    }
+
+    init(entry: VaultPayload) {
+        itemType = entry.itemType
+        title = entry.title
+        content = entry.content
+        imageData = entry.imageData
+        fileData = entry.fileData
+        fileName = entry.fileName
+        isImageFile = entry.fileUTI.flatMap { UTType($0) }?.conforms(to: .image) == true
+    }
+}
+
 // MARK: - Custom Preview Window Manager
 
 /// Manages the custom NSPanel-based preview window lifecycle.
 @MainActor
 class QPCustomPreviewManager {
+    static let compactSize = CGSize(width: 420, height: 400)
+
     private var previewWindow: NSPanel?
+    private weak var mainWindow: NSPanel?
+    private var content: QPPreviewContent?
     var triggerKeyHint: String = "⎵ to close"
+    /// Most of the screen instead of the panel beside the picker.
+    private(set) var isExpanded = false
+    /// Shows the expand button (the Passwords preview; Quick Look has its own).
+    var allowsExpanding = false
 
     var isPreviewVisible: Bool {
         previewWindow?.isVisible == true
     }
 
     func showPreview(for item: CBItem, relativeTo mainWindow: NSPanel?) {
+        showPreview(content: QPPreviewContent(item: item), relativeTo: mainWindow)
+    }
+
+    func showPreview(content: QPPreviewContent, relativeTo mainWindow: NSPanel?, expanded: Bool? = nil) {
+        self.content = content
+        self.mainWindow = mainWindow
+        if let expanded { isExpanded = expanded }
+
         // If already visible, just update
-        let hint = triggerKeyHint
         if let existing = previewWindow, existing.isVisible {
-            let view = QPCustomPreviewPanel(item: item, triggerKeyHint: hint)
-            existing.contentView = NSHostingView(rootView: view)
+            render(in: existing)
             return
         }
 
@@ -199,7 +259,7 @@ class QPCustomPreviewManager {
         // it, an activating borderless panel resolves to our app's home
         // Space instead of the user's current fullscreen Space.
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 400),
+            contentRect: NSRect(origin: .zero, size: Self.compactSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -213,21 +273,7 @@ class QPCustomPreviewManager {
         panel.isMovable = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .transient]
 
-        let view = QPCustomPreviewPanel(item: item, triggerKeyHint: hint)
-        panel.contentView = NSHostingView(rootView: view)
-
-        // Position relative to main window
-        if let mainWindow = mainWindow {
-            let mainFrame = mainWindow.frame
-            var origin = NSPoint(x: mainFrame.maxX + 8, y: mainFrame.origin.y)
-
-            if let screen = NSScreen.main,
-               origin.x + 420 > screen.visibleFrame.maxX {
-                origin.x = mainFrame.minX - 420 - 8
-            }
-            panel.setFrameOrigin(origin)
-        }
-
+        render(in: panel)
         panel.orderFrontRegardless()
         self.previewWindow = panel
 
@@ -237,9 +283,46 @@ class QPCustomPreviewManager {
         }
     }
 
+    /// Switches between the panel beside the picker and most of the screen.
+    func toggleExpanded() {
+        isExpanded.toggle()
+        guard let panel = previewWindow, panel.isVisible else { return }
+        render(in: panel)
+    }
+
     func hidePreview() {
         previewWindow?.orderOut(nil)
         previewWindow?.close()
         previewWindow = nil
+        content = nil
+        isExpanded = false
+    }
+
+    private func render(in panel: NSPanel) {
+        guard let content else { return }
+        let frame = targetFrame()
+        let view = QPCustomPreviewPanel(
+            item: content, triggerKeyHint: triggerKeyHint, size: frame.size, isExpanded: isExpanded,
+            onToggleExpanded: allowsExpanding ? { [weak self] in self?.toggleExpanded() } : nil)
+        panel.contentView = NSHostingView(rootView: view)
+        panel.setFrame(frame, display: true)
+    }
+
+    /// Beside the picker (left if there's no room on the right), or 85 % of
+    /// the picker's screen when expanded.
+    private func targetFrame() -> NSRect {
+        let screen = mainWindow?.screen ?? NSScreen.main
+        if isExpanded, let visible = screen?.visibleFrame {
+            let size = CGSize(width: visible.width * 0.85, height: visible.height * 0.85)
+            return NSRect(
+                origin: NSPoint(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2), size: size)
+        }
+        let size = Self.compactSize
+        guard let mainFrame = mainWindow?.frame else { return NSRect(origin: .zero, size: size) }
+        var origin = NSPoint(x: mainFrame.maxX + 8, y: mainFrame.origin.y)
+        if let screen, origin.x + size.width > screen.visibleFrame.maxX {
+            origin.x = mainFrame.minX - size.width - 8
+        }
+        return NSRect(origin: origin, size: size)
     }
 }

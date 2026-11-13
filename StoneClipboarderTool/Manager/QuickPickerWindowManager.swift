@@ -213,7 +213,13 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             },
             onVaultAuthenticationEnded: { [weak self] in
                 self?.reclaimFocusAfterAuthentication()
-            }
+            },
+            vaultPreview: QPVaultPreviewActions(
+                toggle: { [weak self] entry, expanded in self?.toggleVaultPreview(for: entry, expanded: expanded) },
+                update: { [weak self] entry in self?.updateVaultPreview(for: entry) },
+                hide: { [weak self] in self?.hideVaultPreview() },
+                isVisible: { [weak self] in self?.customPreviewManager.isPreviewVisible ?? false }
+            )
         )
 
         let hostingView = QuickPickerHostingView(rootView: contentView)
@@ -352,6 +358,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             guard quickLookCoordinator.prepareItem(item) else { return }
             quickLookCoordinator.showPreview()
         case .custom:
+            customPreviewManager.allowsExpanding = false
             let triggerKey = settingsManager?.quickLookTriggerKey ?? .space
             customPreviewManager.triggerKeyHint = triggerKey == .space ? "⎵ to close" : "→ to close"
             customPreviewManager.showPreview(for: item, relativeTo: window)
@@ -365,6 +372,47 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         // app was frontmost before the picker opened — typing the literal
         // character there instead of toggling the preview off.
         reclaimKeyFocus()
+    }
+
+    // MARK: - Passwords preview
+
+    /// The Passwords tab always uses the custom panel, whatever the Quick
+    /// Look setting: Quick Look needs a file, and a decrypted entry must not
+    /// be written to disk. `expanded` (⌥Space) opens it, or switches size
+    /// when it is open.
+    private func toggleVaultPreview(for entry: VaultPayload, expanded: Bool) {
+        hidePreviewPanelIfQuickLook()
+        if customPreviewManager.isPreviewVisible {
+            if expanded {
+                customPreviewManager.toggleExpanded()
+            } else {
+                hideVaultPreview()
+            }
+            return
+        }
+        let triggerKey = settingsManager?.quickLookTriggerKey ?? .space
+        customPreviewManager.triggerKeyHint = triggerKey == .space ? "⎵ to close" : "→ to close"
+        customPreviewManager.allowsExpanding = true
+        customPreviewManager.showPreview(content: QPPreviewContent(entry: entry), relativeTo: window, expanded: expanded)
+        reclaimKeyFocus()
+    }
+
+    private func updateVaultPreview(for entry: VaultPayload) {
+        guard customPreviewManager.isPreviewVisible else { return }
+        customPreviewManager.showPreview(content: QPPreviewContent(entry: entry), relativeTo: window)
+    }
+
+    private func hideVaultPreview() {
+        hidePreviewPanel()
+        customPreviewManager.allowsExpanding = false
+        reclaimKeyFocus()
+    }
+
+    /// A history item's Quick Look panel left open when switching to Passwords.
+    private func hidePreviewPanelIfQuickLook() {
+        if quickLookCoordinator.isPreviewVisible {
+            quickLookCoordinator.hidePreview()
+        }
     }
 
     /// After the Touch ID prompt the picker is no longer key, and the app

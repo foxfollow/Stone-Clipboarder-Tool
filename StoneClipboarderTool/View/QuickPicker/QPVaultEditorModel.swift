@@ -19,6 +19,11 @@ final class QPVaultEditorModel: ObservableObject {
     @Published private(set) var count: Int
     /// Deleting asks first.
     @Published var isConfirmingDelete = false
+    /// The eye (⌥R): the content shows in the card.
+    @Published var isRevealed = false
+    /// What the eye shows; text and image copied once from the entry.
+    let revealText: String?
+    let revealImageData: Data?
 
     private let vaultManager: VaultManager
 
@@ -34,6 +39,8 @@ final class QPVaultEditorModel: ObservableObject {
         case .combined: kindDescription = "Text and image"
         }
         title = entry.title ?? ""
+        revealText = entry.content
+        revealImageData = entry.imageData
         position = nil
         count = 0
         refresh()

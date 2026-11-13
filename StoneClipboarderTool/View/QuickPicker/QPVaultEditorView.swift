@@ -7,7 +7,8 @@ import SwiftUI
 
 /// The ⌥E card on the Passwords tab: name the entry, move it, delete it.
 /// Keys arrive through `TabKeyInterceptor`'s editor mode: ⏎ save, Esc
-/// cancel, ⌥↑ / ⌥↓ move, ⌥⌫ delete (⏎ confirms).
+/// cancel, ⌥↑ / ⌥↓ move, ⌥⌫ delete (⏎ confirms), ⌥R show or hide the
+/// content (the eye).
 struct QPVaultEditorView: View {
     @ObservedObject var model: QPVaultEditorModel
     let onSave: () -> Void
@@ -34,6 +35,9 @@ struct QPVaultEditorView: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            if model.isRevealed {
+                revealedContent
+            }
             titleField
             Divider()
             orderAndDelete
@@ -71,9 +75,49 @@ struct QPVaultEditorView: View {
                     .lineLimit(1)
             }
             Spacer()
-            Image(systemName: "lock.fill")
-                .foregroundStyle(.secondary)
+            Button { model.isRevealed.toggle() } label: {
+                Image(systemName: model.isRevealed ? "eye.slash" : "eye")
+                    .font(.system(size: 14))
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .focusable(false)
+            .help(model.isRevealed ? "Hide (⌥R)" : "Show (⌥R)")
         }
+    }
+
+    /// The content behind the eye: text (no selection, so it can't be
+    /// copied into the history by accident) and the image.
+    @ViewBuilder
+    private var revealedContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let text = model.revealText, !text.isEmpty {
+                ScrollView {
+                    Text(text)
+                        .font(.system(size: 12, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 80)
+            }
+            if let data = model.revealImageData, let image = NSImage(data: data) {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: 120)
+            }
+            if (model.revealText ?? "").isEmpty && model.revealImageData == nil {
+                Text("A file: ⎵ previews it, ⏎ pastes it.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.06))
+        )
     }
 
     private var titleField: some View {
@@ -139,6 +183,7 @@ struct QPVaultEditorView: View {
                 keyHint("ESC", "Cancel")
                 keyHint("⌥↑↓", "Move")
                 keyHint("⌥⌫", "Delete")
+                keyHint("⌥R", model.isRevealed ? "Hide" : "Show")
             }
             Spacer()
             Button("Save", action: onSave)

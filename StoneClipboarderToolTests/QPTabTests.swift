@@ -63,3 +63,28 @@ final class QPVaultEditorModelTests: XCTestCase {
 private final class AlwaysYesAuthenticator: VaultAuthenticator {
     func authenticate(reason: String) async -> Bool { true }
 }
+
+final class QPPreviewContentTests: XCTestCase {
+
+    func testVaultEntryPreviewKeepsContentAndDetectsImageFiles() {
+        let png = VaultPayload(
+            itemType: .file, title: "Scan", fileData: Data([1]), fileName: "scan.png", fileUTI: "public.png")
+        let preview = QPPreviewContent(entry: png)
+        XCTAssertEqual(preview.itemType, .file)
+        XCTAssertEqual(preview.title, "Scan")
+        XCTAssertEqual(preview.fileName, "scan.png")
+        XCTAssertTrue(preview.isImageFile)
+
+        let key = VaultPayload(itemType: .file, fileData: Data([1]), fileName: "id_rsa", fileUTI: "public.data")
+        XCTAssertFalse(QPPreviewContent(entry: key).isImageFile)
+        XCTAssertFalse(QPPreviewContent(entry: VaultPayload(itemType: .text, content: "pw")).isImageFile)
+    }
+
+    func testHistoryItemPreview() {
+        let item = CBItem(timestamp: Date(), content: "hello", itemType: .text)
+        item.title = "Greeting"
+        let preview = QPPreviewContent(item: item)
+        XCTAssertEqual(preview.content, "hello")
+        XCTAssertEqual(preview.title, "Greeting")
+    }
+}

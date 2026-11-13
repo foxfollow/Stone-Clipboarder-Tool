@@ -5,13 +5,13 @@
 
 import SwiftUI
 
-/// One entry on the Quick Picker's Passwords tab. Text stays masked unless
-/// the row is revealed (Space / → on the selected row); an image shows only
-/// its icon until then.
+/// One entry on the Quick Picker's Passwords tab. Text stays masked and an
+/// image shows only its icon until the eye button (or ⌥R) reveals the row.
 struct QPVaultRow: View {
     let entry: VaultPayload
     let isSelected: Bool
     let isRevealed: Bool
+    var onToggleReveal: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 12) {
@@ -30,6 +30,17 @@ struct QPVaultRow: View {
             }
 
             Spacer()
+
+            Button(action: onToggleReveal) {
+                Image(systemName: isRevealed ? "eye.slash" : "eye")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .focusable(false)
+            .help(isRevealed ? "Hide (⌥R)" : "Show (⌥R)")
 
             if isSelected {
                 HStack(spacing: 4) {

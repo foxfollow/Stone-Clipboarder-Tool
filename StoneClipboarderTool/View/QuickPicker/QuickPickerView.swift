@@ -44,6 +44,18 @@ enum QPTab: Hashable, CaseIterable, Identifiable {
     }
 }
 
+/// The Passwords preview, run by QuickPickerWindowManager in its custom
+/// panel (never Quick Look, which would need a decrypted file on disk).
+struct QPVaultPreviewActions {
+    /// Opens the preview of the entry, or closes it; `expanded` (⌥Space)
+    /// opens it large, or switches size when it is open.
+    var toggle: (VaultPayload, _ expanded: Bool) -> Void = { _, _ in }
+    /// Shows another entry in an open preview.
+    var update: (VaultPayload) -> Void = { _ in }
+    var hide: () -> Void = {}
+    var isVisible: () -> Bool = { false }
+}
+
 struct QuickPickerView: View {
     @ObservedObject var viewModel: CBViewModel
     @ObservedObject var pinManager: PinManager
@@ -85,6 +97,7 @@ struct QuickPickerView: View {
     let onTypePaste: (String) -> Void
     /// The Touch ID prompt is gone: take the focus back.
     let onVaultAuthenticationEnded: () -> Void
+    let vaultPreview: QPVaultPreviewActions
     private let settingsManager: SettingsManager?
 
     init(
@@ -97,7 +110,8 @@ struct QuickPickerView: View {
         onPreviewUpdate: @escaping (CBItem) -> Void = { _ in },
         isPreviewVisible: @escaping () -> Bool = { false },
         onTypePaste: @escaping (String) -> Void = { _ in },
-        onVaultAuthenticationEnded: @escaping () -> Void = {}
+        onVaultAuthenticationEnded: @escaping () -> Void = {},
+        vaultPreview: QPVaultPreviewActions = QPVaultPreviewActions()
     ) {
         self.viewModel = viewModel
         self.pinManager = pinManager
@@ -108,6 +122,7 @@ struct QuickPickerView: View {
         self.isPreviewVisible = isPreviewVisible
         self.onTypePaste = onTypePaste
         self.onVaultAuthenticationEnded = onVaultAuthenticationEnded
+        self.vaultPreview = vaultPreview
         self.vaultManager = vaultManager ?? VaultManager.makeForApp()
     }
 
@@ -204,6 +219,7 @@ struct QuickPickerView: View {
             // Locked behind the picker (screen lock, timeout): nothing of the
             // vault may stay on screen.
             guard !isUnlocked else { return }
+            vaultPreview.hide()
             revealedVaultID = nil
             vaultIndex = 0
             if vaultEditor != nil { closeVaultEditor(saving: false) }
@@ -231,6 +247,10 @@ struct QuickPickerView: View {
     private var pickerContent: some View {
         mainContent
             .onKeyPress(.escape) {
+                if isPasswordsTab, vaultPreview.isVisible() {
+                    vaultPreview.hide()
+                    return .handled
+                }
                 if isPreviewVisible() {
                     onPreviewToggle(filteredItems[safe: selectedIndex] ?? filteredItems[0])
                 } else {
@@ -279,8 +299,13 @@ struct QuickPickerView: View {
             .onKeyPress(keys: [.space]) { keyPress in
                 // ⌥Space toggles favorite on the selected item.
                 if keyPress.modifiers.contains(.option) {
-                    // Passwords have no favorites.
-                    if !isPasswordsTab { toggleFavoriteForSelected() }
+                    // Passwords have no favorites: ⌥Space is the large
+                    // preview there, as in Finder.
+                    if isPasswordsTab {
+                        toggleVaultPreview(expanded: true)
+                    } else {
+                        toggleFavoriteForSelected()
+                    }
                     return .handled
                 }
                 guard triggerKey == .space else { return .ignored }
@@ -334,11 +359,17 @@ struct QuickPickerView: View {
                     reloadForActiveTab()
                 }
             }
-            .onChange(of: activeTab) { _, newTab in
+            .onChange(of: activeTab) { oldTab, newTab in
                 selectedIndex = 0
                 selectionAnchor = nil
                 vaultIndex = 0
                 revealedVaultID = nil
+                // Neither a decrypted entry nor a history item stays in
+                // the preview across the Passwords boundary.
+                if (oldTab == .passwords || newTab == .passwords),
+                   vaultPreview.isVisible() || isPreviewVisible() {
+                    vaultPreview.hide()
+                }
                 if newTab == .passwords {
                     // Opening the tab counts as use; an expired vault locks.
                     vaultManager.checkExpiry()
@@ -405,7 +436,8 @@ struct QuickPickerView: View {
                     searchText: searchText,
                     onUnlock: { unlockVault() },
                     onPaste: { performVaultAction() },
-                    onEdit: { _ in openVaultEditor() }
+                    onEdit: { _ in openVaultEditor() },
+                    onToggleReveal: { entry in toggleVaultReveal(entry.id) }
                 )
             } else {
             QPItemList(
@@ -498,6 +530,9 @@ struct QuickPickerView: View {
             tabInterceptor.isPasswordsTab = { isPasswordsTab }
             tabInterceptor.onOptionL = {
                 vaultManager.lock()
+            }
+            tabInterceptor.onOptionR = {
+                toggleVaultReveal()
             }
             tabInterceptor.onOptionE = {
                 if isPasswordsTab {
@@ -732,7 +767,8 @@ struct QuickPickerView: View {
                 if vaultEntries[safe: vaultIndex]?.typeableText != nil {
                     typePasteBadge()
                 }
-                shortcutBadge(triggerKey == .space ? "⎵" : "→", label: "Show")
+                shortcutBadge(triggerKey == .space ? "⎵" : "→", label: "Preview")
+                shortcutBadge("⌥R", label: "Show")
                 shortcutBadge("⌥L", label: "Lock")
             } else {
                 shortcutBadge("⏎", label: "Unlock")
@@ -965,6 +1001,8 @@ struct QuickPickerView: View {
                 if !editor.isConfirmingUnfavorite, visibleTabs.contains(.passwords) {
                     moveEditedItemToVault()
                 }
+            case .reveal:
+                break
             }
         }
         isSearchFocused = false
@@ -1209,7 +1247,7 @@ struct QuickPickerView: View {
 
     private func togglePreview() {
         if isPasswordsTab {
-            toggleVaultReveal()
+            toggleVaultPreview(expanded: false)
             return
         }
         guard selectedIndex < filteredItems.count else { return }
@@ -1437,12 +1475,29 @@ struct QuickPickerView: View {
         guard vaultEntries.indices.contains(newIndex) else { return }
         vaultIndex = newIndex
         revealedVaultID = nil
+        if vaultPreview.isVisible(), let entry = vaultEntries[safe: newIndex] {
+            vaultPreview.update(entry)
+        }
     }
 
-    private func toggleVaultReveal() {
-        guard vaultManager.isUnlocked, let entry = vaultEntries[safe: vaultIndex] else { return }
-        revealedVaultID = revealedVaultID == entry.id ? nil : entry.id
+    /// ⌥R or the eye: shows or hides the content in the row. `id` defaults
+    /// to the selected entry; another row's eye also selects it.
+    private func toggleVaultReveal(_ id: UUID? = nil) {
+        guard vaultManager.isUnlocked,
+              let target = id ?? vaultEntries[safe: vaultIndex]?.id else { return }
+        if let index = vaultEntries.firstIndex(where: { $0.id == target }) {
+            vaultIndex = index
+        }
+        revealedVaultID = revealedVaultID == target ? nil : target
         vaultManager.noteUse()
+    }
+
+    /// Space / → (preview beside the picker) and ⌥Space (large).
+    private func toggleVaultPreview(expanded: Bool) {
+        vaultManager.checkExpiry()
+        guard vaultManager.isUnlocked, let entry = vaultEntries[safe: vaultIndex] else { return }
+        vaultManager.noteUse()
+        vaultPreview.toggle(entry, expanded)
     }
 
     /// Touch ID (or the password) while the picker stays open.
@@ -1511,11 +1566,14 @@ struct QuickPickerView: View {
                 } else {
                     editor.isConfirmingDelete = true
                 }
+            case .reveal:
+                editor.isRevealed.toggle()
             case .toggleFavorite, .moveToVault:
                 break  // passwords have no favorites and are in the vault already
             }
         }
         revealedVaultID = nil
+        vaultPreview.hide()
         isSearchFocused = false
         vaultEditor = editor
     }
@@ -1626,10 +1684,14 @@ final class TabKeyInterceptor: ObservableObject {
         case delete
         /// ⌥K in the history editor: Move to Passwords.
         case moveToVault
+        /// ⌥R in the Passwords editor: show or hide the content.
+        case reveal
     }
 
-    /// ⌥L locks the vault; taken only while the Passwords tab is active.
+    /// ⌥L locks the vault, ⌥R shows the selected entry in its row; taken
+    /// only while the Passwords tab is active.
     var onOptionL: (() -> Void)?
+    var onOptionR: (() -> Void)?
     var isPasswordsTab: (() -> Bool)?
 
     /// Set while the ⌥E editor is open. The picker's own shortcuts stand
@@ -1644,6 +1706,7 @@ final class TabKeyInterceptor: ObservableObject {
     private static let fKeyCode: UInt16 = 3
     private static let lKeyCode: UInt16 = 37
     private static let kKeyCode: UInt16 = 40
+    private static let rKeyCode: UInt16 = 15
     private static let deleteKeyCode: UInt16 = 51
     private static let escapeKeyCode: UInt16 = 53
     private static let upArrowKeyCode: UInt16 = 126
@@ -1677,6 +1740,7 @@ final class TabKeyInterceptor: ObservableObject {
         hasChips = nil
         onEditorKey = nil
         onOptionL = nil
+        onOptionR = nil
         isPasswordsTab = nil
     }
 
@@ -1701,14 +1765,19 @@ final class TabKeyInterceptor: ObservableObject {
             return nil
         }
 
-        // ⌥L on the Passwords tab (no Control/Command).
-        if event.keyCode == Self.lKeyCode,
+        // ⌥L / ⌥R on the Passwords tab (no Control/Command).
+        if event.keyCode == Self.lKeyCode || event.keyCode == Self.rKeyCode,
            flags.contains(.option),
            !flags.contains(.control),
            !flags.contains(.command),
            isPasswordsTab?() ?? false {
+            let isLock = event.keyCode == Self.lKeyCode
             DispatchQueue.main.async { [weak self] in
-                self?.onOptionL?()
+                if isLock {
+                    self?.onOptionL?()
+                } else {
+                    self?.onOptionR?()
+                }
             }
             return nil
         }
@@ -1786,6 +1855,8 @@ final class TabKeyInterceptor: ObservableObject {
             key = .delete
         case Self.kKeyCode where option && !commandOrControl:
             key = .moveToVault
+        case Self.rKeyCode where option && !commandOrControl:
+            key = .reveal
         case Self.tabKeyCode:
             return nil  // the title field is the only field; keep focus in it
         default:
