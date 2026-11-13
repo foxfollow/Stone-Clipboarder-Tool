@@ -110,6 +110,20 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         self.menuBarRefreshCallback = callback
     }
 
+    /// Opens the picker on `tab` (when shown) instead of the first tab.
+    func showQuickPicker(on tab: QPTab) {
+        nextInitialTab = tab
+        showQuickPicker()
+    }
+
+    /// Used by the next `showQuickPicker()` only.
+    private var nextInitialTab: QPTab?
+
+    private func takeInitialTab() -> QPTab? {
+        defer { nextInitialTab = nil }
+        return nextInitialTab
+    }
+
     func showQuickPicker() {
         // Opening (or toggling) the Quick Picker stops any in-flight type-out.
         typePaster.cancel()
@@ -219,7 +233,8 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
                 update: { [weak self] entry in self?.updateVaultPreview(for: entry) },
                 hide: { [weak self] in self?.hideVaultPreview() },
                 isVisible: { [weak self] in self?.isVaultPreviewVisible ?? false }
-            )
+            ),
+            initialTab: takeInitialTab()
         )
 
         let hostingView = QuickPickerHostingView(rootView: contentView)

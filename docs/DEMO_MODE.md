@@ -33,7 +33,7 @@ tour gives up on that screen after 30 seconds.
 | `VaultManager.makeForApp` | A Passwords vault in a throwaway folder with in-memory keys (`makeInert`), opened by `DemoAuthenticator` without a prompt and filled by `DemoData.fillVault` with made-up entries (a bank login, a token, a 2FA QR, a key file, a server password). The demo never reads or writes the Keychain or the real vault. |
 | `AppDelegate.setUpDemo` | Fills the store with `DemoData.fill`, adds the demo categories, wires only what the screens need, and starts the tour for `--screenshots`. |
 | `Helper/DemoData.swift` | The made-up history: text, links, code, a document number, two titled favorites, an image with recognized text, a QR code, a file, a Ukrainian note, 120 older filler rows, source apps (Apple apps, so their icons show), the "Documents" regex rule and the "Browsers" app group. Image results are given, not computed, so the demo starts instantly and looks the same every run. |
-| `Helper/ScreenshotTour.swift` | For each of dark and light: the main window (800×600, the image item selected), the Quick Picker, the Quick Picker on the Passwords tab (`sct-*-passwords.png`; the tour puts that tab first for one shot), the menu bar view and Settings → Categories. For each it writes `<name>.wid` with the window number and waits for `<name>` to appear, then quits the app. |
+| `Helper/ScreenshotTour.swift` | For each of dark and light: the main window (800×600, the image item selected), the Quick Picker, the Quick Picker opened on the Passwords tab (`sct-*-passwords.png`, `showQuickPicker(on:)`), the menu bar view and Settings → Categories. For each it writes `<name>.wid` with the window number and waits for `<name>` to appear, then quits the app. |
 | `scripts/screenshots.sh` | Builds, runs the app with `--screenshots`, and turns every `.wid` request into a PNG with `screencapture -x -o -l <window>` (the window as the window server draws it, no shadow, at the screen's scale). |
 
 The app can't capture its own windows without Screen Recording, and asking
@@ -64,7 +64,7 @@ type into them. On a Retina screen the PNGs come out at 2×.
   Add the image to the App Preview section of `docs/index.html` and
   `docs/index-ua.html` (`data-light-src` / `data-dark-src`).
 - **Window sizes:** set in each tour step (main window 800×600, Settings
-  760×640, menu bar 350×400; the Quick Picker uses its own size).
+  880×640, menu bar 350×400; the Quick Picker uses its own size).
 
 After `make screenshots`, look at the PNGs before committing them: they show
 the current UI, so a half-finished change ends up on the site.

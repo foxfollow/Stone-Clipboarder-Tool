@@ -132,6 +132,8 @@ struct QuickPickerView: View {
     /// The Touch ID prompt is gone: take the focus back.
     let onVaultAuthenticationEnded: () -> Void
     let vaultPreview: QPVaultPreviewActions
+    /// The tab to open on instead of the first one (the screenshot tour).
+    let initialTab: QPTab?
     private let settingsManager: SettingsManager?
 
     init(
@@ -145,7 +147,8 @@ struct QuickPickerView: View {
         isPreviewVisible: @escaping () -> Bool = { false },
         onTypePaste: @escaping (String) -> Void = { _ in },
         onVaultAuthenticationEnded: @escaping () -> Void = {},
-        vaultPreview: QPVaultPreviewActions = QPVaultPreviewActions()
+        vaultPreview: QPVaultPreviewActions = QPVaultPreviewActions(),
+        initialTab: QPTab? = nil
     ) {
         self.viewModel = viewModel
         self.pinManager = pinManager
@@ -157,6 +160,7 @@ struct QuickPickerView: View {
         self.onTypePaste = onTypePaste
         self.onVaultAuthenticationEnded = onVaultAuthenticationEnded
         self.vaultPreview = vaultPreview
+        self.initialTab = initialTab
         // Previews and a missing manager get an inert in-memory vault, never
         // a second one on the real Keychain.
         self.vaultManager = vaultManager ?? VaultManager.makeInert()
@@ -557,9 +561,11 @@ struct QuickPickerView: View {
         )
         .clipped()
         .onAppear {
-            // The picker opens on the first tab of the user's order.
-            if let first = visibleTabs.first, first != activeTab {
-                activeTab = first
+            // The picker opens on the first tab of the user's order (or the
+            // one asked for, if it is shown).
+            let opening = initialTab.flatMap { visibleTabs.contains($0) ? $0 : nil } ?? visibleTabs.first
+            if let opening, opening != activeTab {
+                activeTab = opening
             }
             loadInitialItems()
             loadTabCounts()

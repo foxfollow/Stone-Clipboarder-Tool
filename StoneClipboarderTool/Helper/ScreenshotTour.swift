@@ -85,15 +85,10 @@ final class ScreenshotTour {
         quickPicker.hideQuickPicker()
     }
 
-    /// The Quick Picker on the Passwords tab with the made-up entries. The
-    /// picker opens on the first tab of the user's order, so the tour puts
-    /// Passwords first for this one shot and then restores the order.
+    /// The Quick Picker opened on the Passwords tab, with the made-up entries.
     private func passwordsPanel(_ scheme: String) async {
-        let order = settings.quickPickerTabOrder
-        settings.quickPickerTabOrder = [QPTab.passwords.rawValue]
-        defer { settings.quickPickerTabOrder = order }
         vaultManager.noteUse()
-        quickPicker.showQuickPicker()
+        quickPicker.showQuickPicker(on: .passwords)
         try? await Task.sleep(for: settle)
         if let panel = quickPicker.pickerWindow {
             await capture(panel, "sct-\(scheme)-passwords.png")
@@ -131,8 +126,10 @@ final class ScreenshotTour {
             .environmentObject(pinManager)
             .environmentObject(vaultManager)
             .modelContainer(settingsContainer)
-            .frame(width: 760, height: 640)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 640),
+            .frame(width: 880, height: 640)
+        // Wide enough for the sidebar's ideal width: page names and the
+        // search field aren't cut off.
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
