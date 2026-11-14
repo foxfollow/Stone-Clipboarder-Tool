@@ -15,6 +15,10 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
 
     private var previewURL: URL?
     private var tempDirectory: URL?
+    /// The folder of a decrypted Passwords entry; removed as soon as its
+    /// preview closes (see `removeSecretFiles`).
+    private var secretDirectory: URL?
+    private static let secretPrefix = "Secret_"
 
     // Stable directory under Application Support so external apps (Preview.app) can always find the file.
     private static var previewsDirectory: URL {
@@ -110,6 +114,77 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
         }
     }
 
+    /// Writes a decrypted Passwords entry for Quick Look, which only reads
+    /// files. The copy lives in an owner-only `Secret_<uuid>` folder that is
+    /// removed when the preview closes, the vault locks, the picker closes,
+    /// the next entry is shown, and at launch and quit — unlike history
+    /// previews, which stay 10 minutes for "Open with…".
+    func prepareSecret(_ content: QPPreviewContent) -> Bool {
+        removeSecretFiles()
+        cleanupTempFiles()
+        let fileManager = FileManager.default
+        let folder = Self.previewsDirectory.appendingPathComponent(Self.secretPrefix + UUID().uuidString)
+        do {
+            try fileManager.createDirectory(
+                at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        } catch {
+            return false
+        }
+        secretDirectory = folder
+
+        guard let (data, name) = Self.secretFile(for: content) else {
+            removeSecretFiles()
+            return false
+        }
+        let url = folder.appendingPathComponent(PasteboardFileStore.safeFileName(name))
+        guard fileManager.createFile(atPath: url.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+            removeSecretFiles()
+            return false
+        }
+        previewURL = url
+        return true
+    }
+
+    /// What Quick Look gets for an entry: the image (PNG) of an image or
+    /// text + image, the file as is, otherwise the text.
+    static func secretFile(for content: QPPreviewContent) -> (Data, String)? {
+        let base = content.title.map { PasteboardFileStore.safeFileName($0) }
+        switch content.itemType {
+        case .file:
+            guard let data = content.fileData else { return nil }
+            return (data, content.fileName ?? "File")
+        case .image, .combined:
+            if let imageData = content.imageData {
+                let png = NSImage(data: imageData)?.pngRepresentation ?? imageData
+                return (png, (base ?? "Image") + ".png")
+            }
+            fallthrough
+        case .text:
+            guard let text = content.content else { return nil }
+            return (Data(text.utf8), (base ?? "Password") + ".txt")
+        }
+    }
+
+    /// Deletes the decrypted copy of a Passwords entry, if any.
+    func removeSecretFiles() {
+        guard let folder = secretDirectory else { return }
+        try? FileManager.default.removeItem(at: folder)
+        secretDirectory = nil
+        if previewURL?.path.hasPrefix(folder.path) == true {
+            previewURL = nil
+        }
+    }
+
+    /// Fills the screen with the open Quick Look panel, or back.
+    func toggleFullScreen() {
+        guard isPreviewVisible, let panel = QLPreviewPanel.shared() else { return }
+        if panel.isInFullScreenMode {
+            panel.exitFullScreenMode(options: nil)
+        } else {
+            panel.enterFullScreenMode(nil, withOptions: nil)
+        }
+    }
+
     /// Show or update the QLPreviewPanel.
     func showPreview() {
         guard previewURL != nil else { return }
@@ -185,6 +260,11 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
         ) else { return }
         let cutoff = Date().addingTimeInterval(-previewSessionLifetime)
         for url in contents {
+            // A decrypted Passwords copy left by a crash goes at once.
+            if url.lastPathComponent.hasPrefix(secretPrefix) {
+                try? FileManager.default.removeItem(at: url)
+                continue
+            }
             let created = (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? .distantPast
             if created < cutoff {
                 try? FileManager.default.removeItem(at: url)

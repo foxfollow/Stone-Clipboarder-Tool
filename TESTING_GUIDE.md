@@ -70,7 +70,14 @@ all pins.
       also over a full-screen app without switching Spaces.
 - [ ] ↑/↓ select, ⏎ pastes into the previous app, Esc closes, clicking
       outside closes.
-- [ ] Tab / ⇧Tab cycle All, Favs, Text, Images, Files; counts are right.
+- [ ] Tab / ⇧Tab cycle All, Favs, Text, Images, Files, Passwords; counts
+      are right (Passwords shows no count while locked). No pill is cut
+      off; with six tabs they get tighter and an inactive Passwords pill
+      shows only its lock.
+- [ ] ⌘1…⌘6 jump to the tabs (also on a Ukrainian layout); tooltips name
+      the shortcut. Settings → Quick Picker → Tabs: moving a tab changes the
+      pills, ⌘ numbers, Tab cycling and the tab the picker opens on; Reset
+      Order restores it.
 - [ ] Scrolling All keeps loading past 150 items.
 - [ ] Search finds old items; switching tabs keeps the search.
 - [ ] ⇧↑/⇧↓ multi-select: ⏎ pastes texts joined by newlines (and doesn't
@@ -87,9 +94,92 @@ all pins.
       (the list and preview don't react), ⏎ saves, Esc discards. The title
       shows above the content in the picker, menu bar and main window, and
       search finds it. Clearing it removes it.
+- [ ] In the editor, Delete… (or ⌃⌥⌫, also straight from the list) asks
+      first: ⏎ or Delete removes the item, Esc or Cancel keeps it, a second
+      ⌃⌥⌫ only asks again; ⌥⌫ still deletes a word of the title.
 - [ ] In the editor on a favorite, ⌥↑/⌥↓ move it (the Favs list behind
       follows, and so do ⌃⇧1…0); ⌥F asks before removing, ⏎ confirms, Esc
       keeps it. On a non-favorite ⌥F adds it at once.
+
+## Passwords (Quick Picker tab, Settings → Quick Picker)
+
+- [ ] Fresh launch: the Passwords tab is locked. ⏎ or the button shows
+      Touch ID (password fallback); the picker stays open behind it and the
+      cursor is back in the search afterwards. Cancel keeps it locked.
+      Press and release ⏎ slowly several times: the prompt keeps the
+      keyboard every time (typing the login password goes into it).
+- [ ] ⌥E on a history item, then ⌥K (or Move to Passwords): asks Touch ID
+      if locked, the item disappears from the history (and its pin closes)
+      and shows on the Passwords tab with the typed title.
+- [ ] Moving the same content again adds no second entry; the history copy
+      still goes.
+- [ ] Text rows are masked; the eye (or ⌥R) reveals a row, moving the
+      cursor hides it again. Images stay hidden until revealed. The ⌥E
+      editor has the eye too.
+- [ ] Space / → previews the entry the way Settings → Quick Picker says:
+      Apple Quick Look (⌥Space: full screen), the custom panel (⌥Space or
+      its button: 85 % of the screen) or nothing when disabled. ↑/↓ follow;
+      Esc, locking, leaving the tab or closing the picker closes it. With
+      Apple Quick Look, `Previews/Secret_…` exists only while the preview is
+      open; the custom panel writes nothing.
+- [ ] Settings → Passwords → Keep copies of saved passwords out of the
+      history: While unlocked (default) skips a copied-again password only
+      while the tab is unlocked; Always also while locked; Never never. No
+      Keychain prompt at launch unless Always.
+- [ ] Remove history copies (on by default): after an unlock, and after
+      pasting or typing an entry from Passwords, every history copy of it
+      is gone, older duplicates included. Off: they stay.
+- [ ] Clean Up Now, auto-cleanup and Delete All History leave Passwords
+      as they were; the Passwords page shows the "Not your main password
+      manager" notice.
+- [ ] Settings → Security → Passwords → Require a Password: Save stays off
+      until the passwords match, are 6+ characters, the hint doesn't contain
+      it and the warning is confirmed. Then the locked tab's search field
+      asks for the password (spaces and ⌥ letters type into it), shows the
+      hint, Touch ID isn't offered; a wrong password says so. Change and
+      Remove ask to unlock first; Remove brings Touch ID back. Delete All
+      clears it.
+- [ ] ⏎ pastes text, an image, a file and text + image; nothing of it shows
+      up in the history. After 30 s the clipboard is empty, unless something
+      else was copied in the meantime.
+- [ ] ⌘⇧⏎ types a password into a field that blocks paste.
+- [ ] The lock button next to the search field and "⌥L Lock" in the footer
+      lock the tab. ⌃⌥L locks it from any app with the picker closed; it
+      can be changed or turned off in Settings → Hotkeys → Passwords, and
+      an existing install gets the new row.
+- [ ] Searching on another tab (vault unlocked) lists matching Passwords
+      entries (by title or file name, never by the secret) above the
+      history, the first one selected: ⏎ pastes it, ⌘⇧⏎ types it, Space /
+      ⌥Space preview it, ↑/↓ move between them and the history; ⌥E, ⌥P and
+      ⌥Space-favorite do nothing on them. Locked or expired: no hits, and a
+      paste after the vault locked does nothing. Esc with only a hit and its
+      preview open closes the preview without a crash.
+- [ ] ⌥E on an entry: the icon button opens SF Symbols / emoji, the color
+      well changes the color, Default goes back; the row shows it after ⏎
+      and after a relaunch. Entries from before keep the type's icon.
+- [ ] ⌥E on an entry: rename, ⌥↑/⌥↓ reorder, ⌃⌥⌫ (or ⌃⌥⌦; also straight from the list) asks, ⏎ deletes, Esc keeps it; pressing it twice only asks again, ⌥⌫ deletes a word of the title. ⌥L locks.
+- [ ] Locking the screen (⌃⌘Q), sleep and the screen saver lock the tab.
+      Reopening the picker within the relock time (default 1 h after the
+      last use) needs no Touch ID; after it, it does. Quit and relaunch:
+      locked.
+- [ ] ⌥P, ⌥Space and OCR do nothing on the Passwords tab.
+- [ ] Settings: hiding the tab removes it from the Tab cycle and the ⌥K
+      option; Delete All Passwords empties it and asks Touch ID for a new
+      key next time.
+- [ ] After installing an update, macOS may ask once to let the new build
+      use the "Stone Clipboarder Passwords" Keychain item; Always Allow.
+- [ ] Keychain Access shows the item `d3f0ld.StoneClipboarderTool.vault`;
+      `Application Support/StoneClipboarderTool/Vault/*.sctv` files contain
+      no readable text.
+
+## Settings
+
+- [ ] The sidebar shows General, Quick Picker, Security and About headings
+      with their pages; Passwords and Excluded Apps sit under Security.
+- [ ] The search field filters to settings: "shadow", "touch id", "dock",
+      "regex", "security", a hotkey name, a category name. ⏎ opens the first
+      result. A pick opens the page, scrolls to the row and highlights it;
+      a row behind an off toggle brings the toggle into view.
 
 ## Categories (Quick Picker chips, Settings → Categories)
 

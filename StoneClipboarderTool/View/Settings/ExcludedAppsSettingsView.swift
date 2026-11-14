@@ -21,6 +21,7 @@ struct ExcludedAppsSettingsView: View {
         Form {
             Section {
                 Toggle("Enable app exclusion", isOn: $settingsManager.enableAppExclusion)
+                    .settingsAnchor("excluded.enable")
                     .help("When enabled, clipboard content from selected apps will not be saved")
                 
                 Text(
@@ -97,6 +98,7 @@ struct ExcludedAppsSettingsView: View {
                             .foregroundColor(.red)
                         }
                     }
+                    .settingsAnchor("excluded.buttons")
                 }
             }
         }

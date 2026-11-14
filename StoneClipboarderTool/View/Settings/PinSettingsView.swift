@@ -37,21 +37,27 @@ struct PinSettingsView: View {
     private var generalSection: some View {
         Section("Pin Behavior") {
             Toggle("Persist pins across launches", isOn: $settingsManager.pinPersistAcrossLaunches)
+                .settingsAnchor("pins.persist")
                 .help("Reopen your pins when the app restarts. Stored locally; never synced.")
 
             Toggle("Always show pin controls", isOn: $settingsManager.pinAlwaysShowChrome)
+                .settingsAnchor("pins.alwaysShowControls")
                 .help("When off, the close / lock / opacity controls only appear on hover.")
 
             Toggle("Show over fullscreen apps", isOn: $settingsManager.pinShowOverFullscreen)
+                .settingsAnchor("pins.fullscreen")
                 .help("Render pins on top of another app's fullscreen Space.")
 
             Toggle("Snap to screen edges", isOn: $settingsManager.pinSnapToScreenEdges)
+                .settingsAnchor("pins.snap")
                 .help("Stick a pin to a nearby screen edge while dragging.")
 
             Toggle("Drop shadow", isOn: $settingsManager.pinShadowEnabled)
+                .settingsAnchor("pins.shadow")
 
             VStack(alignment: .leading, spacing: 4) {
                 Toggle("Quick Picker dismisses pins", isOn: $settingsManager.pinQuickPickerDismissesPins)
+                    .settingsAnchor("pins.quickPickerDismisses")
                     .help("When on, opening the Quick Picker also hides your pinned windows.")
                 Text("Off by default — pins stay on screen when the Quick Picker opens.")
                     .font(.caption)
@@ -73,6 +79,7 @@ struct PinSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .settingsAnchor("pins.maxConcurrent")
 
             HStack {
                 Text("Corner radius")
@@ -81,6 +88,7 @@ struct PinSettingsView: View {
                     .monospacedDigit()
                     .frame(width: 28, alignment: .trailing)
             }
+            .settingsAnchor("pins.cornerRadius")
         }
     }
 
@@ -94,31 +102,37 @@ struct PinSettingsView: View {
                     .frame(width: 40, alignment: .trailing)
             }
             .help("Initial opacity when a pin is first created. Each pin can then be adjusted independently.")
+            .settingsAnchor("pins.opacity")
 
             sizeRow(
                 label: "Text pins",
                 width: $settingsManager.pinDefaultTextWidth,
                 height: $settingsManager.pinDefaultTextHeight
             )
+            .settingsAnchor("pins.textSize")
             sizeRow(
                 label: "Image pins",
                 width: $settingsManager.pinDefaultImageWidth,
                 height: $settingsManager.pinDefaultImageHeight
             )
+            .settingsAnchor("pins.imageSize")
             sizeRow(
                 label: "File pins",
                 width: $settingsManager.pinDefaultFileWidth,
                 height: $settingsManager.pinDefaultFileHeight
             )
+            .settingsAnchor("pins.fileSize")
         }
     }
 
     private var advancedSection: some View {
         Section("Advanced") {
             Toggle("Allow editing text inside pins", isOn: $settingsManager.pinAllowTextEdit)
+                .settingsAnchor("pins.allowTextEdit")
                 .help("Turns text pins into editable fields. Edits sync back to the clipboard item.")
 
             Toggle("Confirm before dismissing all pins", isOn: $settingsManager.pinDismissAllConfirm)
+                .settingsAnchor("pins.confirmDismissAll")
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Hotkeys")
@@ -162,6 +176,7 @@ struct PinSettingsView: View {
                         }
                     }
                 }
+                .settingsAnchor("pins.dismissAll")
             }
         } header: {
             Text("Active Pins (\(pinManager.activePinSnapshots.count))")

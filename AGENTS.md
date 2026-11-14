@@ -42,7 +42,25 @@ global hotkeys and CGEvent posts the paste keystrokes.
    from every array a view renders, and only on the next main-queue turn
    delete it from the context (see `CBViewModel.deleteItem`). A view that
    still holds a deleted model crashes with "backing data was detached".
-8. **Pins render from snapshots.** Never read `PinnedItemConfig`'s
+8. **Passwords stay sealed.** Vault content (`VaultPayload`) never becomes a
+   `CBItem`, never goes through CBViewModel, pins, Quick Look, OCR,
+   categories, the log or any file except its sealed `Vault/<uuid>.sctv`
+   the pasteboard temp file of a pasted file entry and the `Secret_` Quick
+   Look copy that lives only while its preview is open (`Vault/fingerprints`
+   holds only keyed HMACs). The vault is not
+   SwiftData on purpose: `ModelContainerFactory` deletes a store it can't
+   open. Its key lives only in the Keychain (`KeychainVaultKeyProvider`),
+   wrapped when the user sets a Passwords password (its hint is a Keychain
+   item too, never UserDefaults); nothing can recover a
+   forgotten one, so never add a "reset" that claims to;
+   tests and demo mode use `InMemoryVaultKeyProvider` and a scratch folder.
+   History cleanup, Delete All and the corrupt-store recovery
+   (`ModelContainerFactory.recoveryFiles`) never touch `Vault/`.
+   A locked vault answers nothing about its content by default
+   (`vaultCopyDetection` = while unlocked); a lock always wins over an
+   unlock in flight (`lockGeneration`); a key is never created while
+   entry files exist.
+9. **Pins render from snapshots.** Never read `PinnedItemConfig`'s
    external-storage fields in a SwiftUI body; `PinViewState` copies them
    once.
 
@@ -88,7 +106,8 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
 - Unit tests cover models and enums, `HotkeyShortcut`, the capture rules,
   CBViewModel (list paging, deduplication, queries, cleanup, categories),
   the content classifier and category filters, pin linking, settings and
-  the type-out key tables. Clipboard, windows, hotkeys and
+  the type-out key tables, and the Passwords vault (format, store, lock
+  policy, VaultManager with a stub authenticator). Clipboard, windows, hotkeys and
   synthetic key events are checked by hand with TESTING_GUIDE.md.
 
 ## Architecture in one screen
@@ -99,9 +118,11 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   calls and starts it. That is the single wiring point: no singletons
   besides `ErrorLogger`.
 - Views receive four shared objects through `.environmentObject`:
-  `CBViewModel`, `SettingsManager`, `HotkeyManager`, `PinManager`.
+  `CBViewModel`, `SettingsManager`, `HotkeyManager`, `PinManager`; the
+  Settings windows also get `VaultManager`.
 - Two SwiftData containers: clipboard history (high churn, reset if the
-  store is corrupt) and settings (must survive).
+  store is corrupt) and settings (must survive). Passwords are a third
+  store outside SwiftData: one AES-GCM sealed file per entry.
 - The Dock icon follows "Show Main Window". `applicationDidFinishLaunching`
   re-applies the activation policy and `startGuardingActivationPolicy`
   undoes late LaunchServices resets during login-item launches. Keep both,
@@ -118,7 +139,8 @@ xcodebuild test -project StoneClipboarderTool.xcodeproj -scheme StoneClipboarder
   `deinit` can release them.
 - **Settings.** Add `@Published var foo: T { didSet { defaults.set(…) } }` to
   `SettingsManager` and read the default in `init`, always through the
-  injected `defaults`. No `@AppStorage` for app settings: the managers
+  injected `defaults`. Every control in Settings gets `.settingsAnchor(…)`
+  and an entry in `SettingsSearchIndex`, so the Settings search finds it. No `@AppStorage` for app settings: the managers
   observe `SettingsManager` and wouldn't see the change.
 - **Persisted enums** (`Model/Types/`) have raw `String` values and a
   `displayName`. Never rename or reorder a shipped raw value.

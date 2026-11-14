@@ -35,6 +35,9 @@ The `Stone Clipboarder` app stores clipboard history locally on your device usin
 
 All this data remains on your device and is never shared with external parties. You can delete this data at any time through the app's interface or by uninstalling the app.
 
+### Passwords (since version 1.11.0)
+Items you move into Passwords are encrypted on your Mac (AES-256-GCM) and stored as separate files in the app's folder; the encryption key is kept in your macOS Keychain, optionally protected by a password you choose. To recognize a copy of a saved password, the app keeps keyed fingerprints (HMAC-SHA256) of the saved items, never the items themselves. None of this is sent anywhere, synced or backed up by the app, and Touch ID is checked by macOS: the app never sees your fingerprint. If you forget the optional Passwords password, nobody — including the developer — can recover the saved items. "Delete All Passwords" in Settings removes the files and the Keychain items.
+
 ## Cookies
 The `Stone Clipboarder` app does not use cookies. The app operates as a native macOS application and does not include web-based components that would utilize cookies.
 
@@ -63,7 +66,7 @@ These Services are not aimed at anyone under the age of 13 years. I do not knowi
 ## Changes to This Privacy Policy
 I may update our Privacy Policy from time to time, and you are advised to review this page regularly for any updates. I will notify you of any changes by posting the updated Privacy Policy here.
 
-This policy is effective as of 2025-08-08.
+This policy is effective as of 2025-08-08 and was last updated on 2026-11-13 (Passwords).
 
 ## Contact Us
 For any questions or suggestions regarding this Privacy Policy, feel free to contact me at d3f0ld@proton.me.

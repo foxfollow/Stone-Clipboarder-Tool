@@ -19,6 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var hotkeyManager: HotkeyManager?
     var quickPickerManager: QuickPickerWindowManager?
     var pinManager: PinManager?
+    var vaultManager: VaultManager?
     var clipboardContainer: ModelContainer?
     var settingsContainer: ModelContainer?
 
@@ -68,8 +69,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         guard !AppEnvironment.isRunningUnitTests else { return }
-        // Quick Look copies of clipboard items shouldn't outlive the app.
+        // Quick Look copies of clipboard items shouldn't outlive the app,
+        // nor the decrypted file of a pasted Passwords entry.
         QPQuickLookCoordinator.removeAllPreviewSessions()
+        cbViewModel?.getClipboardManager().removeSecretFile(clearingPasteboard: true)
     }
 
     /// Keeps Dock / Cmd+Tab presence matching `showMainWindow` after launch.
@@ -130,6 +133,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let hotkeyManager,
             let quickPickerManager,
             let pinManager,
+            let vaultManager,
             let clipboardContainer,
             let settingsContainer
         else {
@@ -143,8 +147,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // monitor. Tests build the objects they need themselves.
         if AppEnvironment.isRunningUnitTests { return }
         if AppEnvironment.isDemo {
+            vaultManager.settingsManager = settingsManager
+            vaultManager.clipboardManager = cbViewModel.getClipboardManager()
+            quickPickerManager.setVaultManager(vaultManager)
             setUpDemo(cbViewModel: cbViewModel, settingsManager: settingsManager, hotkeyManager: hotkeyManager,
-                      quickPickerManager: quickPickerManager, pinManager: pinManager,
+                      quickPickerManager: quickPickerManager, pinManager: pinManager, vaultManager: vaultManager,
                       settingsContainer: settingsContainer, clipboardContainer: clipboardContainer)
             return
         }
@@ -172,6 +179,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         quickPickerManager.setSettingsManager(settingsManager)
         quickPickerManager.setPinManager(pinManager)
         hotkeyManager.quickPickerDelegate = quickPickerManager
+
+        // The Passwords vault: locked until Touch ID, re-locks with the screen.
+        vaultManager.settingsManager = settingsManager
+        vaultManager.clipboardManager = cbViewModel.getClipboardManager()
+        vaultManager.startObservingSystemLocks()
+        hotkeyManager.setVaultManager(vaultManager)
+        // A password copied again stays out of the history, locked or not.
+        cbViewModel.isStoredSecret = { [weak vaultManager] capture in
+            vaultManager?.isStoredSecret(capture) ?? false
+        }
+        Task {
+            await vaultManager.migrateLegacyPasswordHint()
+            await vaultManager.prepareCopyDetection()
+        }
+        // Plaintext copies of saved entries leave the history at unlock
+        // and after each paste from Passwords (Settings → Passwords).
+        vaultManager.onUnlocked = { [weak cbViewModel, weak settingsManager] entries in
+            guard settingsManager?.vaultRemoveHistoryCopies ?? true else { return }
+            cbViewModel?.removeHistoryCopies(of: entries.map(\.contentKey))
+        }
+        vaultManager.onEntryUsed = { [weak cbViewModel, weak settingsManager] entry in
+            guard settingsManager?.vaultRemoveHistoryCopies ?? true else { return }
+            cbViewModel?.removeHistoryCopies(of: [entry.contentKey])
+        }
+        quickPickerManager.setVaultManager(vaultManager)
 
         // PinManager shares the settings container (PinnedItemConfig lives there)
         pinManager.viewModel = cbViewModel
@@ -207,7 +239,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// can run next to the installed app.
     private func setUpDemo(
         cbViewModel: CBViewModel, settingsManager: SettingsManager, hotkeyManager: HotkeyManager,
-        quickPickerManager: QuickPickerWindowManager, pinManager: PinManager,
+        quickPickerManager: QuickPickerWindowManager, pinManager: PinManager, vaultManager: VaultManager,
         settingsContainer: ModelContainer, clipboardContainer: ModelContainer
     ) {
         DemoData.addCategories(to: settingsManager)
@@ -229,12 +261,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         pinManager.modelContext = settingsContainer.mainContext
         updateWindowVisibility(settingsManager: settingsManager)
 
-        if let directory = AppEnvironment.screenshotsDirectory {
-            let tour = ScreenshotTour(
+        let tour = AppEnvironment.screenshotsDirectory.map { directory in
+            ScreenshotTour(
                 directory: directory, viewModel: cbViewModel, settings: settingsManager,
                 quickPicker: quickPickerManager, hotkeyManager: hotkeyManager, pinManager: pinManager,
-                settingsContainer: settingsContainer)
-            Task { await tour.run() }  // holds the tour until it quits the app
+                vaultManager: vaultManager, settingsContainer: settingsContainer)
+        }
+        Task {
+            // The made-up Passwords first, so every screen shows them.
+            await DemoData.fillVault(vaultManager)
+            await tour?.run()  // holds the tour until it quits the app
         }
     }
 
@@ -479,10 +515,9 @@ enum ModelContainerFactory {
             do {
                 // Remove the main store file and its WAL/SHM companions
                 let storeDir = storeURL.deletingLastPathComponent()
-                let storeFileName = storeURL.lastPathComponent
                 let fm = FileManager.default
                 if let files = try? fm.contentsOfDirectory(atPath: storeDir.path) {
-                    for file in files where file.hasPrefix(storeFileName) {
+                    for file in recoveryFiles(of: storeURL.lastPathComponent, among: files) {
                         try? fm.removeItem(at: storeDir.appendingPathComponent(file))
                     }
                 }
@@ -495,6 +530,16 @@ enum ModelContainerFactory {
                 return makeInMemoryContainer(schema: schema, name: "\(storeName)Memory")
             }
         }
+    }
+
+    /// The files the recovery deletes: the store and its `-wal` / `-shm`
+    /// companions, matched by exact name and nothing else in the folder.
+    /// The Passwords vault (`Vault/`), the error log and the other store
+    /// live next to them and must survive a corrupt history store: never
+    /// loosen this to a prefix match.
+    static func recoveryFiles(of storeFileName: String, among files: [String]) -> [String] {
+        let names: Set<String> = [storeFileName, storeFileName + "-wal", storeFileName + "-shm"]
+        return files.filter(names.contains)
     }
 
     private static func makeInMemoryContainer(schema: Schema, name: String) -> ModelContainer {
@@ -520,6 +565,7 @@ struct StoneClipboarderToolApp: App {
     @StateObject private var hotkeyManager = HotkeyManager()
     @StateObject private var quickPickerManager = QuickPickerWindowManager()
     @StateObject private var pinManager = PinManager()
+    @StateObject private var vaultManager = VaultManager.makeForApp()
 
     private let updaterController: SPUStandardUpdaterController
 
@@ -574,6 +620,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
                     .environmentObject(pinManager)
+                    .environmentObject(vaultManager)
                     .frame(minWidth: 720, minHeight: 540)
             }
             .modelContainer(settingsContainer)
@@ -586,6 +633,7 @@ struct StoneClipboarderToolApp: App {
                     .environmentObject(hotkeyManager)
                     .environmentObject(cbViewModel)
                     .environmentObject(pinManager)
+                    .environmentObject(vaultManager)
             }
             .modelContainer(settingsContainer)
         }
@@ -600,6 +648,7 @@ struct StoneClipboarderToolApp: App {
         appDelegate.hotkeyManager = hotkeyManager
         appDelegate.quickPickerManager = quickPickerManager
         appDelegate.pinManager = pinManager
+        appDelegate.vaultManager = vaultManager
         appDelegate.clipboardContainer = clipboardContainer
         appDelegate.settingsContainer = settingsContainer
 

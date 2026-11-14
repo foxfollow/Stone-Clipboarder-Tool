@@ -114,6 +114,7 @@ final class ClipboardManager: ObservableObject {
         guard pasteboard.changeCount != lastChangeCount else { return }
 
         lastChangeCount = pasteboard.changeCount
+        pasteboardChangedAfterSecret()
 
         // Check if monitoring is paused
         if isPaused {
@@ -198,12 +199,14 @@ final class ClipboardManager: ObservableObject {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
         lastChangeCount = pasteboard.changeCount
+        pasteboardChangedAfterSecret()
     }
     
     func copyToClipboard(_ image: NSImage) {
         pasteboard.clearContents()
         pasteboard.writeObjects([image])
         lastChangeCount = pasteboard.changeCount
+        pasteboardChangedAfterSecret()
     }
     
     /// Puts a file on the pasteboard. The file stays on disk until the next
@@ -215,6 +218,7 @@ final class ClipboardManager: ObservableObject {
             pasteboard.clearContents()
             pasteboard.writeObjects([fileURL as NSURL])
             lastChangeCount = pasteboard.changeCount
+            pasteboardChangedAfterSecret()
             return true
         } catch {
             ErrorLogger.shared.log("Failed to create temp file for clipboard", category: "Clipboard", error: error)
@@ -346,8 +350,113 @@ final class ClipboardManager: ObservableObject {
             pasteboard.clearContents()
             pasteboard.writeObjects(objects)
             lastChangeCount = pasteboard.changeCount
+            pasteboardChangedAfterSecret()
             return true
         }
+    }
+
+    // MARK: - Passwords
+
+    /// nspasteboard.org markers: other clipboard managers skip concealed and
+    /// transient content instead of recording it.
+    static let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
+    static let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
+
+    /// The pending clear of a pasted password.
+    private var secretClearWork: DispatchWorkItem?
+    /// The folder of a decrypted file entry on the pasteboard. Removed as
+    /// soon as the pasteboard holds something else, when it is cleared,
+    /// and at quit — never left behind in $TMPDIR.
+    private var secretFileFolder: URL?
+    /// `changeCount` of the last pasted Passwords entry.
+    private var secretChangeCount: Int?
+
+    /// Puts a vault entry on the pasteboard, marked concealed and transient.
+    /// Like every write here it records `changeCount`, so the history never
+    /// captures it. After `clearAfter` seconds (0 = never) the pasteboard is
+    /// emptied, but only if it still holds this entry. Returns false when
+    /// there is nothing to copy.
+    @discardableResult
+    func copySecret(_ payload: VaultPayload, clearAfter seconds: Int) -> Bool {
+        secretClearWork?.cancel()
+        secretClearWork = nil
+        removeSecretFile()
+
+        var objects: [NSPasteboardWriting] = []
+        switch payload.itemType {
+        case .text, .combined:
+            if let content = payload.content, !content.isEmpty {
+                objects.append(content as NSString)
+            }
+            if payload.itemType == .combined, let data = payload.imageData, let image = NSImage(data: data) {
+                objects.append(image)
+            }
+        case .image:
+            if let data = payload.imageData, let image = NSImage(data: data) {
+                objects.append(image)
+            }
+        case .file:
+            guard let data = payload.fileData, let name = payload.fileName else { return false }
+            do {
+                let url = try PasteboardFileStore.write(data, fileName: name)
+                secretFileFolder = url.deletingLastPathComponent()
+                objects.append(url as NSURL)
+            } catch {
+                ErrorLogger.shared.log("Failed to create temp file for a vault entry", category: "Vault", error: error)
+                return false
+            }
+        }
+        guard !objects.isEmpty else { return false }
+
+        pasteboard.clearContents()
+        pasteboard.writeObjects(objects)
+        pasteboard.addTypes([Self.concealedType, Self.transientType], owner: nil)
+        pasteboard.setData(Data(), forType: Self.concealedType)
+        pasteboard.setData(Data(), forType: Self.transientType)
+        lastChangeCount = pasteboard.changeCount
+        secretChangeCount = pasteboard.changeCount
+
+        if seconds > 0 {
+            let written = pasteboard.changeCount
+            let work = DispatchWorkItem { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.clearSecret(ifChangeCountIs: written)
+                }
+            }
+            secretClearWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(seconds), execute: work)
+        }
+        return true
+    }
+
+    /// Empties the pasteboard if nothing was copied since the password, and
+    /// deletes its file either way.
+    private func clearSecret(ifChangeCountIs written: Int) {
+        secretClearWork = nil
+        if pasteboard.changeCount == written {
+            pasteboard.clearContents()
+            lastChangeCount = pasteboard.changeCount
+        }
+        removeSecretFile()
+    }
+
+    /// Deletes the decrypted file of a pasted entry, if one is on disk.
+    /// `clearingPasteboard` (at quit) also empties the pasteboard when it
+    /// still points at that file.
+    func removeSecretFile(clearingPasteboard: Bool = false) {
+        if clearingPasteboard, secretFileFolder != nil, pasteboard.changeCount == secretChangeCount {
+            pasteboard.clearContents()
+            lastChangeCount = pasteboard.changeCount
+        }
+        guard let folder = secretFileFolder else { return }
+        try? FileManager.default.removeItem(at: folder)
+        secretFileFolder = nil
+    }
+
+    /// The pasteboard no longer holds the pasted entry.
+    private func pasteboardChangedAfterSecret() {
+        guard secretFileFolder != nil, pasteboard.changeCount != secretChangeCount else { return }
+        removeSecretFile()
     }
 
     // MARK: - Pause Timer Methods

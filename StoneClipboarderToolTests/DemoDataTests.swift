@@ -50,3 +50,30 @@ final class DemoDataTests: XCTestCase {
         XCTAssertNotNil(NSImage(data: DemoData.qrImage("https://example.com")))
     }
 }
+
+/// The made-up Passwords of demo mode.
+@MainActor
+final class DemoVaultTests: XCTestCase {
+
+    func testTheDemoVaultHoldsEveryKindAndNothingReal() async {
+        let vault = VaultManager.makeInert(authenticator: YesForDemoTests())
+        await DemoData.fillVault(vault)
+        XCTAssertTrue(vault.isUnlocked)
+        XCTAssertEqual(vault.entries.count, DemoData.vaultEntries.count)
+        XCTAssertEqual(Set(vault.entries.map(\.itemType)), [.text, .image, .file])
+        XCTAssertTrue(vault.entries.allSatisfy { $0.title != nil })
+        XCTAssertTrue(vault.entries.contains { $0.icon != nil })
+        XCTAssertTrue(DemoData.vaultEntries.allSatisfy(\.hasContent))
+    }
+
+    func testTheDemoAuthenticatorRefusesOutsideDemoMode() async {
+        // Unit tests are not a demo: it must not open anything.
+        let allowed = await DemoAuthenticator().authenticate(reason: "test")
+        XCTAssertFalse(allowed)
+    }
+}
+
+@MainActor
+private final class YesForDemoTests: VaultAuthenticator {
+    func authenticate(reason: String) async -> Bool { true }
+}

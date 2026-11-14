@@ -36,6 +36,7 @@ private struct AppearanceSection: View {
         Section("Appearance") {
             VStack(alignment: .leading, spacing: 4) {
                 Toggle("Show in Menu Bar", isOn: $settingsManager.showInMenubar)
+                    .settingsAnchor("general.showInMenubar")
                     .disabled(!settingsManager.showMainWindow)
                     .help("Show clipboard history in the menu bar for quick access")
 
@@ -46,6 +47,7 @@ private struct AppearanceSection: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Toggle("Show Main Window (in Dock & Cmd+Tab)", isOn: $settingsManager.showMainWindow)
+                    .settingsAnchor("general.showMainWindow")
                     .disabled(!settingsManager.showInMenubar)
                     .help("Show the app icon in the Dock and the Command+Tab switcher")
 
@@ -59,10 +61,12 @@ private struct AppearanceSection: View {
                 .foregroundColor(.secondary.opacity(0.8))
 
             Toggle("Hold or double-tap ⌘Q to quit", isOn: $settingsManager.confirmQuitOnCmdQ)
+                .settingsAnchor("general.confirmQuit")
                 .help("Require holding ⌘Q for 1 second, or double-tapping ⌘Q, to quit — preventing accidental quits")
 
             VStack(alignment: .leading, spacing: 4) {
                 Toggle("Hide other windows when Quick Picker opens", isOn: $settingsManager.closeOtherWindowsOnQuickPicker)
+                    .settingsAnchor("general.hideOtherWindows")
                     .help("Hide the main window (and others) while the Quick Picker is shown.")
                 Text("Pinned windows and the Settings window are kept open. Use the Pins tab to let the Quick Picker dismiss pins.")
                     .font(.caption)
@@ -90,6 +94,7 @@ private struct ClipboardBehaviorSection: View {
                     .foregroundColor(.secondary)
             }
             .help("Choose how to capture clipboard content. Files are always captured regardless of this setting.")
+            .settingsAnchor("general.captureMode")
         }
     }
 }
@@ -114,6 +119,7 @@ private struct MemoryOptimizationSection: View {
             .font(.caption)
 
             Toggle("Auto-cleanup old items", isOn: $settingsManager.enableAutoCleanup)
+                .settingsAnchor("general.autoCleanup")
                 .help("Automatically remove old clipboard items to maintain performance")
 
             if settingsManager.enableAutoCleanup {
@@ -125,6 +131,7 @@ private struct MemoryOptimizationSection: View {
                     }
                 }
                 .help("Maximum number of items to keep before auto-cleanup")
+                .settingsAnchor("general.maxItems")
             }
 
             HStack {
@@ -137,6 +144,7 @@ private struct MemoryOptimizationSection: View {
                     .foregroundColor(.red)
                     .help("Delete all clipboard history items permanently")
             }
+            .settingsAnchor("general.cleanupButtons")
         }
     }
 }
@@ -154,6 +162,7 @@ private struct MenuBarDisplaySection: View {
                 }
             }
             .help("Number of items shown in menu bar dropdown")
+            .settingsAnchor("general.menuBarLimit")
         }
     }
 }
@@ -164,6 +173,7 @@ private struct MemoryManagementSection: View {
     var body: some View {
         Section("Memory Management") {
             Toggle("Enable memory cleanup", isOn: $settingsManager.enableMemoryCleanup)
+                .settingsAnchor("general.memoryCleanup")
                 .help("Automatically release memory from inactive clipboard items")
 
             if settingsManager.enableMemoryCleanup {
@@ -175,6 +185,7 @@ private struct MemoryManagementSection: View {
                     }
                 }
                 .help("How often to check for inactive items")
+                .settingsAnchor("general.memoryInterval")
 
                 HStack {
                     Text("Max inactive time (minutes)")
@@ -184,6 +195,7 @@ private struct MemoryManagementSection: View {
                     }
                 }
                 .help("How long items stay in memory without access")
+                .settingsAnchor("general.maxInactive")
             }
         }
     }
@@ -195,6 +207,7 @@ private struct ErrorLoggingSection: View {
     var body: some View {
         Section("Error Logging") {
             Toggle("Save errors to log file", isOn: $settingsManager.enableErrorFileLogging)
+                .settingsAnchor("general.errorLog")
                 .help("When enabled, SwiftData and other errors are saved to a .log file for debugging")
 
             if settingsManager.enableErrorFileLogging {
@@ -221,6 +234,7 @@ private struct ErrorLoggingSection: View {
                     }
                     .foregroundColor(.red)
                 }
+                .settingsAnchor("general.logButtons")
             }
         }
     }

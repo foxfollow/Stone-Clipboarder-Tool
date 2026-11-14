@@ -5,7 +5,7 @@ final class HotkeyActionTests: XCTestCase {
 
     func testAllCasesCount() {
         // 10 last + 10 favorite + 1 main panel + 2 pin actions
-        XCTAssertEqual(HotkeyAction.allCases.count, 23)
+        XCTAssertEqual(HotkeyAction.allCases.count, 24)
     }
 
     func testLastActionsClassification() {
@@ -85,6 +85,20 @@ final class HotkeyActionTests: XCTestCase {
     func testPinActionsDefaultShortcuts() {
         XCTAssertEqual(HotkeyAction.togglePinLastItem.defaultShortcut, "⌃⌥P")
         XCTAssertEqual(HotkeyAction.dismissAllPins.defaultShortcut, "⌃⌥⇧P")
+    }
+
+    func testLockPasswordsAction() {
+        let action = HotkeyAction.lockPasswords
+        XCTAssertEqual(action.rawValue, "lock_passwords")
+        XCTAssertEqual(action.defaultShortcut, "⌃⌥L")
+        XCTAssertEqual(action.displayName, "Lock Passwords")
+        XCTAssertFalse(action.isLastAction)
+        XCTAssertFalse(action.isFavoriteAction)
+        XCTAssertEqual(action.index, -1)
+        // Its default parses and doesn't collide with another default.
+        XCTAssertNotNil(HotkeyShortcut(action.defaultShortcut))
+        let others = HotkeyAction.allCases.filter { $0 != action }.map(\.defaultShortcut)
+        XCTAssertFalse(others.contains(action.defaultShortcut))
     }
 
     func testDisplayNamesNonEmpty() {

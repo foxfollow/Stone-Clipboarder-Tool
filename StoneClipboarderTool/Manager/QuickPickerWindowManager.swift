@@ -29,8 +29,10 @@ class QuickPickerHostingView: NSHostingView<QuickPickerView> {
 class KeyCapturingPanel: NSPanel {
     weak var quickPickerDelegate: QuickPickerWindowManager?
 
+    /// Not while the Touch ID / password prompt is up: that prompt must keep
+    /// the keyboard, or ⏎ / typing goes to the picker behind it.
     override var canBecomeKey: Bool {
-        return true
+        return !(quickPickerDelegate?.isVaultAuthenticating ?? false)
     }
     // canBecomeMain intentionally not overridden — NSPanel's default is false,
     // which is what we want so .nonactivatingPanel + canJoinAllSpaces can
@@ -43,8 +45,11 @@ class KeyCapturingPanel: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         super.sendEvent(event)
 
-        // Force focus for any keyboard events
-        if (event.type == .keyDown || event.type == .keyUp), !self.isKeyWindow {
+        // Force focus for any keyboard events — except while the Touch ID
+        // prompt is up: the ⏎ that opened it is released after it appears,
+        // and taking key back on that keyUp left the prompt unfocused.
+        if (event.type == .keyDown || event.type == .keyUp), !self.isKeyWindow,
+           !(quickPickerDelegate?.isVaultAuthenticating ?? false) {
             self.makeKey()
         }
     }
@@ -74,6 +79,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
     private weak var cbViewModel: CBViewModel?
     private weak var settingsManager: SettingsManager?
     private weak var pinManager: PinManager?
+    private weak var vaultManager: VaultManager?
     nonisolated(unsafe) private var eventMonitor: Any?
     nonisolated(unsafe) private var keyMonitor: Any?
     nonisolated(unsafe) private var localKeyMonitor: Any?
@@ -101,8 +107,31 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         self.pinManager = manager
     }
 
+    func setVaultManager(_ manager: VaultManager) {
+        self.vaultManager = manager
+    }
+
+    /// The Touch ID / password prompt is up (asked by the picker's panel).
+    var isVaultAuthenticating: Bool {
+        vaultManager?.isAuthenticating == true
+    }
+
     func setMenuBarRefreshCallback(_ callback: @escaping () -> Void) {
         self.menuBarRefreshCallback = callback
+    }
+
+    /// Opens the picker on `tab` (when shown) instead of the first tab.
+    func showQuickPicker(on tab: QPTab) {
+        nextInitialTab = tab
+        showQuickPicker()
+    }
+
+    /// Used by the next `showQuickPicker()` only.
+    private var nextInitialTab: QPTab?
+
+    private func takeInitialTab() -> QPTab? {
+        defer { nextInitialTab = nil }
+        return nextInitialTab
     }
 
     func showQuickPicker() {
@@ -189,6 +218,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             viewModel: cbViewModel,
             pinManager: pinManager,
             settingsManager: settingsManager,
+            vaultManager: vaultManager,
             onClose: { [weak self] in
                 self?.hideQuickPicker()
             },
@@ -204,7 +234,17 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             onTypePaste: { [weak self] text in
                 guard let self else { return }
                 self.typePaster.type(text, charDelayMs: self.settingsManager?.typePasteCharDelayMs ?? 5)
-            }
+            },
+            onVaultAuthenticationEnded: { [weak self] in
+                self?.reclaimFocusAfterAuthentication()
+            },
+            vaultPreview: QPVaultPreviewActions(
+                toggle: { [weak self] entry, expanded in self?.toggleVaultPreview(for: entry, expanded: expanded) },
+                update: { [weak self] entry in self?.updateVaultPreview(for: entry) },
+                hide: { [weak self] in self?.hideVaultPreview() },
+                isVisible: { [weak self] in self?.isVaultPreviewVisible ?? false }
+            ),
+            initialTab: takeInitialTab()
         )
 
         let hostingView = QuickPickerHostingView(rootView: contentView)
@@ -343,6 +383,7 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             guard quickLookCoordinator.prepareItem(item) else { return }
             quickLookCoordinator.showPreview()
         case .custom:
+            customPreviewManager.allowsExpanding = false
             let triggerKey = settingsManager?.quickLookTriggerKey ?? .space
             customPreviewManager.triggerKeyHint = triggerKey == .space ? "⎵ to close" : "→ to close"
             customPreviewManager.showPreview(for: item, relativeTo: window)
@@ -355,6 +396,81 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
         // trigger key (space / →) and escape would be delivered to whichever
         // app was frontmost before the picker opened — typing the literal
         // character there instead of toggling the preview off.
+        reclaimKeyFocus()
+    }
+
+    // MARK: - Passwords preview
+
+    /// Space / → on the Passwords tab follow the Quick Look setting like the
+    /// other tabs. Apple Quick Look needs a file, so the entry is decrypted
+    /// into an owner-only folder that goes as soon as the preview closes;
+    /// the custom panel shows it from memory. `expanded` (⌥Space) opens it
+    /// large, or switches size when it is open.
+    private func toggleVaultPreview(for entry: VaultPayload, expanded: Bool) {
+        if isVaultPreviewVisible {
+            if expanded {
+                if quickLookCoordinator.isPreviewVisible {
+                    quickLookCoordinator.toggleFullScreen()
+                } else {
+                    customPreviewManager.toggleExpanded()
+                }
+            } else {
+                hideVaultPreview()
+            }
+            return
+        }
+        showVaultPreview(for: entry, expanded: expanded)
+    }
+
+    private var isVaultPreviewVisible: Bool {
+        quickLookCoordinator.isPreviewVisible || customPreviewManager.isPreviewVisible
+    }
+
+    private func showVaultPreview(for entry: VaultPayload, expanded: Bool) {
+        let content = QPPreviewContent(entry: entry)
+        let configuredMode = settingsManager?.quickLookMode ?? .native
+        let mode: QuickLookMode =
+            configuredMode == .native && Self.isInOtherAppFullscreenSpace() ? .custom : configuredMode
+        switch mode {
+        case .native:
+            customPreviewManager.hidePreview()
+            guard quickLookCoordinator.prepareSecret(content) else { return }
+            quickLookCoordinator.showPreview()
+            if expanded {
+                DispatchQueue.main.async { [weak self] in self?.quickLookCoordinator.toggleFullScreen() }
+            }
+        case .custom:
+            let triggerKey = settingsManager?.quickLookTriggerKey ?? .space
+            customPreviewManager.triggerKeyHint = triggerKey == .space ? "⎵ to close" : "→ to close"
+            customPreviewManager.allowsExpanding = true
+            customPreviewManager.showPreview(content: content, relativeTo: window, expanded: expanded)
+        case .disabled:
+            return
+        }
+        reclaimKeyFocus()
+    }
+
+    private func updateVaultPreview(for entry: VaultPayload) {
+        if quickLookCoordinator.isPreviewVisible {
+            guard quickLookCoordinator.prepareSecret(QPPreviewContent(entry: entry)) else { return }
+            quickLookCoordinator.showPreview()
+            reclaimKeyFocus()
+        } else if customPreviewManager.isPreviewVisible {
+            customPreviewManager.showPreview(content: QPPreviewContent(entry: entry), relativeTo: window)
+        }
+    }
+
+    private func hideVaultPreview() {
+        hidePreviewPanel()
+        customPreviewManager.allowsExpanding = false
+        reclaimKeyFocus()
+    }
+
+    /// After the Touch ID prompt the picker is no longer key, and the app
+    /// may not be active: take both back and put the cursor in the search.
+    private func reclaimFocusAfterAuthentication() {
+        guard window?.isVisible == true else { return }
+        NSApp.activate(ignoringOtherApps: true)
         reclaimKeyFocus()
     }
 
@@ -417,6 +533,8 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     func hidePreviewPanel() {
         quickLookCoordinator.hidePreview()
+        // A decrypted Passwords entry never outlives its preview.
+        quickLookCoordinator.removeSecretFiles()
         customPreviewManager.hidePreview()
     }
 
@@ -435,6 +553,11 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
             // Never dismiss for clicks inside the QuickPicker window itself
             if window.frame.contains(clickLocation) {
+                return
+            }
+
+            // Nor for clicks on the Touch ID / password prompt.
+            if self.vaultManager?.isAuthenticating == true {
                 return
             }
 
@@ -478,7 +601,9 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             guard let self = self,
                 let window = self.window,
                 window.isVisible,
-                event.keyCode == 53  // Only handle escape key
+                event.keyCode == 53,  // Only handle escape key
+                // Esc in the Touch ID prompt cancels only the prompt.
+                self.vaultManager?.isAuthenticating != true
             else { return }
 
             self.hideQuickPicker()
@@ -550,8 +675,12 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
                 ) { [weak self] _ in
                     MainActor.assumeIsolated {
                         guard let self = self, self.window?.isVisible == true else { return }
+                        // The Touch ID / password prompt is another process:
+                        // the picker waits for it.
+                        if self.vaultManager?.isAuthenticating == true { return }
                         // Delay slightly so "Open with" button action fires and temp files survive
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            guard self.vaultManager?.isAuthenticating != true else { return }
                             self.hideQuickPicker()
                         }
                     }

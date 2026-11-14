@@ -334,6 +334,68 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(showRowBadges, forKey: "showRowBadges") }
     }
 
+    /// Quick Picker tab ids (`QPTab` raw values) in the order shown; tabs
+    /// not listed follow in the default order. Empty = default.
+    @Published var quickPickerTabOrder: [String] {
+        didSet { defaults.set(quickPickerTabOrder, forKey: "quickPickerTabOrder") }
+    }
+
+    // MARK: - Passwords vault
+
+    /// The Quick Picker shows the Passwords tab.
+    @Published var showPasswordsTab: Bool {
+        didSet { defaults.set(showPasswordsTab, forKey: "showPasswordsTab") }
+    }
+
+    /// Minutes an unlocked vault stays unlocked after its last use.
+    @Published var vaultRelockMinutes: Int {
+        didSet {
+            if vaultRelockMinutes < 1 {
+                vaultRelockMinutes = 1  // re-enters didSet once, then persists
+                return
+            }
+            defaults.set(vaultRelockMinutes, forKey: "vaultRelockMinutes")
+        }
+    }
+
+    /// The vault key is wrapped with a password the user chose, which
+    /// unlocks the Passwords tab instead of Touch ID. Mirrors what
+    /// VaultManager finds in the Keychain.
+    @Published var vaultUsesPassword: Bool {
+        didSet { defaults.set(vaultUsesPassword, forKey: "vaultUsesPassword") }
+    }
+
+    /// When copies of saved Passwords entries stay out of the history.
+    @Published var vaultCopyDetection: VaultCopyDetection {
+        didSet { defaults.set(vaultCopyDetection.rawValue, forKey: "vaultCopyDetection") }
+    }
+
+    /// History copies of saved entries are deleted at unlock and after
+    /// pasting from Passwords.
+    @Published var vaultRemoveHistoryCopies: Bool {
+        didSet { defaults.set(vaultRemoveHistoryCopies, forKey: "vaultRemoveHistoryCopies") }
+    }
+
+    /// A hint saved by a 1.11 beta, which kept it here; returned once and
+    /// removed. VaultManager moves it into the Keychain.
+    func takeLegacyVaultPasswordHint() -> String? {
+        guard let hint = defaults.string(forKey: "vaultPasswordHint") else { return nil }
+        defaults.removeObject(forKey: "vaultPasswordHint")
+        return hint
+    }
+
+    /// Seconds after pasting a password before the clipboard is cleared, if
+    /// it still holds that password; 0 = never.
+    @Published var vaultClipboardClearSeconds: Int {
+        didSet {
+            if vaultClipboardClearSeconds < 0 {
+                vaultClipboardClearSeconds = 0
+                return
+            }
+            defaults.set(vaultClipboardClearSeconds, forKey: "vaultClipboardClearSeconds")
+        }
+    }
+
     /// Store the frontmost app's name and bundle id with each capture.
     @Published var recordSourceApp: Bool {
         didSet { defaults.set(recordSourceApp, forKey: "recordSourceApp") }
@@ -490,6 +552,15 @@ final class SettingsManager: ObservableObject {
         self.recognizeTextInNewImages = defaults.object(forKey: "recognizeTextInNewImages") as? Bool ?? true
         self.showImageTextInRows = defaults.object(forKey: "showImageTextInRows") as? Bool ?? true
         self.showRowBadges = defaults.object(forKey: "showRowBadges") as? Bool ?? true
+        self.showPasswordsTab = defaults.object(forKey: "showPasswordsTab") as? Bool ?? true
+        self.quickPickerTabOrder = defaults.stringArray(forKey: "quickPickerTabOrder") ?? []
+        self.vaultRelockMinutes = max(
+            1, defaults.object(forKey: "vaultRelockMinutes") as? Int ?? VaultLockPolicy.defaultTimeoutMinutes)
+        self.vaultClipboardClearSeconds = max(0, defaults.object(forKey: "vaultClipboardClearSeconds") as? Int ?? 30)
+        self.vaultUsesPassword = defaults.object(forKey: "vaultUsesPassword") as? Bool ?? false
+        self.vaultCopyDetection = defaults.string(forKey: "vaultCopyDetection")
+            .flatMap(VaultCopyDetection.init(rawValue:)) ?? .whileUnlocked
+        self.vaultRemoveHistoryCopies = defaults.object(forKey: "vaultRemoveHistoryCopies") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode
         if let savedModeString = defaults.string(forKey: "clipboardCaptureMode"),
