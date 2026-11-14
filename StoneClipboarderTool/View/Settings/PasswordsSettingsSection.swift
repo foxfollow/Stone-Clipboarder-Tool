@@ -86,6 +86,21 @@ struct PasswordsSettingsSection: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("Preview passwords with", selection: $settingsManager.vaultPreviewMode) {
+                    ForEach(VaultPreviewMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                Text(previewModeNote)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .disabled(settingsManager.quickLookMode == .disabled)
+            .settingsAnchor("passwords.previewMode")
+
             Toggle("Remove history copies of saved passwords", isOn: $settingsManager.vaultRemoveHistoryCopies)
                 .help("Every copy of a saved password in the history is deleted when Passwords unlocks and after you paste or type that password from Passwords.")
                 .settingsAnchor("passwords.removeCopies")
@@ -123,6 +138,18 @@ struct PasswordsSettingsSection: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Every entry, its Keychain key and the Passwords password are removed. This can't be undone.")
+        }
+    }
+
+    private var previewModeNote: String {
+        if settingsManager.quickLookMode == .disabled {
+            return "Previews are off (Quick Picker → Preview mode)."
+        }
+        switch settingsManager.vaultPreviewMode {
+        case .quickLook:
+            return "Quick Look reads a decrypted copy of the entry, deleted when the preview closes. Its \"Open with…\" button hands that copy to another app, which may keep its own."
+        case .custom:
+            return "Shown from memory: nothing is written to disk."
         }
     }
 

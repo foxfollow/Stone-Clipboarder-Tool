@@ -370,6 +370,12 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(vaultCopyDetection.rawValue, forKey: "vaultCopyDetection") }
     }
 
+    /// Which panel previews a Passwords entry. The custom panel keeps the
+    /// decrypted entry off the disk.
+    @Published var vaultPreviewMode: VaultPreviewMode {
+        didSet { defaults.set(vaultPreviewMode.rawValue, forKey: "vaultPreviewMode") }
+    }
+
     /// History copies of saved entries are deleted at unlock and after
     /// pasting from Passwords.
     @Published var vaultRemoveHistoryCopies: Bool {
@@ -560,6 +566,11 @@ final class SettingsManager: ObservableObject {
         self.vaultUsesPassword = defaults.object(forKey: "vaultUsesPassword") as? Bool ?? false
         self.vaultCopyDetection = defaults.string(forKey: "vaultCopyDetection")
             .flatMap(VaultCopyDetection.init(rawValue:)) ?? .whileUnlocked
+        // Until now Passwords followed "Preview mode": someone who chose the
+        // custom panel keeps it rather than getting decrypted files.
+        self.vaultPreviewMode = defaults.string(forKey: "vaultPreviewMode")
+            .flatMap(VaultPreviewMode.init(rawValue:))
+            ?? (defaults.string(forKey: "quickLookMode") == QuickLookMode.custom.rawValue ? .custom : .quickLook)
         self.vaultRemoveHistoryCopies = defaults.object(forKey: "vaultRemoveHistoryCopies") as? Bool ?? true
 
         // Migrate from old preferTextOverImage setting to new clipboardCaptureMode

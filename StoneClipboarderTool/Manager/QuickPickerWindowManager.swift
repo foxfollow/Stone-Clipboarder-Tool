@@ -401,11 +401,12 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     // MARK: - Passwords preview
 
-    /// Space / → on the Passwords tab follow the Quick Look setting like the
-    /// other tabs. Apple Quick Look needs a file, so the entry is decrypted
-    /// into an owner-only folder that goes as soon as the preview closes;
-    /// the custom panel shows it from memory. `expanded` (⌥Space) opens it
-    /// large, or switches size when it is open.
+    /// Space / → on the Passwords tab use their own setting
+    /// (`vaultPreviewMode`); "Preview mode: Disabled" turns them off too.
+    /// Apple Quick Look needs a file, so the entry is decrypted into an
+    /// owner-only folder that goes as soon as the preview closes; the custom
+    /// panel shows it from memory. `expanded` (⌥Space) opens it large, or
+    /// switches size when it is open.
     private func toggleVaultPreview(for entry: VaultPayload, expanded: Bool) {
         if isVaultPreviewVisible {
             if expanded {
@@ -428,9 +429,10 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
 
     private func showVaultPreview(for entry: VaultPayload, expanded: Bool) {
         let content = QPPreviewContent(entry: entry)
-        let configuredMode = settingsManager?.quickLookMode ?? .native
-        let mode: QuickLookMode =
-            configuredMode == .native && Self.isInOtherAppFullscreenSpace() ? .custom : configuredMode
+        let mode = Self.vaultPreviewPanel(
+            quickLookMode: settingsManager?.quickLookMode ?? .native,
+            vaultPreviewMode: settingsManager?.vaultPreviewMode ?? .quickLook,
+            inOtherAppFullscreenSpace: Self.isInOtherAppFullscreenSpace())
         switch mode {
         case .native:
             customPreviewManager.hidePreview()
@@ -448,6 +450,16 @@ class QuickPickerWindowManager: NSObject, ObservableObject, QuickPickerDelegate 
             return
         }
         reclaimKeyFocus()
+    }
+
+    /// The panel a Passwords preview opens in. Apple's panel can't show over
+    /// another app's fullscreen Space, so the custom one stands in there.
+    static func vaultPreviewPanel(
+        quickLookMode: QuickLookMode, vaultPreviewMode: VaultPreviewMode, inOtherAppFullscreenSpace: Bool
+    ) -> QuickLookMode {
+        guard quickLookMode != .disabled else { return .disabled }
+        if vaultPreviewMode == .custom || inOtherAppFullscreenSpace { return .custom }
+        return .native
     }
 
     private func updateVaultPreview(for entry: VaultPayload) {

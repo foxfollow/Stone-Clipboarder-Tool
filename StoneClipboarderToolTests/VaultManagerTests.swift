@@ -354,6 +354,31 @@ final class VaultSettingsTests: XCTestCase {
         XCTAssertEqual(reloaded.vaultClipboardClearSeconds, 0)
         XCTAssertFalse(reloaded.showPasswordsTab)
     }
+
+    @MainActor
+    func testPreviewModeDefaultsToQuickLookUnlessCustomWasChosen() {
+        let isolated = IsolatedDefaults()
+        defer { isolated.remove() }
+        XCTAssertEqual(SettingsManager(defaults: isolated.defaults).vaultPreviewMode, .quickLook)
+
+        isolated.defaults.set(QuickLookMode.custom.rawValue, forKey: "quickLookMode")
+        let migrated = SettingsManager(defaults: isolated.defaults)
+        XCTAssertEqual(migrated.vaultPreviewMode, .custom)
+
+        migrated.vaultPreviewMode = .quickLook
+        XCTAssertEqual(SettingsManager(defaults: isolated.defaults).vaultPreviewMode, .quickLook)
+    }
+
+    @MainActor
+    func testVaultPreviewPanel() {
+        let panel = QuickPickerWindowManager.vaultPreviewPanel
+        XCTAssertEqual(panel(.native, .quickLook, false), .native)
+        XCTAssertEqual(panel(.custom, .quickLook, false), .native)
+        XCTAssertEqual(panel(.native, .custom, false), .custom)
+        XCTAssertEqual(panel(.native, .quickLook, true), .custom)
+        XCTAssertEqual(panel(.disabled, .custom, false), .disabled)
+        XCTAssertEqual(panel(.disabled, .quickLook, false), .disabled)
+    }
 }
 
 @MainActor

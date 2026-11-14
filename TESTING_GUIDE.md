@@ -119,9 +119,11 @@ all pins.
 - [ ] Text rows are masked; the eye (or ⌥R) reveals a row, moving the
       cursor hides it again. Images stay hidden until revealed. The ⌥E
       editor has the eye too.
-- [ ] Space / → previews the entry the way Settings → Quick Picker says:
-      Apple Quick Look (⌥Space: full screen), the custom panel (⌥Space or
-      its button: 85 % of the screen) or nothing when disabled. ↑/↓ follow;
+- [ ] Space / → previews the entry with Settings → Passwords → Preview
+      passwords with: Apple Quick Look (default; ⌥Space: full screen) or the
+      custom panel (⌥Space or its button: 85 % of the screen); nothing when
+      Settings → Quick Picker → Preview mode is Disabled. Someone whose
+      Preview mode was Custom before this setting gets Custom. ↑/↓ follow;
       Esc, locking, leaving the tab or closing the picker closes it. With
       Apple Quick Look, `Previews/Secret_…` exists only while the preview is
       open; the custom panel writes nothing.

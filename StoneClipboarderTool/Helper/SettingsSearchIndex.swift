@@ -203,6 +203,8 @@ enum SettingsSearchIndex {
                          "protect", "security"]),
         entry("passwords.copyDetection", "Keep copies of saved passwords out of the history", .passwords, "Passwords",
               keywords: ["duplicates", "copied again", "history", "fingerprint", "locked", "detect"]),
+        entry("passwords.previewMode", "Preview passwords with", .passwords, "Passwords",
+              keywords: ["quick look", "custom preview", "space", "open with", "file", "disk"]),
         entry("passwords.removeCopies", "Remove history copies of saved passwords", .passwords, "Passwords",
               keywords: ["duplicates", "delete copies", "history", "clean", "paste"]),
         entry("passwords.relock", "Lock passwords again after", .passwords, "Passwords",
