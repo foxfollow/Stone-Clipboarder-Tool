@@ -42,6 +42,11 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
         } catch {
             return false
         }
+        // Without another preview nothing else would sweep this copy until
+        // quit: remove it once it has outlived the "Open with…" window.
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.previewSessionLifetime + 1) {
+            MainActor.assumeIsolated { Self.cleanupOldPreviewSessions() }
+        }
 
         switch item.itemType {
         case .text:
@@ -205,7 +210,8 @@ class QPQuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
 
     /// Hide the QLPreviewPanel if visible.
     /// Does NOT delete the session file — Preview.app or other external apps may still have it open.
-    /// The file is cleaned up when the next preview is prepared, or on app launch.
+    /// The file goes `previewSessionLifetime` after it was written (timer,
+    /// next preview or launch) and at quit.
     func hidePreview() {
         if QLPreviewPanel.sharedPreviewPanelExists(),
            let panel = QLPreviewPanel.shared(),

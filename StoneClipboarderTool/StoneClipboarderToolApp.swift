@@ -73,6 +73,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // nor the decrypted file of a pasted Passwords entry.
         QPQuickLookCoordinator.removeAllPreviewSessions()
         cbViewModel?.getClipboardManager().removeSecretFile(clearingPasteboard: true)
+        ExternalOpener.removeAllTempFiles()
     }
 
     /// Keeps Dock / Cmd+Tab presence matching `showMainWindow` after launch.
@@ -222,6 +223,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Clean up leftover preview session files from previous launches
         QPQuickLookCoordinator.cleanupOldPreviewSessions()
+        // and "Open in TextEdit / Preview" copies a quit or crash left behind
+        ExternalOpener.removeAllTempFiles()
 
         // Load and register hotkeys
         hotkeyManager.loadHotkeyConfigs()

@@ -155,8 +155,8 @@ app's container for sandboxed Debug builds).
 | Purpose | Location | Lifetime |
 | --- | --- | --- |
 | File items put on the pasteboard | `$TMPDIR/StoneClipboarderTool/Pasteboard/<uuid>/` | until the next file copy; a pasted password file also when the clipboard is cleared |
-| Open in Preview / TextEdit / default app | `$TMPDIR/StoneClipboarderTool/Open/<uuid>/` | 60 s |
-| Quick Look previews | `Application Support/StoneClipboarderTool/Previews/Session_<uuid>/` | 10 min; all removed at quit |
+| Open in Preview / TextEdit / default app | `$TMPDIR/StoneClipboarderTool/Open/<uuid>/` | 60 s; all removed at launch and quit |
+| Quick Look previews | `Application Support/StoneClipboarderTool/Previews/Session_<uuid>/` | 10 min (timer, next preview or launch); all removed at quit |
 | Quick Look of a Passwords entry | `…/Previews/Secret_<uuid>/` (0700, file 0600) | until the preview closes, the picker closes or the next entry shows; any left over at launch and quit |
 
 ### Timers
@@ -171,6 +171,8 @@ app's container for sandboxed Debug builds).
 | Pin save debounce | PinWindowController | 0.25 s |
 | Vault expiry check | VaultManager | 30 s, while unlocked |
 | Clear a pasted password | ClipboardManager | `vaultClipboardClearSeconds` (30 s) |
+| Open-in-app temp copy | ExternalOpener | 60 s after writing |
+| Quick Look preview copy sweep | QPQuickLookCoordinator | 10 min + 1 s after each preview |
 | Accessibility status refresh | AccessibilitySettingsView | 2 s, while shown |
 
 ### Event monitors

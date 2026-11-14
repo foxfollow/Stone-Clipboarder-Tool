@@ -87,7 +87,10 @@ all pins.
       remote desktop, and a Ukrainian keyboard layout: Latin letters,
       capitals and !@# arrive correctly.
 - [ ] Space (or →, per settings) toggles Quick Look / the custom preview;
-      "Open with…" from Quick Look works.
+      "Open with…" from Quick Look works. `Previews/Session_…` is gone about
+      10 minutes later without another preview; `$TMPDIR/StoneClipboarderTool/Open/`
+      (Open in TextEdit / Preview) is gone after 60 s, and both at quit and
+      the next launch.
 - [ ] ⌥Space toggles favorite, ⌥P pins the selection.
 - [ ] ⌥E (also on a Ukrainian layout, and from the row's context menu)
       opens the editor over the list: type a title with spaces and arrows
