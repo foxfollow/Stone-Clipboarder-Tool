@@ -76,6 +76,7 @@ struct VaultPasswordSheet: View {
         }
         .padding(20)
         .frame(width: 440)
+        .task { await vaultManager.loadPasswordHint() }
     }
 
     /// The key is needed to (re)wrap it: unlock first.
@@ -88,8 +89,8 @@ struct VaultPasswordSheet: View {
             SecureField("Current password", text: $currentPassword)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { unlockWithPassword() }
-            if !settingsManager.vaultPasswordHint.isEmpty {
-                Text("Hint: \(settingsManager.vaultPasswordHint)")
+            if !vaultManager.passwordHint.isEmpty {
+                Text("Hint: \(vaultManager.passwordHint)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

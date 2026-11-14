@@ -32,6 +32,9 @@ final class VaultManager: ObservableObject {
     @Published private(set) var unreadableCount = 0
     /// A short message for the Passwords tab, e.g. a keychain failure.
     @Published var statusMessage: String?
+    /// The Passwords password's hint, read from the Keychain when a lock
+    /// screen asks for it (`loadPasswordHint`); empty when none.
+    @Published private(set) var passwordHint = ""
 
     enum AddResult: Equatable {
         case added(UUID)
@@ -54,6 +57,7 @@ final class VaultManager: ObservableObject {
     private let store: VaultStore
     private let keyProvider: VaultKeyProvider
     private let fingerprintKeyProvider: VaultKeyProvider
+    private let hintProvider: VaultKeyProvider
     private let authenticator: VaultAuthenticator
     private let now: () -> Date
     private var key: SymmetricKey?
@@ -74,12 +78,14 @@ final class VaultManager: ObservableObject {
         keyProvider: VaultKeyProvider = KeychainVaultKeyProvider(),
         fingerprintKeyProvider: VaultKeyProvider = KeychainVaultKeyProvider(
             account: KeychainVaultKeyProvider.fingerprintAccount),
+        hintProvider: VaultKeyProvider = KeychainVaultKeyProvider(account: KeychainVaultKeyProvider.hintAccount),
         authenticator: VaultAuthenticator? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.store = store
         self.keyProvider = keyProvider
         self.fingerprintKeyProvider = fingerprintKeyProvider
+        self.hintProvider = hintProvider
         self.authenticator = authenticator ?? LocalAuthenticationAuthenticator()
         self.now = now
     }
@@ -102,7 +108,8 @@ final class VaultManager: ObservableObject {
             .appendingPathComponent("StoneClipboarderTool-Vault-\(UUID().uuidString)", isDirectory: true)
         return VaultManager(
             store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(),
-            fingerprintKeyProvider: InMemoryVaultKeyProvider(), authenticator: authenticator)
+            fingerprintKeyProvider: InMemoryVaultKeyProvider(), hintProvider: InMemoryVaultKeyProvider(),
+            authenticator: authenticator)
     }
 
     deinit {
@@ -256,6 +263,41 @@ final class VaultManager: ObservableObject {
 
     // MARK: - Passwords password
 
+    /// Reads the hint for a lock screen (off the main thread: the Keychain
+    /// may prompt). Only in password mode.
+    func loadPasswordHint() async {
+        guard usesPassword else { return }
+        let provider = hintProvider
+        let data = await Task.detached(priority: .userInitiated) { try? provider.readKeyData() }.value
+        passwordHint = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    /// Stores the hint in the Keychain, or removes it when empty.
+    private func storePasswordHint(_ hint: String) async {
+        let provider = hintProvider
+        let result: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
+            Result {
+                if hint.isEmpty {
+                    try provider.deleteKey()
+                } else {
+                    try provider.writeKeyData(Data(hint.utf8))
+                }
+            }
+        }.value
+        if case .failure(let error) = result {
+            ErrorLogger.shared.log("Failed to store the Passwords hint", category: "Vault", error: error)
+        }
+        passwordHint = hint
+    }
+
+    /// 1.11 betas kept the hint in UserDefaults: move it to the Keychain.
+    func migrateLegacyPasswordHint() async {
+        guard let legacy = settingsManager?.takeLegacyVaultPasswordHint() else { return }
+        if !legacy.isEmpty {
+            await storePasswordHint(legacy)
+        }
+    }
+
     /// Wraps the vault key with `password` (the Keychain then holds only the
     /// wrapped key) and stores the optional hint. Needs an unlocked vault.
     /// `rounds` is lowered only by tests.
@@ -269,7 +311,7 @@ final class VaultManager: ObservableObject {
         switch result {
         case .success:
             let trimmedHint = hint?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            settingsManager?.vaultPasswordHint = trimmedHint
+            await storePasswordHint(trimmedHint)
             settingsManager?.vaultUsesPassword = true
             noteUse()
             return true
@@ -290,7 +332,7 @@ final class VaultManager: ObservableObject {
         switch result {
         case .success:
             settingsManager?.vaultUsesPassword = false
-            settingsManager?.vaultPasswordHint = ""
+            await storePasswordHint("")
             noteUse()
             return true
         case .failure(let error):
@@ -530,7 +572,8 @@ final class VaultManager: ObservableObject {
             fingerprints = []
             fingerprintKey = nil
             settingsManager?.vaultUsesPassword = false
-            settingsManager?.vaultPasswordHint = ""
+            try hintProvider.deleteKey()
+            passwordHint = ""
             unreadableCount = 0
             statusMessage = nil
         } catch {

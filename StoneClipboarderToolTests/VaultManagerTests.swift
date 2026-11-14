@@ -49,7 +49,7 @@ final class VaultManagerTests: XCTestCase {
     private func makeManager() -> VaultManager {
         let manager = VaultManager(
             store: VaultStore(root: root), keyProvider: keyProvider, fingerprintKeyProvider: fingerprintProvider,
-            authenticator: authenticator,
+            hintProvider: InMemoryVaultKeyProvider(), authenticator: authenticator,
             now: { [unowned self] in self.clock })
         manager.settingsManager = settings
         return manager
@@ -366,7 +366,8 @@ final class VaultPasteTests: XCTestCase {
         let authenticator = StubAuthenticator()
         let manager = VaultManager(
             store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(),
-            fingerprintKeyProvider: InMemoryVaultKeyProvider(), authenticator: authenticator)
+            fingerprintKeyProvider: InMemoryVaultKeyProvider(), hintProvider: InMemoryVaultKeyProvider(),
+            authenticator: authenticator)
 
         // No ClipboardManager is attached: the test never writes the real pasteboard.
         XCTAssertFalse(manager.copyToPasteboard(UUID()))

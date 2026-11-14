@@ -376,9 +376,12 @@ final class SettingsManager: ObservableObject {
         didSet { defaults.set(vaultRemoveHistoryCopies, forKey: "vaultRemoveHistoryCopies") }
     }
 
-    /// Shown on the lock screen next to the password field; may be empty.
-    @Published var vaultPasswordHint: String {
-        didSet { defaults.set(vaultPasswordHint, forKey: "vaultPasswordHint") }
+    /// A hint saved by a 1.11 beta, which kept it here; returned once and
+    /// removed. VaultManager moves it into the Keychain.
+    func takeLegacyVaultPasswordHint() -> String? {
+        guard let hint = defaults.string(forKey: "vaultPasswordHint") else { return nil }
+        defaults.removeObject(forKey: "vaultPasswordHint")
+        return hint
     }
 
     /// Seconds after pasting a password before the clipboard is cleared, if
@@ -555,7 +558,6 @@ final class SettingsManager: ObservableObject {
             1, defaults.object(forKey: "vaultRelockMinutes") as? Int ?? VaultLockPolicy.defaultTimeoutMinutes)
         self.vaultClipboardClearSeconds = max(0, defaults.object(forKey: "vaultClipboardClearSeconds") as? Int ?? 30)
         self.vaultUsesPassword = defaults.object(forKey: "vaultUsesPassword") as? Bool ?? false
-        self.vaultPasswordHint = defaults.string(forKey: "vaultPasswordHint") ?? ""
         self.vaultCopyDetection = defaults.string(forKey: "vaultCopyDetection")
             .flatMap(VaultCopyDetection.init(rawValue:)) ?? .whileUnlocked
         self.vaultRemoveHistoryCopies = defaults.object(forKey: "vaultRemoveHistoryCopies") as? Bool ?? true

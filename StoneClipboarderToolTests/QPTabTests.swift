@@ -32,7 +32,7 @@ final class QPVaultEditorModelTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let manager = VaultManager(
             store: VaultStore(root: root), keyProvider: InMemoryVaultKeyProvider(), fingerprintKeyProvider: InMemoryVaultKeyProvider(),
-            authenticator: AlwaysYesAuthenticator())
+            hintProvider: InMemoryVaultKeyProvider(), authenticator: AlwaysYesAuthenticator())
         await manager.unlock()
         _ = manager.add(VaultPayload(itemType: .text, content: "a"))
         _ = manager.add(VaultPayload(itemType: .file, fileData: Data([1]), fileName: "b.key"))

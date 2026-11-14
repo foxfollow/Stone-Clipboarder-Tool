@@ -52,7 +52,7 @@ item or pins, and the `ScreenshotTour` when asked (docs/DEMO_MODE.md).
 | MenuBarManager | NSStatusItem and the popover hosting MenuBarView; icon follows pause state | CBViewModel, SettingsManager, ClipboardManager |
 | SettingsManager | Every user setting (`@Published` + `didSet` → injected UserDefaults); visibility invariant; migrations; login item | — |
 | VaultManager | The Passwords vault: lock state, decrypted entries (`VaultPayload`), add with dedupe / rename / move / delete / delete all, sliding unlock window (`VaultLockPolicy`, `vaultRelockMinutes`), locks on screen lock, screen saver, sleep, display sleep, session switch; paste through `ClipboardManager.copySecret`; Touch ID or the Passwords password (`unlock(password:)`, `setPassword`, `removePassword`); fingerprints for `isStoredSecret` (CBViewModel skips such captures; `vaultCopyDetection`: never, while unlocked (default), always) and `onUnlocked` / `onEntryUsed` (every history copy of an entry is deleted at unlock and after a paste, when `vaultRemoveHistoryCopies`); `lockGeneration` drops an unlock a lock overtook; refuses to create a key while entries exist | VaultStore, VaultKeyProvider, VaultAuthenticator, ClipboardManager, SettingsManager |
-| VaultKeyProvider | One blob per Keychain item (read / write / delete): the vault key, raw or wrapped (account `vault-key`), and the fingerprint key (account `vault-fingerprint-key`), service `d3f0ld.StoneClipboarderTool.vault`, login keychain; `InMemoryVaultKeyProvider` for tests and demo | Security |
+| VaultKeyProvider | One blob per Keychain item (read / write / delete): the vault key, raw or wrapped (account `vault-key`), the fingerprint key (account `vault-fingerprint-key`) and the Passwords password's hint (account `vault-password-hint`), service `d3f0ld.StoneClipboarderTool.vault`, login keychain; `InMemoryVaultKeyProvider` for tests and demo | Security |
 | VaultAuthenticator | `LocalAuthenticationAuthenticator`: Touch ID with password fallback before the key is read | LocalAuthentication |
 | ErrorLogger | The only singleton: unified log, optional plaintext file with 5 MB rotation | — |
 
@@ -146,7 +146,7 @@ app's container for sandboxed Debug builds).
 | --- | --- |
 | Clipboard history | `ClipboardHistory.store`, blobs in `.ClipboardHistory_SUPPORT/` |
 | Hotkeys, excluded apps, pins | `Settings.store` |
-| Passwords | `Vault/<uuid>.sctv`, sealed; `Vault/fingerprints` (one HMAC per entry); the keys in the login keychain (service `d3f0ld.StoneClipboarderTool.vault`, accounts `vault-key`, raw or password-wrapped, and `vault-fingerprint-key`) |
+| Passwords | `Vault/<uuid>.sctv`, sealed; `Vault/fingerprints` (one HMAC per entry); the keys in the login keychain (service `d3f0ld.StoneClipboarderTool.vault`, accounts `vault-key`, raw or password-wrapped, `vault-fingerprint-key` and `vault-password-hint`); never in UserDefaults |
 | Settings | UserDefaults through SettingsManager; keys are the property names. `enableErrorFileLogging` is also read by ErrorLogger; `itemCategories` is a JSON array of `ItemCategory` (fields a newer version wrote are written back unless edited here) |
 | Error log | `StoneClipboarder_errors.log` (+ `.old.log`) |
 

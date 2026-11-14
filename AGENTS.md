@@ -50,7 +50,8 @@ global hotkeys and CGEvent posts the paste keystrokes.
    holds only keyed HMACs). The vault is not
    SwiftData on purpose: `ModelContainerFactory` deletes a store it can't
    open. Its key lives only in the Keychain (`KeychainVaultKeyProvider`),
-   wrapped when the user sets a Passwords password; nothing can recover a
+   wrapped when the user sets a Passwords password (its hint is a Keychain
+   item too, never UserDefaults); nothing can recover a
    forgotten one, so never add a "reset" that claims to;
    tests and demo mode use `InMemoryVaultKeyProvider` and a scratch folder.
    History cleanup, Delete All and the corrupt-store recovery

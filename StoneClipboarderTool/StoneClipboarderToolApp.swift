@@ -189,7 +189,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         cbViewModel.isStoredSecret = { [weak vaultManager] capture in
             vaultManager?.isStoredSecret(capture) ?? false
         }
-        Task { await vaultManager.prepareCopyDetection() }
+        Task {
+            await vaultManager.migrateLegacyPasswordHint()
+            await vaultManager.prepareCopyDetection()
+        }
         // Plaintext copies of saved entries leave the history at unlock
         // and after each paste from Passwords (Settings → Passwords).
         vaultManager.onUnlocked = { [weak cbViewModel, weak settingsManager] entries in

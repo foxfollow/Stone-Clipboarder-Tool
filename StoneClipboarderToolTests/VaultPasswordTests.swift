@@ -83,6 +83,7 @@ final class VaultManagerPasswordTests: XCTestCase {
 
     private var root: URL!
     private var keyProvider: InMemoryVaultKeyProvider!
+    private var hintProvider: InMemoryVaultKeyProvider!
     private var isolated: IsolatedDefaults!
     private var settings: SettingsManager!
     private var authenticator: YesAuthenticator!
@@ -92,6 +93,7 @@ final class VaultManagerPasswordTests: XCTestCase {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("VaultManagerPasswordTests-\(UUID().uuidString)", isDirectory: true)
         keyProvider = InMemoryVaultKeyProvider()
+        hintProvider = InMemoryVaultKeyProvider()
         isolated = IsolatedDefaults()
         settings = SettingsManager(defaults: isolated.defaults)
         authenticator = YesAuthenticator()
@@ -106,9 +108,27 @@ final class VaultManagerPasswordTests: XCTestCase {
     private func makeManager() -> VaultManager {
         let manager = VaultManager(
             store: VaultStore(root: root), keyProvider: keyProvider,
-            fingerprintKeyProvider: InMemoryVaultKeyProvider(), authenticator: authenticator)
+            fingerprintKeyProvider: InMemoryVaultKeyProvider(), hintProvider: hintProvider,
+            authenticator: authenticator)
         manager.settingsManager = settings
         return manager
+    }
+
+    func testTheHintIsReadBackForTheLockScreenAndALegacyOneMoves() async {
+        let manager = makeManager()
+        await manager.unlock()
+        await manager.setPassword("secret1", hint: "pet", rounds: 1_000)
+
+        let relaunched = makeManager()
+        XCTAssertEqual(relaunched.passwordHint, "")
+        await relaunched.loadPasswordHint()
+        XCTAssertEqual(relaunched.passwordHint, "pet")
+
+        // A 1.11 beta left one in UserDefaults.
+        isolated.defaults.set("old hint", forKey: "vaultPasswordHint")
+        await relaunched.migrateLegacyPasswordHint()
+        XCTAssertNil(isolated.defaults.object(forKey: "vaultPasswordHint"))
+        XCTAssertEqual(hintProvider.storedData, Data("old hint".utf8))
     }
 
     func testSetPasswordWrapsTheKeyAndReplacesTouchID() async throws {
@@ -118,7 +138,9 @@ final class VaultManagerPasswordTests: XCTestCase {
         let didSet = await manager.setPassword("secret1", hint: "  pet  ", rounds: 1_000)
         XCTAssertTrue(didSet)
         XCTAssertTrue(settings.vaultUsesPassword)
-        XCTAssertEqual(settings.vaultPasswordHint, "pet")
+        XCTAssertEqual(manager.passwordHint, "pet")
+        XCTAssertEqual(hintProvider.storedData, Data("pet".utf8), "the hint is in the Keychain, not UserDefaults")
+        XCTAssertNil(isolated.defaults.object(forKey: "vaultPasswordHint"))
         XCTAssertTrue(VaultKeyWrapper.isWrapped(try XCTUnwrap(keyProvider.storedData)))
 
         manager.lock()
@@ -201,6 +223,7 @@ final class VaultManagerPasswordTests: XCTestCase {
         await manager.setPassword("secret1", hint: "h", rounds: 1_000)
         manager.deleteAll()
         XCTAssertFalse(settings.vaultUsesPassword)
-        XCTAssertEqual(settings.vaultPasswordHint, "")
+        XCTAssertEqual(manager.passwordHint, "")
+        XCTAssertFalse(hintProvider.hasKey)
     }
 }

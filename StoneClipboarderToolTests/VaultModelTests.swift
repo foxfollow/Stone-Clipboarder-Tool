@@ -212,7 +212,9 @@ final class VaultStoreTests: XCTestCase {
     }
 
     func testSaveLoadReplaceAndDelete() throws {
-        var entry = VaultPayload(itemType: .text, content: "pw", orderIndex: 0)
+        // A whole-second date: sub-second digits don't survive JSON exactly.
+        var entry = VaultPayload(
+            itemType: .text, content: "pw", createdAt: Date(timeIntervalSince1970: 1_000), orderIndex: 0)
         try store.save(entry, with: key)
         XCTAssertTrue(store.hasEntries)
         XCTAssertEqual(store.loadAll(with: key).entries, [entry])

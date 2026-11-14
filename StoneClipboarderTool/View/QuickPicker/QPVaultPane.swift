@@ -61,6 +61,8 @@ struct QPVaultPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // The hint lives in the Keychain; read it when this screen shows.
+        .task(id: vaultManager.usesPassword) { await vaultManager.loadPasswordHint() }
     }
 
     private var lockSymbol: String {
@@ -76,7 +78,8 @@ struct QPVaultPane: View {
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 40)
-        if let hint = vaultManager.settingsManager?.vaultPasswordHint, !hint.isEmpty {
+        if !vaultManager.passwordHint.isEmpty {
+            let hint = vaultManager.passwordHint
             Label("Hint: \(hint)", systemImage: "lightbulb")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)

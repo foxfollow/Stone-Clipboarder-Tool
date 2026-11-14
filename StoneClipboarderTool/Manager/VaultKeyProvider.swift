@@ -47,6 +47,9 @@ struct KeychainVaultKeyProvider: VaultKeyProvider {
     static let account = "vault-key"
     /// The HMAC key of `VaultFingerprint`.
     static let fingerprintAccount = "vault-fingerprint-key"
+    /// The Passwords password's hint (UTF-8): it can say a lot about the
+    /// password, so it isn't kept in UserDefaults.
+    static let hintAccount = "vault-password-hint"
 
     enum Failure: Error, Equatable {
         case keychain(OSStatus)
@@ -106,8 +109,14 @@ struct KeychainVaultKeyProvider: VaultKeyProvider {
         attributes[kSecValueData as String] = data
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
         attributes[kSecAttrLabel as String] = "Stone Clipboarder Passwords"
-        attributes[kSecAttrDescription as String] = account == Self.fingerprintAccount
-            ? "Recognizes copies of saved passwords" : "Encryption key of the Passwords vault"
+        switch account {
+        case Self.fingerprintAccount:
+            attributes[kSecAttrDescription as String] = "Recognizes copies of saved passwords"
+        case Self.hintAccount:
+            attributes[kSecAttrDescription as String] = "Hint for the Passwords password"
+        default:
+            attributes[kSecAttrDescription as String] = "Encryption key of the Passwords vault"
+        }
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else { throw Failure.keychain(status) }
     }
