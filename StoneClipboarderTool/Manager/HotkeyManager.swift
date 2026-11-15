@@ -21,6 +21,7 @@ class HotkeyManager: ObservableObject {
     private var modelContext: ModelContext?
     private var settingsManager: SettingsManager?
     private weak var pinManager: PinManager?
+    private weak var vaultManager: VaultManager?
 
     weak var quickPickerDelegate: QuickPickerDelegate?
 
@@ -51,6 +52,10 @@ class HotkeyManager: ObservableObject {
 
     func setSettingsManager(_ manager: SettingsManager) {
         self.settingsManager = manager
+    }
+
+    func setVaultManager(_ manager: VaultManager) {
+        self.vaultManager = manager
     }
 
     func setPinManager(_ manager: PinManager) {
@@ -150,7 +155,12 @@ class HotkeyManager: ObservableObject {
         guard !missing.isEmpty else { return }
 
         for action in missing {
-            let config = HotkeyConfig(action: action)
+            // A new action's default may already be the user's shortcut for
+            // something else (⌃⌥L before Lock Passwords existed): keep theirs.
+            let taken = hotkeyConfigs.contains {
+                HotkeyShortcut($0.shortcutKeys) == HotkeyShortcut(action.defaultShortcut)
+            }
+            let config = taken ? HotkeyConfig(action: action, shortcutKeys: "") : HotkeyConfig(action: action)
             modelContext.insert(config)
             hotkeyConfigs.append(config)
         }
@@ -275,6 +285,10 @@ class HotkeyManager: ObservableObject {
         case .dismissAllPins:
             actionClosure = { [weak self] in
                 self?.pinManager?.dismissAll()
+            }
+        case .lockPasswords:
+            actionClosure = { [weak self] in
+                self?.vaultManager?.lock()
             }
         }
 

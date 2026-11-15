@@ -9,23 +9,37 @@ struct SettingsSidebar: View {
     @Binding var selectedSection: SettingsSection
     let accessibilityGranted: Bool
     let appVersion: String
+    /// Non-nil while searching: shown instead of the pages.
+    var searchResults: [SettingsSearchEntry]? = nil
+    var onPickResult: (SettingsSearchEntry) -> Void = { _ in }
 
     var body: some View {
         VStack(spacing: 0) {
-            List(selection: $selectedSection) {
-                ForEach(SettingsSection.allCases) { section in
-                    SettingsSidebarRow(
-                        section: section,
-                        accessibilityGranted: accessibilityGranted
-                    )
-                    .tag(section)
+            if let searchResults {
+                SettingsSearchResults(results: searchResults, onPick: onPickResult)
+            } else {
+                List(selection: $selectedSection) {
+                    ForEach(SettingsGroup.allCases) { group in
+                        Section(group.title) {
+                            ForEach(group.sections) { section in
+                                SettingsSidebarRow(
+                                    section: section,
+                                    accessibilityGranted: accessibilityGranted
+                                )
+                                .tag(section)
+                            }
+                        }
+                    }
                 }
+                .listStyle(.sidebar)
             }
-            .listStyle(.sidebar)
 
             Divider()
             SettingsSidebarFooter(appVersion: appVersion)
         }
+        // The column width alone isn't kept in every host (the screenshot
+        // tour's window shrank it until page names were cut off).
+        .frame(minWidth: 200)
         .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
     }
 }

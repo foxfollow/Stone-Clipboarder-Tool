@@ -9,13 +9,15 @@ import SwiftUI
 /// from the favorites, move it within the favorites.
 ///
 /// Keys reach it through `TabKeyInterceptor`'s editor mode (⏎ save, Esc
-/// cancel, ⌥↑ / ⌥↓ move, ⌥F favorite), matched by key code so they work on
+/// cancel, ⌥↑ / ⌥↓ move, ⌥F favorite, ⌥K Move to Passwords), matched by key code so they work on
 /// any keyboard layout and never type into the title field. Favorite changes
 /// apply at once; only the title waits for ⏎.
 struct QPItemEditorView: View {
     @ObservedObject var model: QPItemEditorModel
     let onSave: () -> Void
     let onCancel: () -> Void
+    /// Nil hides the Passwords section (the tab is turned off).
+    var onMoveToVault: (() -> Void)?
 
     @FocusState private var isTitleFocused: Bool
 
@@ -42,6 +44,12 @@ struct QPItemEditorView: View {
             titleField
             Divider()
             favoriteSection
+            if onMoveToVault != nil {
+                Divider()
+                vaultSection
+            }
+            Divider()
+            deleteSection
             Divider()
             footer
         }
@@ -148,15 +156,69 @@ struct QPItemEditorView: View {
         }
     }
 
+    private var vaultSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .foregroundStyle(Color.accentColor)
+                Text("Encrypt it and remove it from the history")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Move to Passwords") { onMoveToVault?() }
+                    .help("Move to Passwords (⌥K)")
+                    .focusable(false)
+                    .disabled(model.isMovingToVault || model.isConfirmingUnfavorite)
+            }
+            .controlSize(.small)
+            if let message = model.vaultMessage {
+                Text(message)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    /// Delete from the history, after confirming (⌃⌥⌫, ⏎ confirms).
+    @ViewBuilder
+    private var deleteSection: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "trash")
+                .foregroundStyle(model.isConfirmingDelete ? Color.red : Color.secondary)
+            Text(model.isConfirmingDelete ? "Delete this item from the history?" : "Delete from the history")
+                .font(.system(size: 12, weight: model.isConfirmingDelete ? .medium : .regular))
+                .foregroundStyle(model.isConfirmingDelete ? Color.primary : Color.secondary)
+            Spacer()
+            if model.isConfirmingDelete {
+                Button("Cancel") { model.isConfirmingDelete = false }
+                    .focusable(false)
+                Button("Delete", role: .destructive) { model.confirmDelete() }
+                    .focusable(false)
+            } else {
+                Button("Delete…", role: .destructive) { model.requestDelete() }
+                    .help("Delete from the history (⌃⌥⌫)")
+                    .focusable(false)
+                    .disabled(model.isConfirmingUnfavorite)
+            }
+        }
+        .controlSize(.small)
+    }
+
     private var footer: some View {
         HStack(spacing: 10) {
-            if model.isConfirmingUnfavorite {
+            if model.isConfirmingDelete {
+                keyHint("⏎", "Delete")
+                keyHint("ESC", "Keep")
+            } else if model.isConfirmingUnfavorite {
                 keyHint("⏎", "Remove")
                 keyHint("ESC", "Keep")
             } else {
                 keyHint("⏎", "Save")
                 keyHint("ESC", "Cancel")
                 keyHint("⌥F", model.isFavorite ? "Unfavorite" : "Favorite")
+                if onMoveToVault != nil {
+                    keyHint("⌥K", "Passwords")
+                }
                 if model.isFavorite {
                     keyHint("⌥↑↓", "Move")
                 }
@@ -166,7 +228,7 @@ struct QPItemEditorView: View {
                 .keyboardShortcut(.defaultAction)
                 .controlSize(.small)
                 .focusable(false)
-                .disabled(model.isConfirmingUnfavorite)
+                .disabled(model.isConfirmingUnfavorite || model.isConfirmingDelete)
         }
     }
 

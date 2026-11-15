@@ -47,6 +47,7 @@ struct AboutSettingsView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(!(updater?.canCheckForUpdates ?? false))
                 }
+                .settingsAnchor("about.updates")
                 
                 HStack {
                     Text("Built with ❤️")
@@ -81,6 +82,7 @@ struct AboutSettingsView: View {
                     }
                     
                 }
+                .settingsAnchor("about.links")
                 
                 HStack {
                     Text("© 2025 Heorhii Savoiskyi")
@@ -116,6 +118,7 @@ struct AboutSettingsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                 }
+                .settingsAnchor("about.feedback")
             }
             
             Section(header: HStack {
@@ -134,6 +137,7 @@ struct AboutSettingsView: View {
                     }
                 }
                 .foregroundStyle(.primary)
+                .settingsAnchor("about.social")
             }
         }
         .formStyle(.grouped)

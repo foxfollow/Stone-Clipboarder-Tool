@@ -66,9 +66,9 @@ struct ClipboardAlertModifier: ViewModifier {
     private var alertMessage: String {
         switch activeAlert {
         case .cleanup:
-            return "This will remove old items beyond the maximum limit and free up memory. Favorites will be preserved."
+            return "This will remove old items beyond the maximum limit and free up memory. Favorites and Passwords will be preserved."
         case .deleteAll:
-            return "This will permanently delete all clipboard history items. This action cannot be undone."
+            return "This will permanently delete all clipboard history items. This action cannot be undone. Passwords are not affected: delete them in Settings → Security → Passwords."
         case nil:
             return ""
         }

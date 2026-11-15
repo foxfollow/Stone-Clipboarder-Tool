@@ -10,9 +10,10 @@ struct SettingsDetail: View {
     let section: SettingsSection
     let updater: SPUUpdater?
     @Binding var accessibilityGranted: Bool
+    var highlight = SettingsHighlight()
 
     var body: some View {
-        SettingsDetailContainer(subtitle: section.subtitle) {
+        SettingsDetailContainer(subtitle: section.subtitle, highlight: highlight) {
             content
         }
     }
@@ -25,6 +26,7 @@ struct SettingsDetail: View {
         case .quickPicker:   QuickPickerSettingsView()
         case .categories:    CategoriesSettingsView()
         case .pins:          PinSettingsView()
+        case .passwords:     PasswordsSettingsView()
         case .excludedApps:  ExcludedAppsSettingsView()
         case .accessibility: AccessibilitySettingsView(accessibilityGranted: $accessibilityGranted)
         case .about:         AboutSettingsView(updater: updater)

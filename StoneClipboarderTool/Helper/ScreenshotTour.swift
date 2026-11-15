@@ -20,19 +20,22 @@ final class ScreenshotTour {
     let quickPicker: QuickPickerWindowManager
     let hotkeyManager: HotkeyManager
     let pinManager: PinManager
+    let vaultManager: VaultManager
     let settingsContainer: ModelContainer
     /// Found once: with an item selected the window takes the detail's
     /// title ("Clipboard Item"), which `MainWindow.find()` doesn't match.
     private var mainWindowRef: NSWindow?
 
     init(directory: URL, viewModel: CBViewModel, settings: SettingsManager, quickPicker: QuickPickerWindowManager,
-         hotkeyManager: HotkeyManager, pinManager: PinManager, settingsContainer: ModelContainer) {
+         hotkeyManager: HotkeyManager, pinManager: PinManager, vaultManager: VaultManager,
+         settingsContainer: ModelContainer) {
         self.directory = directory
         self.viewModel = viewModel
         self.settings = settings
         self.quickPicker = quickPicker
         self.hotkeyManager = hotkeyManager
         self.pinManager = pinManager
+        self.vaultManager = vaultManager
         self.settingsContainer = settingsContainer
     }
 
@@ -49,6 +52,7 @@ final class ScreenshotTour {
             NSApp.appearance = NSAppearance(named: appearance)
             await mainWindow(scheme)
             await quickPickerPanel(scheme)
+            await passwordsPanel(scheme)
             await menuBar(scheme)
             await categoriesSettings(scheme)
         }
@@ -81,6 +85,17 @@ final class ScreenshotTour {
         quickPicker.hideQuickPicker()
     }
 
+    /// The Quick Picker opened on the Passwords tab, with the made-up entries.
+    private func passwordsPanel(_ scheme: String) async {
+        vaultManager.noteUse()
+        quickPicker.showQuickPicker(on: .passwords)
+        try? await Task.sleep(for: settle)
+        if let panel = quickPicker.pickerWindow {
+            await capture(panel, "sct-\(scheme)-passwords.png")
+        }
+        quickPicker.hideQuickPicker()
+    }
+
     /// The menu bar popover's view, in a borderless panel of the same size.
     private func menuBar(_ scheme: String) async {
         let view = MenuBarView()
@@ -109,9 +124,12 @@ final class ScreenshotTour {
             .environmentObject(hotkeyManager)
             .environmentObject(viewModel)
             .environmentObject(pinManager)
+            .environmentObject(vaultManager)
             .modelContainer(settingsContainer)
-            .frame(width: 760, height: 640)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 640),
+            .frame(width: 880, height: 640)
+        // Wide enough for the sidebar's ideal width: page names and the
+        // search field aren't cut off.
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false

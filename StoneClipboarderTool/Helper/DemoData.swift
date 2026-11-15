@@ -77,10 +77,10 @@ enum DemoData {
         add(CBItem(timestamp: now, imageData: screenshotImage(), itemType: .image), ago: 95,
             app: "com.apple.Safari", appName: "Safari",
             image: ImageClassifier.Result(
-                recognizedText: "Release notes 1.10.0\n\(siteURL)", foundText: true, ranVisual: true))
+                recognizedText: "Release notes 1.11.0\n\(siteURL)", foundText: true, ranVisual: true))
         add(text("Dear team, please find the signed contract attached. I'll be in the office tomorrow."),
             ago: 260, app: "com.apple.mail", appName: "Mail", title: "Reply to the bank", favorite: 0)
-        add(text("№ 9351/2026 від 19.05.2026"), ago: 410, app: "com.apple.Notes", appName: "Notes")
+        add(text("Звіт за квартал — до 19.05.2026"), ago: 410, app: "com.apple.Notes", appName: "Notes")
         add(text("git remote add origin https://github.com/foxfollow/Stone-Clipboarder-Tool.git"),
             ago: 640, app: "com.apple.Terminal", appName: "Terminal")
         add(CBItem(timestamp: now, imageData: qrImage(siteURL), itemType: .image), ago: 900,
@@ -91,7 +91,7 @@ enum DemoData {
             ago: 2400, app: "com.apple.Notes", appName: "Notes", title: "Meeting reminder (UA)", favorite: 1)
         add(CBItem(timestamp: now, fileData: Data(repeating: 1, count: 5_120), fileName: "invite.ics",
                    fileUTI: "com.apple.ical.ics", itemType: .file), ago: 3600, app: "com.apple.mail", appName: "Mail")
-        add(text(#"{"version": "1.10.0", "build": 25, "categories": true}"#), ago: 5400, app: "com.apple.Terminal", appName: "Terminal")
+        add(text(#"{"version": "1.11.0", "build": 27, "passwords": true}"#), ago: 5400, app: "com.apple.Terminal", appName: "Terminal")
         add(text("hello@stone.example"), ago: 7200, app: "com.apple.Safari", appName: "Safari")
         add(text("+380 44 123 45 67"), ago: 9000, app: "com.apple.Notes", appName: "Notes")
 
@@ -108,6 +108,34 @@ enum DemoData {
         try context.save()
     }
 
+    // MARK: - Passwords
+
+    /// Made-up Passwords entries (no real secret anywhere): logins and a
+    /// token with their own icons and colors, a 2FA QR code and a key file. The demo vault lives
+    /// in memory with in-memory keys; the demo unlocks it without a prompt.
+    static let vaultEntries: [VaultPayload] = [
+        VaultPayload(itemType: .text, title: "Bank login", content: "Demo-Pass-2026!",
+                     icon: .symbol("building.columns"), colorHex: "#0A84FF"),
+        VaultPayload(itemType: .text, title: "GitHub token", content: "ghp_DEMO0000000000000000000000000000demo",
+                     icon: .symbol("chevron.left.forwardslash.chevron.right"), colorHex: "#BF5AF2"),
+        VaultPayload(itemType: .image, title: "2FA recovery QR",
+                     imageData: qrImage("otpauth://totp/Stone:demo@stone.example?secret=DEMODEMODEMODEMO"),
+                     icon: .emoji("🔐")),
+        VaultPayload(itemType: .file, title: "Deploy key",
+                     fileData: Data("-----BEGIN DEMO KEY-----\nnot a real key\n-----END DEMO KEY-----\n".utf8),
+                     fileName: "deploy_key.pem", fileUTI: "public.x509-certificate"),
+        VaultPayload(itemType: .text, title: "Server root password", content: "demo-root-0000",
+                     icon: .symbol("server.rack"), colorHex: "#FF9F0A"),
+    ]
+
+    /// Unlocks the demo vault and fills it. Only for the inert demo vault.
+    static func fillVault(_ vault: VaultManager) async {
+        guard await vault.unlock(reason: "show the demo passwords") else { return }
+        for entry in vaultEntries {
+            _ = vault.add(entry)
+        }
+    }
+
     // MARK: - Pictures
 
     /// A dark window-like picture with a title, for the OCR row.
@@ -120,7 +148,7 @@ enum DemoData {
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 84, weight: .bold), .foregroundColor: NSColor.white,
             ]
-            ("Release notes 1.10.0" as NSString).draw(at: NSPoint(x: 120, y: 360), withAttributes: attributes)
+            ("Release notes 1.11.0" as NSString).draw(at: NSPoint(x: 120, y: 360), withAttributes: attributes)
         }
     }
 

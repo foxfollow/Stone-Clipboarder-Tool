@@ -6,7 +6,7 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <script>(function () { var d = document.documentElement; d.classList.add('js'); if ((localStorage.getItem('theme') || 'dark') !== 'dark') d.classList.remove('dark'); })();</script>
     <meta name="description"
-        content="Free, open-source clipboard manager for macOS. Save your entire copy-paste history, access it instantly with global hotkeys or Spotlight-like Quick Picker. Features OCR text recognition, smart categories, favorites, and 100% local privacy." />
+        content="Free, open-source clipboard manager for macOS. Save your entire copy-paste history, access it instantly with global hotkeys or Spotlight-like Quick Picker. Features OCR text recognition, smart categories, an encrypted password vault, favorites, and 100% local privacy." />
     <meta name="keywords"
         content="clipboard manager, macOS, clipboard history, copy paste manager, clipboard organizer, productivity tool, OCR, clipboard categories, free, open source" />
     <title>Stone Clipboarder Tool – Free Clipboard Manager for macOS</title>
@@ -20,13 +20,13 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Stone Clipboarder Tool" />
     <meta property="og:title" content="Stone Clipboarder Tool – Free Clipboard Manager for macOS" />
-    <meta property="og:description" content="Free, open-source clipboard history manager for macOS with OCR, smart categories, global hotkeys, and complete privacy." />
+    <meta property="og:description" content="Free, open-source clipboard history manager for macOS with OCR, smart categories, an encrypted password vault, global hotkeys, and complete privacy." />
     <meta property="og:url" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/" />
     <meta property="og:image" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png" />
     <meta property="og:locale" content="en_US" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Stone Clipboarder Tool – Free Clipboard Manager for macOS" />
-    <meta name="twitter:description" content="Free, open-source clipboard history manager for macOS with OCR, smart categories, global hotkeys, and complete privacy." />
+    <meta name="twitter:description" content="Free, open-source clipboard history manager for macOS with OCR, smart categories, an encrypted password vault, global hotkeys, and complete privacy." />
     <meta name="twitter:image" content="https://foxfollow.github.io/Stone-Clipboarder-Tool/resources/index/StoneClipboarderIcon2-iOS-Default-1024x1024@2x.png" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
@@ -307,7 +307,7 @@
                 Never lose what you copy.
             </h1>
             <p class="anim-fade anim-d2 hero-sub text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-                A free, open-source clipboard history manager for macOS with OCR, smart categories, global hotkeys, and complete privacy.
+                A free, open-source clipboard history manager for macOS with OCR, smart categories, an encrypted password vault, global hotkeys, and complete privacy.
             </p>
             <div class="anim-fade anim-d3 flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
                 <a href="https://github.com/foxfollow/Stone-Clipboarder-Tool/releases/latest"
@@ -338,12 +338,12 @@
         </section>
 
         <!-- Screenshot Showcase -->
-        <section class="max-w-6xl mx-auto px-4 mb-32" id="screenshots">
+        <section class="max-w-7xl mx-auto px-4 mb-32" id="screenshots">
             <div class="reveal text-center mb-12">
                 <h2 class="section-title text-3xl font-bold mb-4">App Preview</h2>
                 <p class="section-sub text-gray-400">Fits perfectly into your macOS workflow.</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-stretch">
                 <div class="reveal">
                     <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Main Window')">
                         <img alt="Main Window" class="theme-image"
@@ -358,6 +358,14 @@
                             data-light-src="resources/index/sct-light-quickpicker.png"
                             data-dark-src="resources/index/sct-dark-quickpicker.png"
                             src="resources/index/sct-dark-quickpicker.png" />
+                    </div>
+                </div>
+                <div class="reveal" style="transition-delay: 150ms">
+                    <div class="screenshot-card h-full" onclick="openModal(this.querySelector('img'), 'Passwords')">
+                        <img alt="Passwords" class="theme-image"
+                            data-light-src="resources/index/sct-light-passwords.png"
+                            data-dark-src="resources/index/sct-dark-passwords.png"
+                            src="resources/index/sct-dark-passwords.png" />
                     </div>
                 </div>
                 <div class="reveal" style="transition-delay: 200ms">
@@ -412,6 +420,17 @@
             </div>
             <div class="carousel-container reveal" id="featureCarousel">
                 <div class="carousel-track">
+                    <!-- Slide: Passwords (1.11.0) -->
+                    <div class="carousel-slide">
+                        <div class="card-gradient feat-card p-8 rounded-2xl h-full">
+                            <div class="mb-6"><i class="fa-solid fa-key text-3xl text-amber-400"></i></div>
+                            <h4 class="text-xl font-bold mb-3">
+                                Passwords
+                                <span class="text-[10px] align-middle ml-1 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">v1.11.0</span>
+                            </h4>
+                            <p class="text-gray-400 leading-relaxed text-sm">Move a password, key file or QR code out of your history into an encrypted vault on your Mac. Touch ID or your own password unlocks it, it locks with the screen, and pasting clears the clipboard after 30 seconds.</p>
+                        </div>
+                    </div>
                     <!-- Slide: Pinned Windows (1.6.0) -->
                     <div class="carousel-slide">
                         <div class="card-gradient feat-card p-8 rounded-2xl h-full">
@@ -603,6 +622,7 @@
                         <tr class="border-b border-white/5"><td class="py-4 px-6">App Exclusions</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6 text-gray-500">Sometimes</td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td></tr>
                         <tr class="border-b border-white/5"><td class="py-4 px-6">Smart Categories</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6 text-gray-500">Limited</td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td></tr>
                         <tr class="border-b border-white/5"><td class="py-4 px-6">Search Text in Images</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6 text-gray-500">Sometimes</td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td></tr>
+                        <tr class="border-b border-white/5"><td class="py-4 px-6">Encrypted Password Vault</td><td class="py-4 px-6 bg-blue-500/5"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6 text-gray-500">Sometimes</td><td class="py-4 px-6 text-gray-500">Rarely</td></tr>
                         <tr class="border-b border-white/5"><td class="py-4 px-6">Native macOS</td><td class="py-4 px-6 bg-blue-500/5 rounded-b-xl"><i class="fa-solid fa-circle-check text-green-500"></i></td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td><td class="py-4 px-6"><i class="fa-solid fa-circle-xmark text-red-500/50"></i></td></tr>
                     </tbody>
                 </table>

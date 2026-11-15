@@ -75,5 +75,6 @@ struct CategorySettingsRow: View {
                 .help(category.isEnabled ? "Shown in the Quick Picker" : "Hidden")
         }
         .opacity(category.isEnabled ? 1 : 0.6)
+        .settingsAnchor(SettingsAnchor.category(category.id))
     }
 }

@@ -34,7 +34,9 @@ struct CategoriesSettingsView: View {
         Form {
             Section("Quick Picker") {
                 Toggle("Show the category bar", isOn: $settingsManager.showCategoryBar)
+                    .settingsAnchor("categories.showBar")
                 Toggle("Show category, language and app icons on rows", isOn: $settingsManager.showRowBadges)
+                    .settingsAnchor("categories.rowBadges")
                 Text("Chips under the tabs filter the list; ⌥← and ⌥→ switch between them. In the search field, is:link, app:Safari and lang:uk filter too, and combine with text.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -42,10 +44,12 @@ struct CategoriesSettingsView: View {
 
             Section("Source app") {
                 Toggle("Remember the source app", isOn: $settingsManager.recordSourceApp)
+                    .settingsAnchor("categories.sourceApp")
                 Text("Saves which app was in front when you copied, for app groups and app: search. Stays on this Mac.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("Forget Recorded Apps…") { confirmingForgetApps = true }
+                    .settingsAnchor("categories.forgetApps")
             }
 
             Section {
@@ -58,11 +62,13 @@ struct CategoriesSettingsView: View {
                     Spacer()
                     Button("Reset…") { confirmingReset = true }
                         .controlSize(.small)
+                        .settingsAnchor("categories.reset")
                 }
             }
 
             Section {
                 Toggle("Find QR codes, faces and transparency", isOn: $settingsManager.analyzeImages)
+                    .settingsAnchor("categories.analyzeImages")
                 Text("Apple Vision checks each image once, in the background and on this Mac.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -76,12 +82,16 @@ struct CategoriesSettingsView: View {
 
             Section {
                 Toggle("Recognize text in new images", isOn: $settingsManager.recognizeTextInNewImages)
+                    .settingsAnchor("categories.ocrNew")
                 Text("Reads the text of each image you copy or screenshot from now on, once, right after the copy. Text recognition uses more CPU than the other checks, so older images are left alone unless you start it below.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 textRecognitionControls
+                    .settingsAnchor("categories.ocrAll")
                 Toggle("Find images by the text in them", isOn: $settingsManager.searchImageText)
+                    .settingsAnchor("categories.searchImageText")
                 Toggle("Show the text of images in Quick Picker rows", isOn: $settingsManager.showImageTextInRows)
+                    .settingsAnchor("categories.imageTextRows")
                 Text("Text from this, or from your own OCR (⌥⏎, Extract Text), stays with the image and counts for Link, Email, the language and your rules.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -96,6 +106,7 @@ struct CategoriesSettingsView: View {
                 Button("Add Rule…") {
                     editing = Editing(category: .newRegex(), isNew: true)
                 }
+                .settingsAnchor("categories.addRule")
             } header: {
                 Text("Custom rules")
             } footer: {
@@ -111,6 +122,7 @@ struct CategoriesSettingsView: View {
                 Button("Add App Group…") {
                     editing = Editing(category: .newAppGroup(), isNew: true)
                 }
+                .settingsAnchor("categories.addAppGroup")
             }
         }
         .formStyle(.grouped)

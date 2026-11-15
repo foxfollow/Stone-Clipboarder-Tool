@@ -16,7 +16,8 @@
     const hero = $('main > section');
 
     // ---------- Quick Picker demo (hero) ----------
-    // Mirrors the app's Quick Picker: search, type tabs and the category chip
+    // Mirrors the app's Quick Picker: search, type tabs (with the locked
+    // Passwords tab, which shows no count) and the category chip
     // row with counts, rows with a title, category icons, language and source
     // app, the text found in an image, the ⌥E / Return / OCR hints on the
     // selected row and the footer shortcuts. It shows the app's own English
@@ -90,7 +91,9 @@
             '<div class="qp-search"><i class="fa-solid fa-magnifying-glass"></i><span class="qp-caret"></span><span class="qp-ph">Search clipboard… (is:link, app:Safari, lang:uk)</span></div>' +
             '<div class="qp-chips">' + tab('all', 'All', true) + tab('favs', '<i class="fa-solid fa-heart"></i> Favs') +
             tab('text', 'Text') + tab('image', 'Images') + tab('file', 'Files') +
-            '<span class="qp-switch"><kbd>⇥</kbd> switch</span></div>' +
+            // The Passwords tab, locked: a lock and no count, as in the app.
+            '<span class="qp-chip qp-vault" title="Passwords (⌘6), locked"><i class="fa-solid fa-lock"></i> Passwords</span>' +
+            '<span class="qp-switch"><kbd>⌘1–6</kbd></span></div>' +
             '<div class="qp-cats"><div class="qp-cats-row">' +
             cat('link', CATS.link) + cat('date', CATS.date) + cat('code', CATS.code) + cat('email', CATS.email) +
             cat('path', CATS.path) + cat('en', { ...lang, name: 'English' }) + cat('uk', { ...lang, name: 'Ukrainian' }) +

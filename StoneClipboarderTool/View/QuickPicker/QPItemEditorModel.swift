@@ -7,7 +7,7 @@ import SwiftData
 import SwiftUI
 
 /// State behind the Quick Picker's ⌥E editor: the item's title, its favorite
-/// flag and its place among the favorites.
+/// flag, its place among the favorites, and Move to Passwords (⌥K).
 ///
 /// The editor view renders only the snapshot fields copied here, never the
 /// `CBItem`, so a deletion while the editor is open can't crash a render. The
@@ -27,6 +27,12 @@ final class QPItemEditorModel: ObservableObject {
     @Published private(set) var favoriteCount: Int
     /// Removing a favorite asks first: a non-favorite can be cleaned up.
     @Published var isConfirmingUnfavorite = false
+    /// Deleting the item asks first (⌃⌥⌫ or Delete…; ⏎ confirms).
+    @Published var isConfirmingDelete = false
+    /// Why "Move to Passwords" didn't go through, if it didn't.
+    @Published var vaultMessage: String?
+    /// True while Move to Passwords waits for Touch ID.
+    @Published var isMovingToVault = false
 
     private let item: CBItem
     private let viewModel: CBViewModel
@@ -74,6 +80,20 @@ final class QPItemEditorModel: ObservableObject {
             refreshFavoriteState()
             onFavoritesChanged()
         }
+    }
+
+    /// Asks to delete the item; a second request only asks again.
+    func requestDelete() {
+        isConfirmingUnfavorite = false
+        isConfirmingDelete = true
+    }
+
+    /// Deletes the item from the history (two steps, like every delete).
+    /// The Quick Picker closes the editor on the deletion it announces.
+    func confirmDelete() {
+        guard isConfirmingDelete else { return }
+        isConfirmingDelete = false
+        viewModel.deleteItem(item)
     }
 
     func confirmUnfavorite() {

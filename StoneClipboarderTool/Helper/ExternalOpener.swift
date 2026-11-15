@@ -14,6 +14,19 @@ enum ExternalOpener {
     /// short enough not to leave clipboard content lying around.
     static let tempFileLifetime: TimeInterval = 60
 
+    nonisolated static var directory: URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("StoneClipboarderTool", isDirectory: true)
+            .appendingPathComponent("Open", isDirectory: true)
+    }
+
+    /// Removes every temp copy. The timer in `writeTempFile` doesn't fire if
+    /// the app quits or crashes first, so this runs at quit and at launch.
+    /// `root` is only overridden by tests.
+    static func removeAllTempFiles(root: URL = directory) {
+        try? FileManager.default.removeItem(at: root)
+    }
+
     /// Opens image data in the default image viewer (Preview), as PNG.
     @discardableResult
     static func openImage(_ data: Data, fileName: String = "Clipboard Image.png") -> Bool {
@@ -61,10 +74,7 @@ enum ExternalOpener {
     /// Image.png") without
     /// collisions. The folder is removed after `tempFileLifetime`.
     private static func writeTempFile(_ data: Data, fileName: String) -> URL? {
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("StoneClipboarderTool", isDirectory: true)
-            .appendingPathComponent("Open", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let url = folder.appendingPathComponent(PasteboardFileStore.safeFileName(fileName))

@@ -8,6 +8,7 @@ import SwiftUI
 struct QuickPickerSettingsView: View {
     var body: some View {
         Form {
+            QuickPickerTabOrderSection()
             QuickLookSection()
             TypeOutPasteSection()
         }
@@ -27,6 +28,7 @@ private struct QuickLookSection: View {
             }
             .pickerStyle(.menu)
             .help("Choose preview style when pressing the trigger key in QuickPicker")
+            .settingsAnchor("quickPicker.previewMode")
 
             Picker("Trigger key:", selection: $settingsManager.quickLookTriggerKey) {
                 ForEach(QuickLookTriggerKey.allCases, id: \.self) { key in
@@ -37,9 +39,11 @@ private struct QuickLookSection: View {
             .disabled(settingsManager.quickLookMode == .disabled)
             .opacity(settingsManager.quickLookMode == .disabled ? 0.5 : 1)
             .help("Key to open preview in QuickPicker")
+            .settingsAnchor("quickPicker.triggerKey")
 
             Toggle("⌥ Enter to extract text (Apple Vision)", isOn: $settingsManager.enableOCROptionKey)
                 .help("When enabled, pressing Option+Enter on an image in QuickPicker will extract and paste text using Apple Vision OCR instead of the image")
+                .settingsAnchor("quickPicker.ocrKey")
         }
     }
 }
@@ -88,6 +92,7 @@ private struct TypeOutPasteSection: View {
                     .foregroundColor(.secondary)
             }
             .help("How long to wait between each typed character. Raise this if a slow text field drops characters.")
+            .settingsAnchor("quickPicker.typeOutDelay")
         }
     }
 

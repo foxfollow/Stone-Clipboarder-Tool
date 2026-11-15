@@ -308,7 +308,27 @@ class CBViewModel: ObservableObject {
         clipboardManager.startMonitoring()
     }
 
+    /// Deletes every history copy of the given saved Passwords entries,
+    /// older duplicates and every image of the same size included (two
+    /// steps, like every delete). Returns how many went.
+    @discardableResult
+    func removeHistoryCopies(of keys: [CBItem.ContentKey]) -> Int {
+        var seen = Set<PersistentIdentifier>()
+        let copies = keys.flatMap { items(matching: $0, imageLimit: nil) }
+            .filter { seen.insert($0.persistentModelID).inserted }
+        copies.forEach(deleteItem)
+        return copies.count
+    }
+
+    /// True for a capture whose content is saved in Passwords: it isn't
+    /// added to the history (VaultManager.isStoredSecret, set at launch).
+    var isStoredSecret: ((ClipboardContent) -> Bool)?
+
     private func handleClipboardChange(_ clipboardContent: ClipboardContent, source: CaptureSource?) {
+        if isStoredSecret?(clipboardContent) == true {
+            ErrorLogger.shared.debug("Skipped a copy that is saved in Passwords", category: "Vault")
+            return
+        }
         switch clipboardContent {
         case .text(let content):
             addOrUpdateTextItem(content: content, source: source)
@@ -409,7 +429,13 @@ class CBViewModel: ObservableObject {
     /// those are compared in full. Text and file candidates are almost
     /// always the item itself; image candidates are capped.
     func existingItem(matching key: CBItem.ContentKey) -> CBItem? {
-        guard let modelContext = _modelContext else { return nil }
+        items(matching: key, imageLimit: imageCandidateLimit).first
+    }
+
+    /// Every item with the same content, newest first. `imageLimit` caps
+    /// the image candidates compared (nil = all of that size).
+    func items(matching key: CBItem.ContentKey, imageLimit: Int?) -> [CBItem] {
+        guard let modelContext = _modelContext else { return [] }
 
         let newestFirst = [SortDescriptor(\CBItem.timestamp, order: .reverse)]
         var descriptor: FetchDescriptor<CBItem>
@@ -417,25 +443,25 @@ class CBViewModel: ObservableObject {
         // Predicate values stay optional to match the optional columns.
         case .text, .combined:
             let preview = key.preview
-            guard preview != nil else { return nil }
+            guard preview != nil else { return [] }
             descriptor = FetchDescriptor(predicate: #Predicate { $0.contentPreview == preview }, sortBy: newestFirst)
         case .image:
             let size = key.imageSize
-            guard size != nil else { return nil }
+            guard size != nil else { return [] }
             descriptor = FetchDescriptor(predicate: #Predicate { $0.imageSize == size }, sortBy: newestFirst)
-            descriptor.fetchLimit = imageCandidateLimit
+            if let imageLimit { descriptor.fetchLimit = imageLimit }
         case .file:
             let name = key.fileName
-            guard name != nil, let byteCount = key.fileData.map({ Int64($0.count) }) else { return nil }
+            guard name != nil, let byteCount = key.fileData.map({ Int64($0.count) }) else { return [] }
             descriptor = FetchDescriptor(
                 predicate: #Predicate { $0.fileName == name && $0.fileSize == byteCount }, sortBy: newestFirst)
         }
 
         do {
-            return try modelContext.fetch(descriptor).first { $0.hasSameContent(as: key) }
+            return try modelContext.fetch(descriptor).filter { $0.hasSameContent(as: key) }
         } catch {
             ErrorLogger.shared.log("Failed to look up a duplicate item", category: "SwiftData", error: error)
-            return nil
+            return []
         }
     }
 
