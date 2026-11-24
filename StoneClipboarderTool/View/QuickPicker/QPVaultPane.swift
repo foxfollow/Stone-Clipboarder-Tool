@@ -126,7 +126,8 @@ struct QPVaultPane: View {
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                         QPVaultRow(
                             entry: entry, isSelected: index == selectedIndex, isRevealed: entry.id == revealedID,
-                            onToggleReveal: { onToggleReveal(entry) })
+                            onToggleReveal: { onToggleReveal(entry) },
+                            pasteNumber: QPTab.passwords.pasteNumber(forRow: index, count: entries.count))
                             .id(entry.id)
                             .contentShape(Rectangle())
                             .onTapGesture {

@@ -69,7 +69,15 @@ all pins.
 - [ ] Opens centered on first use, then where you left it (until relaunch);
       also over a full-screen app without switching Spaces.
 - [ ] ↑/↓ select, ⏎ pastes into the previous app, Esc closes, clicking
-      outside closes.
+      outside closes. On Favs and Passwords ↑ on the first row jumps to the
+      last.
+- [ ] ⌃1…⌃9 paste that row at once (rows show their ⌃ number faintly); on
+      Favs and Passwords ⌃9 pastes the last row. Also on a Ukrainian
+      layout; ⌃⇧1…0 still paste favorites globally.
+- [ ] When typing stops reaching the search (focus moved, the panel lost
+      key), an orange frame and hint appear after a moment; ⇥ (without
+      switching tabs) or a click brings the cursor back and clears it. No
+      flash on tab switches, Quick Look, the ⌥E editors or Touch ID.
 - [ ] Tab / ⇧Tab cycle All, Favs, Text, Images, Files, Passwords; counts
       are right (Passwords shows no count while locked). No pill is cut
       off; with six tabs they get tighter and an inactive Passwords pill
