@@ -183,7 +183,7 @@ app's container for sandboxed Debug builds).
 | ⌘Q down / up (local) | AppDelegate | app lifetime / while ⌘Q is held |
 | Esc cancels type-out (global + local) | TypePaster | while typing |
 | Click outside, Esc (global); key re-routing (local) | QuickPickerWindowManager | while the picker is open |
-| Tab, ⇧Tab (Tab only refocuses the search while it lost focus), ⌘1…⌘9 (tabs), ⌃1…⌃9 (paste that row; ⌃9 = last on Favs and Passwords), ⌥P, ⌥⏎, ⌥E, ⌥L, ⌥R and ⌃⌥⌫ (unlocked Passwords tab; ⌥ letters pass through while its password is typed), ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editors ⏎, Esc, ⌥F, ⌥K, ⌥R, ⌥↑/⌥↓, ⌃⌥⌫ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
+| ⌘ / ⌃ held alone (flagsChanged: number hints), Tab, ⇧Tab (Tab only refocuses the search while it lost focus), ⌘1…⌘9 (tabs), ⌃1…⌃9 (paste that row; ⌃9 = last on Favs and Passwords), ⌥P, ⌥⏎, ⌥E, ⌥L, ⌥R and ⌃⌥⌫ (unlocked Passwords tab; ⌥ letters pass through while its password is typed), ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editors ⏎, Esc, ⌥F, ⌥K, ⌥R, ⌥↑/⌥↓, ⌃⌥⌫ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
 | Screen lock, screen saver (distributed); sleep, display sleep, session switch (workspace) | VaultManager | app lifetime |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
 | ⌘C / ⌘W in a pin (local; ⌘C copies a text selection first, else the whole pin) | PinContentView `CommandKeyHandler` | while the pin is in a window |

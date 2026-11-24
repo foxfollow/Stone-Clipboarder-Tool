@@ -69,9 +69,12 @@ all pins.
 - [ ] Opens centered on first use, then where you left it (until relaunch);
       also over a full-screen app without switching Spaces.
 - [ ] ↑/↓ select, ⏎ pastes into the previous app, Esc closes, clicking
-      outside closes. On Favs and Passwords ↑ on the first row jumps to the
-      last.
-- [ ] ⌃1…⌃9 paste that row at once (rows show their ⌃ number faintly); on
+      outside closes. On Favs and Passwords the list goes round: ↑ on the
+      first row jumps to the last, ↓ on the last to the first.
+- [ ] Holding ⌘ alone fades in ⌘1…⌘9 over the tab pills, holding ⌃ alone
+      fades in ⌃1…⌃9 on the rows (after ~0.15 s; a quick ⌘⇧⏎ or ⌃⌥⌫
+      doesn't flash them); releasing hides them.
+- [ ] ⌃1…⌃9 paste that row at once; on
       Favs and Passwords ⌃9 pastes the last row. Also on a Ukrainian
       layout; ⌃⇧1…0 still paste favorites globally.
 - [ ] When typing stops reaching the search (focus moved, the panel lost

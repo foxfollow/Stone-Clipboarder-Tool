@@ -144,6 +144,11 @@ struct QuickPickerView: View {
     /// Typing no longer reaches the search field: orange frame and a hint.
     @State private var isInputLost = false
     @State private var inputLostCheck: Task<Void, Never>?
+    /// ⌘ or ⌃ held alone: show the ⌘1…⌘9 tab or ⌃1…⌃9 row hints.
+    @State private var heldHint: HeldHint?
+    @State private var heldHintTask: Task<Void, Never>?
+
+    private enum HeldHint { case command, control }
 
     let onClose: () -> Void
     let onPreviewToggle: (CBItem) -> Void
@@ -350,7 +355,7 @@ struct QuickPickerView: View {
             }
             .onKeyPress(keys: [.downArrow]) { keyPress in
                 if isPasswordsTab {
-                    moveVaultSelection(by: 1)
+                    moveVaultSelection(by: 1, wrapping: true)
                     return .handled
                 }
                 if moveVaultHitSelection(by: 1) { return .handled }
@@ -531,7 +536,8 @@ struct QuickPickerView: View {
                     onUnlock: { performVaultAction() },
                     onPaste: { performVaultAction() },
                     onEdit: { _ in openVaultEditor() },
-                    onToggleReveal: { entry in toggleVaultReveal(entry.id) }
+                    onToggleReveal: { entry in toggleVaultReveal(entry.id) },
+                    showsPasteNumbers: heldHint == .control
                 )
             } else {
             if !vaultSearchHits.isEmpty {
@@ -572,7 +578,9 @@ struct QuickPickerView: View {
                 showLanguage: showsLanguageBadge,
                 showBadges: settingsManager?.showRowBadges ?? true,
                 showImageText: settingsManager?.showImageTextInRows ?? true,
-                pasteNumber: { [activeTab] index, count in activeTab.pasteNumber(forRow: index, count: count) }
+                pasteNumber: { [activeTab, heldHint] index, count in
+                    heldHint == .control ? activeTab.pasteNumber(forRow: index, count: count) : nil
+                }
             )
             }
             footerBar
@@ -689,6 +697,9 @@ struct QuickPickerView: View {
             tabInterceptor.onControlDigit = { number in
                 pasteRow(number: number)
             }
+            tabInterceptor.onModifiersChanged = { flags in
+                updateHeldHint(flags)
+            }
             tabInterceptor.onOptionE = {
                 if isPasswordsTab {
                     openVaultEditor()
@@ -707,6 +718,47 @@ struct QuickPickerView: View {
             tabInterceptor.stop()
             countsReloadTask?.cancel()
             inputLostCheck?.cancel()
+            heldHintTask?.cancel()
+            heldHint = nil
+        }
+    }
+
+    // MARK: - Held ⌘ / ⌃ hints
+
+    /// ⌘ or ⌃ held on its own shows its number hints after a short delay
+    /// (so a quick ⌘⇧⏎ or ⌃⌥⌫ doesn't flash them); any other combination
+    /// or the release hides them.
+    private func updateHeldHint(_ flags: NSEvent.ModifierFlags) {
+        let held = flags.intersection([.command, .control, .option, .shift])
+        let wanted: HeldHint? = held == .command ? .command : held == .control ? .control : nil
+        heldHintTask?.cancel()
+        guard let wanted, itemEditor == nil, vaultEditor == nil else {
+            if heldHint != nil {
+                withAnimation(.easeOut(duration: 0.12)) { heldHint = nil }
+            }
+            return
+        }
+        guard wanted != heldHint else { return }
+        heldHintTask = Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled, isWindowKey else { return }
+            withAnimation(.easeIn(duration: 0.15)) { heldHint = wanted }
+        }
+    }
+
+    /// The ⌘ number over a tab pill while ⌘ is held.
+    @ViewBuilder
+    private func tabNumberBadge(_ tab: QPTab) -> some View {
+        if heldHint == .command, let index = visibleTabs.firstIndex(of: tab), index < 9 {
+            Text("⌘\(index + 1)")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Capsule().fill(Color.black.opacity(0.75)))
+                .offset(x: 6, y: -8)
+                .transition(.opacity)
+                .allowsHitTesting(false)
         }
     }
 
@@ -979,6 +1031,7 @@ struct QuickPickerView: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .overlay(alignment: .topTrailing) { tabNumberBadge(tab) }
         .help(tabHelp(tab))
     }
 
@@ -1432,9 +1485,10 @@ struct QuickPickerView: View {
 
     private func moveSelection(by delta: Int, extendingWith extending: Bool) {
         var newIndex = selectedIndex + delta
-        // ↑ on the first row of Favs goes to the last one.
-        if newIndex < 0, delta < 0, !extending, activeTab.isShortList, filteredItems.count > 1 {
-            newIndex = filteredItems.count - 1
+        // Favs go round: ↑ on the first row to the last, ↓ on the last to the first.
+        if !extending, activeTab.isShortList, filteredItems.count > 1 {
+            if newIndex < 0 { newIndex = filteredItems.count - 1 }
+            if newIndex >= filteredItems.count { newIndex = 0 }
         }
         guard newIndex >= 0, newIndex < filteredItems.count else { return }
 
@@ -1905,8 +1959,9 @@ struct QuickPickerView: View {
 
     private func moveVaultSelection(by delta: Int, wrapping: Bool = false) {
         var newIndex = vaultIndex + delta
-        if wrapping, newIndex < 0, vaultEntries.count > 1 {
-            newIndex = vaultEntries.count - 1
+        if wrapping, vaultEntries.count > 1 {
+            if newIndex < 0 { newIndex = vaultEntries.count - 1 }
+            if newIndex >= vaultEntries.count { newIndex = 0 }
         }
         guard vaultEntries.indices.contains(newIndex) else { return }
         vaultIndex = newIndex
@@ -2148,6 +2203,8 @@ final class TabKeyInterceptor: ObservableObject {
     var onCommandDigit: ((Int) -> Void)?
     /// ⌃1…⌃9 with the number: paste that row.
     var onControlDigit: ((Int) -> Void)?
+    /// Every modifier change (⌘ / ⌃ held shows number hints).
+    var onModifiersChanged: ((NSEvent.ModifierFlags) -> Void)?
     /// Key codes of 1…9 on the main row (ANSI positions, any layout).
     private static let digitKeyCodes: [UInt16: Int] = [18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9]
     var isPasswordsTab: (() -> Bool)?
@@ -2176,7 +2233,7 @@ final class TabKeyInterceptor: ObservableObject {
 
     func start() {
         guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             // NOTE: must NOT use `intercept(event) ?? event` — that turns a
             // deliberate nil (swallow) back into the event, so the keystroke
             // (e.g. the "p" in ⌥P) would leak into the search field.
@@ -2204,11 +2261,19 @@ final class TabKeyInterceptor: ObservableObject {
         passesOptionKeys = nil
         onCommandDigit = nil
         onControlDigit = nil
+        onModifiersChanged = nil
         onDeleteEntry = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
         let flags = event.modifierFlags
+
+        if event.type == .flagsChanged {
+            DispatchQueue.main.async { [weak self] in
+                self?.onModifiersChanged?(flags)
+            }
+            return event
+        }
 
         if let onEditorKey {
             return interceptForEditor(event, flags: flags, handler: onEditorKey)

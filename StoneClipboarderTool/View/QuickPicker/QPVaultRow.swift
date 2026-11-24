@@ -14,7 +14,7 @@ struct QPVaultRow: View {
     var onToggleReveal: () -> Void = {}
     /// Off for the hits listed on other tabs (no eye, no ⌥E there).
     var showsEye = true
-    /// ⌃1…⌃9 pastes this entry; shown faintly at the end of the row.
+    /// ⌃1…⌃9 pastes this entry; set only while ⌃ is held.
     var pasteNumber: Int?
 
     var body: some View {
@@ -53,11 +53,8 @@ struct QPVaultRow: View {
                 }
             }
             if let pasteNumber {
-                Text("⌃\(pasteNumber)")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.tertiary)
-                    .frame(minWidth: 18, alignment: .trailing)
-                    .help("⌃\(pasteNumber) pastes this entry")
+                rowKeyBadge("⌃\(pasteNumber)", help: "⌃\(pasteNumber) pastes this entry")
+                    .transition(.opacity)
             }
         }
         .padding(.horizontal, 12)

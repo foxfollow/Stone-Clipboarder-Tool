@@ -25,7 +25,7 @@ struct QPItemRow: View {
     var showBadges: Bool = true
     /// An image's recognized text under its "[Image - W×H]" line.
     var showImageText: Bool = true
-    /// ⌃1…⌃9 pastes this row; shown faintly at the end of the row.
+    /// ⌃1…⌃9 pastes this row; set only while ⌃ is held.
     var pasteNumber: Int?
 
     private var imageTextSnippet: String? {
@@ -159,6 +159,7 @@ struct QPItemRow: View {
             }
             if let pasteNumber {
                 pasteNumberLabel(pasteNumber)
+                    .transition(.opacity)
             }
         }
         .padding(.horizontal, 12)
@@ -220,11 +221,7 @@ struct QPItemRow: View {
     }
 
     private func pasteNumberLabel(_ number: Int) -> some View {
-        Text("⌃\(number)")
-            .font(.system(size: 10, weight: .medium, design: .rounded))
-            .foregroundStyle(.tertiary)
-            .frame(minWidth: 18, alignment: .trailing)
-            .help("⌃\(number) pastes this item")
+        rowKeyBadge("⌃\(number)", help: "⌃\(number) pastes this item")
     }
 
     private func rowKeyBadge(_ key: String, help: String) -> some View {
