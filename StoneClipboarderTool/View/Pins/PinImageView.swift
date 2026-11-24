@@ -29,6 +29,8 @@
 //  Double-click resets to fit; a two-finger double-tap toggles fit / 2×.
 //  None of that is discoverable, so the pin says so: a tooltip, a hint the
 //  first time the pointer enters each pin view, and a zoom badge on every change.
+//  Live Text (PinLiveText): a toggle at the bottom right selects and copies
+//  text in the image.
 //
 //  Smoothness: the image is a layer's contents, so magnifying scales a GPU
 //  texture instead of redrawing (and resampling) the whole bitmap on every
@@ -77,6 +79,17 @@ struct PinImageView: NSViewRepresentable {
         context.coordinator.imageView = imageView
         context.coordinator.image = image
 
+        let liveText = context.coordinator.liveText
+        liveText.imageView = imageView
+        liveText.setImage(image)
+        liveText.onActiveChange = { [weak scrollView] isOn in
+            scrollView?.showHint(
+                isOn ? "Live Text on · drag over text, ⌘C copies" : "Live Text off",
+                duration: isOn ? 2.2 : 1.0)
+        }
+        scrollView.installLiveText(liveText)
+        context.coordinator.observeScrolling(of: scrollView.contentView)
+
         // Re-fit whenever the scroll view lays out (initial sizing + resize).
         scrollView.onLayout = { [weak coordinator = context.coordinator] in
             coordinator?.applyLayout()
@@ -100,6 +113,7 @@ struct PinImageView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: PinScrollView, context: Context) {
         context.coordinator.image = image
+        context.coordinator.liveText.setImage(image)
         if let imageView = scrollView.documentView as? PinDraggableImageView,
            imageView.image !== image {
             imageView.image = image
@@ -121,6 +135,8 @@ struct PinImageView: NSViewRepresentable {
         weak var scrollView: PinScrollView?
         weak var imageView: PinDraggableImageView?
         var image: NSImage?
+        let liveText = PinLiveText()
+        nonisolated(unsafe) private var scrollObserver: NSObjectProtocol?
         var fitMagnification: CGFloat = 1.0
         private var didInitialFit = false
         nonisolated(unsafe) private var magnifyMonitor: Any?
@@ -141,7 +157,19 @@ struct PinImageView: NSViewRepresentable {
 
         deinit {
             if let magnifyMonitor { NSEvent.removeMonitor(magnifyMonitor) }
+            if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }
             commitWorkForDeinit?.cancel()
+        }
+
+        /// Scrolling and zoom change the clip view's bounds; Live Text's
+        /// overlay has to follow the image.
+        func observeScrolling(of clipView: NSClipView) {
+            clipView.postsBoundsChangedNotifications = true
+            scrollObserver = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification, object: clipView, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.liveText.contentsMoved() }
+            }
         }
 
         /// Picks up a zoom change made outside this view (e.g. a restored
@@ -386,6 +414,7 @@ struct PinImageView: NSViewRepresentable {
                 )
             }
             updatePannable()
+            liveText.contentsMoved()
         }
 
         private func updatePannable(magnification: CGFloat? = nil) {
@@ -428,12 +457,45 @@ final class PinScrollView: NSScrollView {
         Fit: ⌘0 or double-click
         Two-finger double-tap: fit ↔ 2×
         Drag to pan when zoomed in
+        Live Text (button at the bottom right): select and copy text
         """
 
     private let hintLabel = PinHintLabel()
     private var hintHide: DispatchWorkItem?
     private var didShowIntroHint = false
     private var hoverArea: NSTrackingArea?
+    private(set) var liveText: PinLiveText?
+
+    /// Puts Live Text's overlay over the image (under the hint badge) and
+    /// its toggle at the bottom right.
+    func installLiveText(_ liveText: PinLiveText) {
+        self.liveText = liveText
+        addSubview(liveText.container, positioned: .below, relativeTo: hintLabel)
+        addSubview(liveText.button)
+        needsLayout = true
+    }
+
+    /// ⌘C: the text selected in the image, if Live Text has a selection.
+    func copyLiveTextSelection() -> Bool {
+        liveText?.copySelection() ?? false
+    }
+
+    /// The image pin's scroll view inside `view`, if any.
+    static func find(in view: NSView?) -> PinScrollView? {
+        guard let view else { return nil }
+        if let pin = view as? PinScrollView { return pin }
+        for sub in view.subviews {
+            if let pin = find(in: sub) { return pin }
+        }
+        return nil
+    }
+
+    private func positionLiveText() {
+        guard let liveText else { return }
+        liveText.container.frame = bounds
+        let size = PinLiveTextButton.size
+        liveText.button.frame = NSRect(x: bounds.width - size - 10, y: 10, width: size, height: size)
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -493,6 +555,7 @@ final class PinScrollView: NSScrollView {
     /// The first time the pointer enters, say how to zoom.
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
+        liveText?.analyzeIfNeeded()
         guard !didShowIntroHint else { return }
         didShowIntroHint = true
         showHint("Pinch or ⌘-scroll · ⌘+ ⌘− zoom · ⌘0 fit", duration: 2.5)
@@ -530,6 +593,7 @@ final class PinScrollView: NSScrollView {
     override func layout() {
         super.layout()
         positionHint()
+        positionLiveText()
         onLayout?()
     }
 

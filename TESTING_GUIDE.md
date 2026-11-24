@@ -278,6 +278,12 @@ all pins.
       German or Ukrainian layout, and quick repeats step evenly), a
       two-finger double-tap toggles fit / 2×, a badge shows the zoom, and
       the first hover shows a zoom hint.
+- [ ] Image pin with text: after the first hover a Live Text button shows
+      at the bottom right (none on an image without text). On: text is
+      highlighted, dragging selects it, ⌘C copies only the selection, right
+      click offers Translate / Look Up; it stays aligned after zooming and
+      scrolling. Off: dragging moves or pans the pin again, ⌘C copies the
+      image.
 - [ ] Text pin with editing off: ⌘C with a selection copies only the
       selection; ⌘C without one copies the whole pin (also on a Ukrainian
       layout).

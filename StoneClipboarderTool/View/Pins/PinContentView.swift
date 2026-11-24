@@ -213,6 +213,10 @@ private struct CommandKeyHandler: NSViewRepresentable {
         /// window. Returns false when nothing is selected, so ⌘C falls back to
         /// copying the whole pin.
         private func copySelection(in window: NSWindow) -> Bool {
+            // Text selected with Live Text in an image pin.
+            if PinScrollView.find(in: window.contentView)?.copyLiveTextSelection() == true {
+                return true
+            }
             let copyAction = #selector(NSText.copy(_:))
             var responder = window.firstResponder
             while let current = responder, current !== window {
