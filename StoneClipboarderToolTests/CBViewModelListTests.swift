@@ -50,6 +50,19 @@ final class CBViewModelListTests: XCTestCase {
         XCTAssertEqual(viewModel.items.count, 130, "a copy must not collapse the list back to 30 rows")
     }
 
+    func testMoveToTopPutsTheItemsFirstInOrderWithoutCopying() throws {
+        try insertTextItems(count: 5)
+        viewModel.fetchItems(reset: true)
+        let second = try XCTUnwrap(viewModel.items.first { $0.content == "item 1" })
+        let third = try XCTUnwrap(viewModel.items.first { $0.content == "item 2" })
+        let pasteboardChange = NSPasteboard.general.changeCount
+
+        viewModel.moveToTop([second, third])
+
+        XCTAssertEqual(viewModel.items.prefix(2).map(\.content), ["item 1", "item 2"])
+        XCTAssertEqual(NSPasteboard.general.changeCount, pasteboardChange, "type-out must not touch the pasteboard")
+    }
+
     func testNextPageAfterADeleteSkipsNothing() async throws {
         try insertTextItems(count: 40)
         viewModel.fetchItems(reset: true)

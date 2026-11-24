@@ -1729,23 +1729,27 @@ struct QuickPickerView: View {
     // desktops, terminals). Text-only — images/files have nothing to type.
     private func performTypePaste() {
         let targetText: String?
+        let typedItems: [CBItem]
 
         if let range = selectedRange(), range.count > 1 {
             let items = range.compactMap { filteredItems[safe: $0] }
             guard !items.isEmpty, items.allSatisfy({ isTextLikeWithContent($0) }) else { return }
-            items.forEach { viewModel.markItemAccessed($0) }
+            typedItems = items
             targetText = items.compactMap { $0.content }.joined(separator: "\n")
         } else {
             guard let item = filteredItems[safe: selectedIndex],
                   isTextLikeWithContent(item),
                   let content = item.content else { return }
-            viewModel.markItemAccessed(item)
+            typedItems = [item]
             targetText = content
         }
 
         guard let text = targetText, !text.isEmpty else { return }
 
         guard PasteSimulator.ensureAccessibility() else { return }
+        // Typed out counts as used: up to the top like a paste, but the
+        // pasteboard stays as it was.
+        viewModel.moveToTop(typedItems)
 
         onClose()
         // Let focus return to the previously-active window before typing.

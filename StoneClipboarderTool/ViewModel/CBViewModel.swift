@@ -470,10 +470,21 @@ class CBViewModel: ObservableObject {
     @discardableResult
     func copyAndUpdateItem(_ item: CBItem) -> Bool {
         guard clipboardManager.copyItemToClipboard(item) else { return false }
+        moveToTop([item])
+        return true
+    }
 
-        markItemAccessed(item)
-        guard let modelContext = _modelContext else { return true }
-        item.timestamp = Date()
+    /// Marks items as just used and moves them to the top of the history,
+    /// the first one topmost, without touching the pasteboard (type-out
+    /// puts nothing there).
+    func moveToTop(_ items: [CBItem]) {
+        guard !items.isEmpty else { return }
+        items.forEach(markItemAccessed)
+        guard let modelContext = _modelContext else { return }
+        let now = Date()
+        for (offset, item) in items.enumerated() {
+            item.timestamp = now.addingTimeInterval(-Double(offset) * 0.001)
+        }
 
         do {
             try modelContext.save()
@@ -482,7 +493,6 @@ class CBViewModel: ObservableObject {
             modelContext.rollback()
             ErrorLogger.shared.log("Failed to update item timestamp", category: "SwiftData", error: error)
         }
-        return true
     }
 
     func saveItemToFile(_ item: CBItem) {

@@ -91,7 +91,8 @@ all pins.
 - [ ] ⇧↑/⇧↓ multi-select: ⏎ pastes texts joined by newlines (and doesn't
       save the joined text as a new item); mixed items paste one by one.
 - [ ] ⌥⏎ on an image pastes its recognized text (OCR).
-- [ ] ⌘⇧⏎ types text out key by key; Esc stops it. Try a terminal, a
+- [ ] ⌘⇧⏎ types text out key by key; Esc stops it. The typed item moves
+      to the top of the history, but the pasteboard keeps what it had. Try a terminal, a
       remote desktop, and a Ukrainian keyboard layout: Latin letters,
       capitals and !@# arrive correctly.
 - [ ] Space (or →, per settings) toggles Quick Look / the custom preview;
