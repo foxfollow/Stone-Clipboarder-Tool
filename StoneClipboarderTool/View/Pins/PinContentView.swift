@@ -55,15 +55,17 @@ struct PinContentView: View {
             }
         }
         // Don't make Cmd+C trigger when text is being actively edited — the
-        // editor needs that for normal copy behavior.
+        // editor needs that for normal copy behavior. With selectable
+        // (read-only) text, the handler copies the selection first and only
+        // falls back to the whole pin when nothing is selected.
         .background(
             CommandKeyHandler { event in
                 guard !isEditing else { return false }
-                if event.charactersIgnoringModifiers == "c" {
+                if CommandKeyHandler.isKey(event, "c", keyCode: 8) {
                     controller.copyToClipboard()
                     return true
                 }
-                if event.charactersIgnoringModifiers == "w" {
+                if CommandKeyHandler.isKey(event, "w", keyCode: 13) {
                     controller.dismissByUser()
                     return true
                 }
@@ -162,6 +164,14 @@ struct PinContentView: View {
 private struct CommandKeyHandler: NSViewRepresentable {
     let onCommand: (NSEvent) -> Bool
 
+    /// Matches a ⌘-letter by its character, or by the US key position when
+    /// the layout types a non-Latin letter there (Ukrainian ⌘С is ⌘C).
+    static func isKey(_ event: NSEvent, _ letter: String, keyCode: UInt16) -> Bool {
+        let chars = (event.charactersIgnoringModifiers ?? "").lowercased()
+        if chars == letter { return true }
+        return event.keyCode == keyCode && chars.unicodeScalars.contains { !$0.isASCII }
+    }
+
     func makeNSView(context: Context) -> CommandHandlerView {
         let v = CommandHandlerView()
         v.onCommand = onCommand
@@ -187,12 +197,47 @@ private struct CommandKeyHandler: NSViewRepresentable {
                 guard let self = self, let window = self.window, event.window === window else {
                     return event
                 }
-                if event.modifierFlags.contains(.command),
-                   self.onCommand?(event) == true {
+                guard event.modifierFlags.contains(.command) else { return event }
+                // ⌘C with text selected copies the selection, not the whole pin.
+                if CommandKeyHandler.isKey(event, "c", keyCode: 8), self.copySelection(in: window) {
+                    return nil
+                }
+                if self.onCommand?(event) == true {
                     return nil
                 }
                 return event
             }
+        }
+
+        /// Sends `copy:` to the responder that owns a text selection in this
+        /// window. Returns false when nothing is selected, so ⌘C falls back to
+        /// copying the whole pin.
+        private func copySelection(in window: NSWindow) -> Bool {
+            let copyAction = #selector(NSText.copy(_:))
+            var responder = window.firstResponder
+            while let current = responder, current !== window {
+                if let textView = current as? NSTextView {
+                    guard textView.selectedRanges.contains(where: { $0.rangeValue.length > 0 }) else {
+                        return false
+                    }
+                    textView.copy(nil)
+                    return true
+                }
+                if current.responds(to: copyAction) {
+                    let probe = NSMenuItem(title: "", action: copyAction, keyEquivalent: "")
+                    if let validator = current as? NSUserInterfaceValidations,
+                       !validator.validateUserInterfaceItem(probe) {
+                        return false
+                    }
+                    // Only count it as handled if something reached the
+                    // pasteboard; otherwise ⌘C copies the whole pin.
+                    let before = NSPasteboard.general.changeCount
+                    return current.tryToPerform(copyAction, with: nil)
+                        && NSPasteboard.general.changeCount != before
+                }
+                responder = current.nextResponder
+            }
+            return false
         }
 
         deinit {

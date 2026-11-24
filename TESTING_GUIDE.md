@@ -259,6 +259,9 @@ all pins.
 - [ ] Image pin: the image is centered and grows/shrinks with the window;
       pinch (also with another app active) and ⌘-scroll zoom toward the
       cursor, a zoomed image pans on drag, double-click fits it again.
+- [ ] Text pin with editing off: ⌘C with a selection copies only the
+      selection; ⌘C without one copies the whole pin (also on a Ukrainian
+      layout).
 - [ ] Copying a pinned file and pasting it in Finder a minute later works.
 - [ ] Settings → Pins → Active Pins lists every open pin, including pins of
       items no longer in the history, and updates immediately.

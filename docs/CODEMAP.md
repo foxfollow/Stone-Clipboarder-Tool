@@ -185,7 +185,7 @@ app's container for sandboxed Debug builds).
 | Tab, ⇧Tab, ⌘1…⌘9 (tabs), ⌥P, ⌥⏎, ⌥E, ⌥L, ⌥R and ⌃⌥⌫ (unlocked Passwords tab; ⌥ letters pass through while its password is typed), ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editors ⏎, Esc, ⌥F, ⌥K, ⌥R, ⌥↑/⌥↓, ⌃⌥⌫ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
 | Screen lock, screen saver (distributed); sleep, display sleep, session switch (workspace) | VaultManager | app lifetime |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
-| ⌘C / ⌘W in a pin (local) | PinContentView `CommandKeyHandler` | while the pin is in a window |
+| ⌘C / ⌘W in a pin (local; ⌘C copies a text selection first, else the whole pin) | PinContentView `CommandKeyHandler` | while the pin is in a window |
 | Pinch zoom (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
 | Shortcut recording (local + global) | HotkeySettingsView | while recording |
 | Two-finger swipe (local) | SwipeableRow | while the row is in a window |
