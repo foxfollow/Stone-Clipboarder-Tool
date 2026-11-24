@@ -363,6 +363,12 @@ struct QuickPickerView: View {
                 return .handled
             }
             .onKeyPress(keys: [.return]) { keyPress in
+                // ⌘⌥⇧⏎ → type out what is on the pasteboard right now (e.g.
+                // copied from a password manager and never saved here).
+                if keyPress.modifiers.isSuperset(of: [.command, .option, .shift]) {
+                    typeOutPasteboard()
+                    return .handled
+                }
                 // ⌘⇧⏎ → type the selected text out character by character
                 // instead of the normal pasteboard + ⌘V.
                 if keyPress.modifiers.contains(.command) && keyPress.modifiers.contains(.shift) {
@@ -1184,7 +1190,7 @@ struct QuickPickerView: View {
                 .font(.system(size: 9))
         }
         .foregroundStyle(.tertiary)
-        .help("Type the selected text character by character (⌘⇧Return)")
+        .help("Type the selected text character by character (⌘⇧Return); ⌘⌥⇧Return types what is on the clipboard now")
     }
 
     private func favoriteToggleBadge() -> some View {
@@ -1807,6 +1813,20 @@ struct QuickPickerView: View {
 
         onClose()
         // Let focus return to the previously-active window before typing.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            onTypePaste(text)
+        }
+    }
+
+    /// ⌘⌥⇧⏎: types out the text on the pasteboard now, once. It doesn't
+    /// become a history item and isn't kept anywhere by this path.
+    private func typeOutPasteboard() {
+        guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        guard PasteSimulator.ensureAccessibility() else { return }
+        onClose()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             onTypePaste(text)
         }

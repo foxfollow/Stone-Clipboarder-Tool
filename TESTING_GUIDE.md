@@ -94,10 +94,13 @@ all pins.
 - [ ] ⇧↑/⇧↓ multi-select: ⏎ pastes texts joined by newlines (and doesn't
       save the joined text as a new item); mixed items paste one by one.
 - [ ] ⌥⏎ on an image pastes its recognized text (OCR).
-- [ ] ⌘⇧⏎ types text out key by key; Esc stops it. The typed item moves
-      to the top of the history, but the pasteboard keeps what it had. Try a terminal, a
+- [ ] ⌘⇧⏎ types text out key by key; Esc stops it. Try a terminal, a
       remote desktop, and a Ukrainian keyboard layout: Latin letters,
-      capitals and !@# arrive correctly.
+      capitals and !@# arrive correctly. The typed item moves to the top of
+      the history, but the pasteboard keeps what it had.
+- [ ] ⌘⌥⇧⏎ types out the text on the clipboard now (e.g. copied from a
+      password manager or an excluded app), whatever row is selected; with
+      no text on the clipboard it beeps and the picker stays open.
 - [ ] Space (or →, per settings) toggles Quick Look / the custom preview;
       "Open with…" from Quick Look works. `Previews/Session_…` is gone about
       10 minutes later without another preview; `$TMPDIR/StoneClipboarderTool/Open/`
