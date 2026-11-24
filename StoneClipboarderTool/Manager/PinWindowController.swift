@@ -250,6 +250,9 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
     }
 
     func setImageZoom(_ zoom: Double) {
+        // A deferred zoom commit can land after the pin was closed and its
+        // config deleted.
+        guard config.modelContext != nil else { return }
         let clamped = max(0.25, min(8.0, zoom))
         state.imageZoom = clamped
         config.imageZoom = clamped

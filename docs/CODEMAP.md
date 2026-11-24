@@ -169,6 +169,7 @@ app's container for sandboxed Debug builds).
 | Activation-policy re-checks | AppDelegate | 1, 3, 6, 10 and 20 s after launch |
 | ⌘Q hold / double tap | AppDelegate | 1.0 s / 0.4 s |
 | Pin save debounce | PinWindowController | 0.25 s |
+| Pin image zoom commit / zoom badge fade | PinImageView | 0.3 s after the last zoom step / 1.4 s (2.5 s for the first-hover hint) |
 | Vault expiry check | VaultManager | 30 s, while unlocked |
 | Clear a pasted password | ClipboardManager | `vaultClipboardClearSeconds` (30 s) |
 | Open-in-app temp copy | ExternalOpener | 60 s after writing |
@@ -186,7 +187,7 @@ app's container for sandboxed Debug builds).
 | Screen lock, screen saver (distributed); sleep, display sleep, session switch (workspace) | VaultManager | app lifetime |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
 | ⌘C / ⌘W in a pin (local; ⌘C copies a text selection first, else the whole pin) | PinContentView `CommandKeyHandler` | while the pin is in a window |
-| Pinch zoom (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
+| Pinch, two-finger double-tap, ⌘+ / ⌘− / ⌘0 (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
 | Shortcut recording (local + global) | HotkeySettingsView | while recording |
 | Two-finger swipe (local) | SwipeableRow | while the row is in a window |
 

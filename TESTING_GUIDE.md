@@ -258,7 +258,11 @@ all pins.
       dragging the image); a locked pin doesn't move or resize.
 - [ ] Image pin: the image is centered and grows/shrinks with the window;
       pinch (also with another app active) and ⌘-scroll zoom toward the
-      cursor, a zoomed image pans on drag, double-click fits it again.
+      cursor, a zoomed image pans on drag (the image follows the pointer),
+      double-click fits it again. ⌘+ / ⌘− / ⌘0 zoom and fit (also on a
+      German or Ukrainian layout, and quick repeats step evenly), a
+      two-finger double-tap toggles fit / 2×, a badge shows the zoom, and
+      the first hover shows a zoom hint.
 - [ ] Text pin with editing off: ⌘C with a selection copies only the
       selection; ⌘C without one copies the whole pin (also on a Ukrainian
       layout).
