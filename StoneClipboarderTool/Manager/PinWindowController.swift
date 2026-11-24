@@ -130,6 +130,10 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
         removeClickThroughMonitors()
         panel.orderOut(nil)
         panel.close()
+        // Tear down the SwiftUI tree: PinContentView holds this controller
+        // strongly, so without this a closed pin (and its event monitors)
+        // stays alive for the rest of the session.
+        panel.contentView = nil
     }
 
     // MARK: - Public actions (called from SwiftUI chrome)
