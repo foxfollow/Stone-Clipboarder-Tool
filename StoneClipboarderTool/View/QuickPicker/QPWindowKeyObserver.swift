@@ -12,13 +12,13 @@ import SwiftUI
 struct QPWindowKeyObserver: NSViewRepresentable {
     @Binding var isKey: Bool
 
-    func makeNSView(context: Context) -> ObserverView {
+    func makeNSView(context _: Context) -> ObserverView {
         let view = ObserverView()
         view.onChange = { isKey = $0 }
         return view
     }
 
-    func updateNSView(_ nsView: ObserverView, context: Context) {
+    func updateNSView(_ nsView: ObserverView, context _: Context) {
         nsView.onChange = { isKey = $0 }
     }
 

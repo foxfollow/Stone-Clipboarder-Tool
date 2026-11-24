@@ -624,9 +624,9 @@ final class PinHintLabel: NSTextField {
         alphaValue = 0
     }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+    required init?(coder _: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func hitTest(_: NSPoint) -> NSView? { nil }
 }
 
 /// Clip view that keeps a document smaller than the viewport centered.

@@ -736,7 +736,12 @@ struct QuickPickerView: View {
     /// or the release hides them.
     private func updateHeldHint(_ flags: NSEvent.ModifierFlags) {
         let held = flags.intersection([.command, .control, .option, .shift])
-        let wanted: HeldHint? = held == .command ? .command : held == .control ? .control : nil
+        let wanted: HeldHint?
+        switch held {
+        case .command: wanted = .command
+        case .control: wanted = .control
+        default: wanted = nil
+        }
         heldHintTask?.cancel()
         guard let wanted, itemEditor == nil, vaultEditor == nil else {
             if heldHint != nil {

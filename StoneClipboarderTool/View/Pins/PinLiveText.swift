@@ -131,9 +131,9 @@ final class PinLiveText: NSObject, ImageAnalysisOverlayViewDelegate {
     }
 
     func overlayView(
-        _ overlayView: ImageAnalysisOverlayView,
-        shouldBeginAt point: CGPoint,
-        forAnalysisType analysisType: ImageAnalysisOverlayView.InteractionTypes
+        _: ImageAnalysisOverlayView,
+        shouldBeginAt _: CGPoint,
+        forAnalysisType _: ImageAnalysisOverlayView.InteractionTypes
     ) -> Bool {
         isActive
     }
@@ -170,13 +170,13 @@ final class PinLiveTextButton: NSButton {
         updateLook()
     }
 
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         fatalError("init(coder:) is not supported")
     }
 
     override var mouseDownCanMoveWindow: Bool { false }
 
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func acceptsFirstMouse(for _: NSEvent?) -> Bool { true }
 
     private func updateLook() {
         layer?.backgroundColor = (isOn

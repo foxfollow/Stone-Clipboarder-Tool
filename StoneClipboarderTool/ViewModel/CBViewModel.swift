@@ -470,7 +470,18 @@ class CBViewModel: ObservableObject {
     @discardableResult
     func copyAndUpdateItem(_ item: CBItem) -> Bool {
         guard clipboardManager.copyItemToClipboard(item) else { return false }
-        moveToTop([item])
+
+        markItemAccessed(item)
+        guard let modelContext = _modelContext else { return true }
+        item.timestamp = Date()
+
+        do {
+            try modelContext.save()
+            fetchItems(reset: true)
+        } catch {
+            modelContext.rollback()
+            ErrorLogger.shared.log("Failed to update item timestamp", category: "SwiftData", error: error)
+        }
         return true
     }
 
