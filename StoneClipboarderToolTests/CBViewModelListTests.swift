@@ -63,6 +63,25 @@ final class CBViewModelListTests: XCTestCase {
         XCTAssertEqual(NSPasteboard.general.changeCount, pasteboardChange, "type-out must not touch the pasteboard")
     }
 
+    func testMoveToTopWithNothingChangesNothing() throws {
+        try insertTextItems(count: 3)
+        viewModel.fetchItems(reset: true)
+        let before = viewModel.items.map(\.content)
+
+        viewModel.moveToTop([])
+
+        XCTAssertEqual(viewModel.items.map(\.content), before)
+    }
+
+    func testMoveToTopWithoutAStoreLeavesTheTimestamp() {
+        let detached = CBViewModel()
+        let item = CBItem(timestamp: Date(timeIntervalSince1970: 0), content: "loose", itemType: .text)
+
+        detached.moveToTop([item])
+
+        XCTAssertEqual(item.timestamp, Date(timeIntervalSince1970: 0))
+    }
+
     func testNextPageAfterADeleteSkipsNothing() async throws {
         try insertTextItems(count: 40)
         viewModel.fetchItems(reset: true)
