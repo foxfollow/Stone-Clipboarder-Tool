@@ -31,6 +31,8 @@ struct QPItemList: View {
     var showLanguage: Bool = false
     var showBadges: Bool = true
     var showImageText: Bool = true
+    /// The ⌃ number that pastes a row (index, row count), nil = none.
+    var pasteNumber: (Int, Int) -> Int? = { _, _ in nil }
 
     var body: some View {
         if filteredItems.isEmpty {
@@ -75,7 +77,8 @@ struct QPItemList: View {
                             badgeCategories: badgeCategories,
                             showLanguage: showLanguage,
                             showBadges: showBadges,
-                            showImageText: showImageText
+                            showImageText: showImageText,
+                            pasteNumber: pasteNumber(index, filteredItems.count)
                         )
                             .id(item.id)
                             .contentShape(Rectangle())

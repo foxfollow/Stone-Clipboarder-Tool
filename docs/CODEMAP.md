@@ -117,8 +117,8 @@ user's OCR result (⌥⏎, Extract Text) on the image.
 | ContentView | Main window: Recent / Favorites, whole-history search, `DetailedCardView` rows, `ClipboardHeader` |
 | ZoomView/, Small/ActionsBottomButtonView | Detail pane: text/image/file preview, zoom, copy, edit, open, OCR, delete |
 | Menu/ | MenuBarView (popover list of `SwipeableRow`s), MenuBarItemView, PauseTimerView |
-| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order, ⌥K Move to Passwords, Delete… / ⌃⌥⌫ with ⏎ to confirm; renders from a snapshot); Passwords hits above another tab's search results (`vaultSearchHits`, by label only, while unlocked), QPVaultPane + QPVaultRow (the Passwords tab: lock screen, masked rows, the eye), QPVaultEditorView + QPVaultEditorModel (⌥E on an entry: rename, ⌥↑/⌥↓, ⌃⌥⌫ delete (⏎ confirms), ⌥R the eye), `QPTab` (raw values stored in `quickPickerTabOrder`, `ordered(_:)`), QPCategoryBar + `QPCategoryChip.chips` (category chips of the active tab), QPQuickLookCoordinator (native Quick Look through temp files; a Passwords entry goes to an owner-only `Secret_<uuid>` folder deleted when its preview closes; Passwords previews pick their panel with `vaultPreviewMode` through `QuickPickerWindowManager.vaultPreviewPanel`, default Apple Quick Look), QPCustomPreviewPanel (own panel from a `QPPreviewContent` snapshot, also used over full-screen apps; nothing on disk; ⌥Space makes it 85 % of the screen, or Quick Look full screen) |
-| Pins/ | PinContentView, PinChromeView (+ PinDragArea to move the pin), PinImageView; all render from `PinViewState` |
+| QuickPicker/ | QuickPickerView (keys, tabs, multi-select, paste / OCR / type-out, ⌘⌥⇧⏎ types out the current pasteboard), QPItemList, QPItemRow, QPItemEditorView + QPItemEditorModel (⌥E: title, favorite, favorite order, ⌥K Move to Passwords, Delete… / ⌃⌥⌫ with ⏎ to confirm; renders from a snapshot); Passwords hits above another tab's search results (`vaultSearchHits`, by label only, while unlocked), QPVaultPane + QPVaultRow (the Passwords tab: lock screen, masked rows, the eye), QPVaultEditorView + QPVaultEditorModel (⌥E on an entry: rename, ⌥↑/⌥↓, ⌃⌥⌫ delete (⏎ confirms), ⌥R the eye), `QPTab` (raw values stored in `quickPickerTabOrder`, `ordered(_:)`, ⌃1…⌃9 row mapping `row(forPasteNumber:)` / `pasteNumber(forRow:)`), QPWindowKeyObserver (panel key state for the orange "lost focus" frame), QPCategoryBar + `QPCategoryChip.chips` (category chips of the active tab), QPQuickLookCoordinator (native Quick Look through temp files; a Passwords entry goes to an owner-only `Secret_<uuid>` folder deleted when its preview closes; Passwords previews pick their panel with `vaultPreviewMode` through `QuickPickerWindowManager.vaultPreviewPanel`, default Apple Quick Look), QPCustomPreviewPanel (own panel from a `QPPreviewContent` snapshot, also used over full-screen apps; nothing on disk; ⌥Space makes it 85 % of the screen, or Quick Look full screen) |
+| Pins/ | PinContentView, PinChromeView (+ PinDragArea to move the pin), PinImageView, PinLiveText (VisionKit Live Text over an image pin: analyzed in memory on first hover, a bottom-right toggle; its overlay lets clicks through while off); all render from `PinViewState` |
 | Settings/ | `SettingsGroup` headings with `SettingsSection` pages: General (General, Hotkeys, Accessibility), Quick Picker (Quick Picker with QuickPickerTabOrderSection, Categories, Pins), Security (Passwords: PasswordsSettingsView + VaultPasswordSheet, Excluded Apps), About. The sidebar's search field lists `SettingsSearchResults`; a pick scrolls the page (SettingsDetailContainer) to the row's `.settingsAnchor` and highlights it. Pages: Categories (CategoriesSettingsView, CategorySettingsRow, CategoryEditorView sheet, CategoryIconPicker), Pins, Excluded Apps (`@Query` is fine here), Accessibility, About. AppPickerView is shared by Excluded Apps and app groups |
 | Components/, Small/, Cells/ | Shared pieces: search bar, swipeable row, alerts, buttons, list cell, CategoryIconView, CategoryChipView |
 
@@ -169,6 +169,7 @@ app's container for sandboxed Debug builds).
 | Activation-policy re-checks | AppDelegate | 1, 3, 6, 10 and 20 s after launch |
 | ⌘Q hold / double tap | AppDelegate | 1.0 s / 0.4 s |
 | Pin save debounce | PinWindowController | 0.25 s |
+| Pin image zoom commit / zoom badge fade | PinImageView | 0.3 s after the last zoom step / 1.4 s (2.5 s for the first-hover hint) |
 | Vault expiry check | VaultManager | 30 s, while unlocked |
 | Clear a pasted password | ClipboardManager | `vaultClipboardClearSeconds` (30 s) |
 | Open-in-app temp copy | ExternalOpener | 60 s after writing |
@@ -182,11 +183,11 @@ app's container for sandboxed Debug builds).
 | ⌘Q down / up (local) | AppDelegate | app lifetime / while ⌘Q is held |
 | Esc cancels type-out (global + local) | TypePaster | while typing |
 | Click outside, Esc (global); key re-routing (local) | QuickPickerWindowManager | while the picker is open |
-| Tab, ⇧Tab, ⌘1…⌘9 (tabs), ⌥P, ⌥⏎, ⌥E, ⌥L, ⌥R and ⌃⌥⌫ (unlocked Passwords tab; ⌥ letters pass through while its password is typed), ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editors ⏎, Esc, ⌥F, ⌥K, ⌥R, ⌥↑/⌥↓, ⌃⌥⌫ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
+| ⌘ / ⌃ held alone (flagsChanged: number hints), Tab, ⇧Tab (Tab only refocuses the search while it lost focus), ⌘1…⌘9 (tabs), ⌃1…⌃9 (paste that row; ⌃9 = last on Favs and Passwords), ⌥P, ⌥⏎, ⌥E, ⌥L, ⌥R and ⌃⌥⌫ (unlocked Passwords tab; ⌥ letters pass through while its password is typed), ⌥←/⌥→ and ⌥⇧←/⌥⇧→ (category chips, only while there are chips); in the ⌥E editors ⏎, Esc, ⌥F, ⌥K, ⌥R, ⌥↑/⌥↓, ⌃⌥⌫ (local) | QuickPickerView `TabKeyInterceptor` | while the picker is open |
 | Screen lock, screen saver (distributed); sleep, display sleep, session switch (workspace) | VaultManager | app lifetime |
 | ⌘ held over click-through pins (global + local) | PinWindowController | while click-through is on |
-| ⌘C / ⌘W in a pin (local) | PinContentView `CommandKeyHandler` | while the pin is in a window |
-| Pinch zoom (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
+| ⌘C / ⌘W in a pin (local; ⌘C copies a text selection first, else the whole pin) | PinContentView `CommandKeyHandler` | while the pin is in a window |
+| Pinch, two-finger double-tap, ⌘+ / ⌘− / ⌘0 (local; ⌘-scroll via PinScrollView) | PinImageView | image pins |
 | Shortcut recording (local + global) | HotkeySettingsView | while recording |
 | Two-finger swipe (local) | SwipeableRow | while the row is in a window |
 

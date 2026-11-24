@@ -130,6 +130,10 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
         removeClickThroughMonitors()
         panel.orderOut(nil)
         panel.close()
+        // Tear down the SwiftUI tree: PinContentView holds this controller
+        // strongly, so without this a closed pin (and its event monitors)
+        // stays alive for the rest of the session.
+        panel.contentView = nil
     }
 
     // MARK: - Public actions (called from SwiftUI chrome)
@@ -250,6 +254,9 @@ final class PinWindowController: NSObject, NSWindowDelegate, ObservableObject {
     }
 
     func setImageZoom(_ zoom: Double) {
+        // A deferred zoom commit can land after the pin was closed and its
+        // config deleted.
+        guard config.modelContext != nil else { return }
         let clamped = max(0.25, min(8.0, zoom))
         state.imageZoom = clamped
         config.imageZoom = clamped

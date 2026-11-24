@@ -19,6 +19,8 @@ struct QPVaultPane: View {
     let onEdit: (VaultPayload) -> Void
     /// The row's eye: show or hide its content.
     var onToggleReveal: (VaultPayload) -> Void = { _ in }
+    /// ⌃ held: rows show the ⌃1…⌃9 that pastes them.
+    var showsPasteNumbers = false
 
     var body: some View {
         if vaultManager.isUnlocked {
@@ -126,7 +128,9 @@ struct QPVaultPane: View {
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                         QPVaultRow(
                             entry: entry, isSelected: index == selectedIndex, isRevealed: entry.id == revealedID,
-                            onToggleReveal: { onToggleReveal(entry) })
+                            onToggleReveal: { onToggleReveal(entry) },
+                            pasteNumber: showsPasteNumbers
+                                ? QPTab.passwords.pasteNumber(forRow: index, count: entries.count) : nil)
                             .id(entry.id)
                             .contentShape(Rectangle())
                             .onTapGesture {

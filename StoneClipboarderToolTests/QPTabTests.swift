@@ -21,6 +21,37 @@ final class QPTabTests: XCTestCase {
     func testPasswordsListNoHistoryTypes() {
         XCTAssertNil(QPTab.passwords.itemTypes)
     }
+
+    func testControlDigitPastesTheNthRow() {
+        XCTAssertEqual(QPTab.all.row(forPasteNumber: 1, count: 30), 0)
+        XCTAssertEqual(QPTab.all.row(forPasteNumber: 9, count: 30), 8)
+        XCTAssertNil(QPTab.all.row(forPasteNumber: 4, count: 3))
+        XCTAssertNil(QPTab.all.row(forPasteNumber: 0, count: 3))
+        XCTAssertNil(QPTab.text.row(forPasteNumber: 1, count: 0))
+    }
+
+    func testControlNinePastesTheLastRowOfShortLists() {
+        XCTAssertEqual(QPTab.favorites.row(forPasteNumber: 9, count: 13), 12)
+        XCTAssertEqual(QPTab.passwords.row(forPasteNumber: 9, count: 4), 3)
+        XCTAssertEqual(QPTab.favorites.row(forPasteNumber: 8, count: 13), 7)
+        XCTAssertNil(QPTab.favorites.row(forPasteNumber: 9, count: 0))
+    }
+
+    func testRowLabelsMatchWhatTheDigitPastes() {
+        for tab in QPTab.allCases {
+            for count in [0, 1, 5, 9, 13] {
+                for row in 0..<count {
+                    if let number = tab.pasteNumber(forRow: row, count: count) {
+                        XCTAssertEqual(tab.row(forPasteNumber: number, count: count), row, "\(tab) \(count) \(row)")
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(QPTab.favorites.pasteNumber(forRow: 12, count: 13), 9)
+        XCTAssertNil(QPTab.favorites.pasteNumber(forRow: 8, count: 13))
+        XCTAssertEqual(QPTab.all.pasteNumber(forRow: 8, count: 13), 9)
+        XCTAssertNil(QPTab.all.pasteNumber(forRow: 12, count: 13))
+    }
 }
 
 @MainActor

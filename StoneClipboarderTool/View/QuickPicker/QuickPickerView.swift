@@ -59,6 +59,25 @@ enum QPTab: String, Hashable, CaseIterable, Identifiable {
         return tabs[(i - 1 + tabs.count) % tabs.count]
     }
 
+    /// Favs and Passwords are short, hand-kept lists: ↑ on the first row
+    /// wraps to the last, and ⌃9 pastes the last row instead of the ninth.
+    var isShortList: Bool { self == .favorites || self == .passwords }
+
+    /// The row ⌃`number` (1…9) pastes in a list of `count` rows.
+    func row(forPasteNumber number: Int, count: Int) -> Int? {
+        guard (1...9).contains(number), count > 0 else { return nil }
+        if number == 9, isShortList { return count - 1 }
+        return number - 1 < count ? number - 1 : nil
+    }
+
+    /// The ⌃ number shown on row `index`, if one pastes it.
+    func pasteNumber(forRow index: Int, count: Int) -> Int? {
+        guard index >= 0, index < count else { return nil }
+        if index < 8 { return index + 1 }
+        if isShortList { return index == count - 1 ? 9 : nil }
+        return index == 8 ? 9 : nil
+    }
+
     /// Item types listed on the tab; nil = every type (All, Favorites) or
     /// no history items at all (Passwords).
     var itemTypes: Set<CBItemType>? {
@@ -120,6 +139,16 @@ struct QuickPickerView: View {
     /// The Passwords password, typed where the search field usually is.
     @State private var vaultPasswordInput = ""
     @FocusState private var isSearchFocused: Bool
+    /// Whether the picker panel is the key window (QPWindowKeyObserver).
+    @State private var isWindowKey = true
+    /// Typing no longer reaches the search field: orange frame and a hint.
+    @State private var isInputLost = false
+    @State private var inputLostCheck: Task<Void, Never>?
+    /// ⌘ or ⌃ held alone: show the ⌘1…⌘9 tab or ⌃1…⌃9 row hints.
+    @State private var heldHint: HeldHint?
+    @State private var heldHintTask: Task<Void, Never>?
+
+    private enum HeldHint { case command, control }
 
     let onClose: () -> Void
     let onPreviewToggle: (CBItem) -> Void
@@ -317,7 +346,7 @@ struct QuickPickerView: View {
             }
             .onKeyPress(keys: [.upArrow]) { keyPress in
                 if isPasswordsTab {
-                    moveVaultSelection(by: -1)
+                    moveVaultSelection(by: -1, wrapping: true)
                     return .handled
                 }
                 if moveVaultHitSelection(by: -1) { return .handled }
@@ -326,7 +355,7 @@ struct QuickPickerView: View {
             }
             .onKeyPress(keys: [.downArrow]) { keyPress in
                 if isPasswordsTab {
-                    moveVaultSelection(by: 1)
+                    moveVaultSelection(by: 1, wrapping: true)
                     return .handled
                 }
                 if moveVaultHitSelection(by: 1) { return .handled }
@@ -334,6 +363,12 @@ struct QuickPickerView: View {
                 return .handled
             }
             .onKeyPress(keys: [.return]) { keyPress in
+                // ⌘⌥⇧⏎ → type out what is on the pasteboard right now (e.g.
+                // copied from a password manager and never saved here).
+                if keyPress.modifiers.isSuperset(of: [.command, .option, .shift]) {
+                    typeOutPasteboard()
+                    return .handled
+                }
                 // ⌘⇧⏎ → type the selected text out character by character
                 // instead of the normal pasteboard + ⌘V.
                 if keyPress.modifiers.contains(.command) && keyPress.modifiers.contains(.shift) {
@@ -507,7 +542,8 @@ struct QuickPickerView: View {
                     onUnlock: { performVaultAction() },
                     onPaste: { performVaultAction() },
                     onEdit: { _ in openVaultEditor() },
-                    onToggleReveal: { entry in toggleVaultReveal(entry.id) }
+                    onToggleReveal: { entry in toggleVaultReveal(entry.id) },
+                    showsPasteNumbers: heldHint == .control
                 )
             } else {
             if !vaultSearchHits.isEmpty {
@@ -547,7 +583,10 @@ struct QuickPickerView: View {
                 badgeCategories: badgeCategories,
                 showLanguage: showsLanguageBadge,
                 showBadges: settingsManager?.showRowBadges ?? true,
-                showImageText: settingsManager?.showImageTextInRows ?? true
+                showImageText: settingsManager?.showImageTextInRows ?? true,
+                pasteNumber: { [activeTab, heldHint] index, count in
+                    heldHint == .control ? activeTab.pasteNumber(forRow: index, count: count) : nil
+                }
             )
             }
             footerBar
@@ -557,8 +596,25 @@ struct QuickPickerView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                .stroke(isInputLost ? Color.orange : Color.gray.opacity(0.2), lineWidth: isInputLost ? 2 : 1)
         )
+        .overlay(alignment: .bottom) {
+            if isInputLost {
+                inputLostHint
+                    .padding(.bottom, 44)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: isInputLost)
+        .background(QPWindowKeyObserver(isKey: $isWindowKey))
+        .onChange(of: isWindowKey) { _, isKey in
+            scheduleInputLostCheck()
+            // Clicking back into the picker puts the cursor in the search.
+            if isKey, isInputLost { refocusSearch() }
+        }
+        .onChange(of: isSearchFocused) { _, _ in scheduleInputLostCheck() }
+        .onChange(of: itemEditor == nil) { _, _ in scheduleInputLostCheck() }
+        .onChange(of: vaultEditor == nil) { _, _ in scheduleInputLostCheck() }
         .clipped()
         .onAppear {
             // The picker opens on the first tab of the user's order (or the
@@ -580,6 +636,11 @@ struct QuickPickerView: View {
             // and re-assigning `true` to an already-`true` state is a no-op
             // that won't re-grab focus from the field editor.
             tabInterceptor.onTab = {
+                // Lost focus: Tab only brings the cursor back.
+                if isInputLost {
+                    refocusSearch()
+                    return
+                }
                 activeTab = activeTab.next(in: visibleTabs)
                 isSearchFocused = false
                 DispatchQueue.main.async {
@@ -638,6 +699,13 @@ struct QuickPickerView: View {
                     isSearchFocused = true
                 }
             }
+            // ⌃1…⌃9: paste that row (⌃9 = the last one on Favs and Passwords).
+            tabInterceptor.onControlDigit = { number in
+                pasteRow(number: number)
+            }
+            tabInterceptor.onModifiersChanged = { flags in
+                updateHeldHint(flags)
+            }
             tabInterceptor.onOptionE = {
                 if isPasswordsTab {
                     openVaultEditor()
@@ -655,7 +723,133 @@ struct QuickPickerView: View {
         .onDisappear {
             tabInterceptor.stop()
             countsReloadTask?.cancel()
+            inputLostCheck?.cancel()
+            heldHintTask?.cancel()
+            heldHint = nil
         }
+    }
+
+    // MARK: - Held ⌘ / ⌃ hints
+
+    /// ⌘ or ⌃ held on its own shows its number hints after a short delay
+    /// (so a quick ⌘⇧⏎ or ⌃⌥⌫ doesn't flash them); any other combination
+    /// or the release hides them.
+    private func updateHeldHint(_ flags: NSEvent.ModifierFlags) {
+        let held = flags.intersection([.command, .control, .option, .shift])
+        let wanted: HeldHint?
+        switch held {
+        case .command: wanted = .command
+        case .control: wanted = .control
+        default: wanted = nil
+        }
+        heldHintTask?.cancel()
+        guard let wanted, itemEditor == nil, vaultEditor == nil else {
+            if heldHint != nil {
+                withAnimation(.easeOut(duration: 0.12)) { heldHint = nil }
+            }
+            return
+        }
+        guard wanted != heldHint else { return }
+        heldHintTask = Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled, isWindowKey else { return }
+            withAnimation(.easeIn(duration: 0.15)) { heldHint = wanted }
+        }
+    }
+
+    /// The ⌘ number over a tab pill while ⌘ is held.
+    @ViewBuilder
+    private func tabNumberBadge(_ tab: QPTab) -> some View {
+        if heldHint == .command, let index = visibleTabs.firstIndex(of: tab), index < 9 {
+            Text("⌘\(index + 1)")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Capsule().fill(Color.black.opacity(0.75)))
+                .offset(x: 6, y: -8)
+                .transition(.opacity)
+                .allowsHitTesting(false)
+        }
+    }
+
+    // MARK: - Lost keyboard focus
+
+    /// Shown while typing doesn't reach the search field.
+    private var inputLostHint: some View {
+        Button {
+            refocusSearch()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(isWindowKey ? "Typing isn't going to the search. Press ⇥ or click here" : "Typing isn't going here. Click here to focus")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.orange))
+            .shadow(color: .black.opacity(0.2), radius: 4, y: 1)
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .help("Put the cursor back in the search field")
+    }
+
+    /// Re-checks a moment later, so the false→true focus toggles of a tab
+    /// switch and a Quick Look preview (which takes key while open) don't
+    /// flash the frame.
+    private func scheduleInputLostCheck() {
+        inputLostCheck?.cancel()
+        inputLostCheck = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            isInputLost = computeInputLost()
+        }
+    }
+
+    private func computeInputLost() -> Bool {
+        // An editor owns the keyboard; the Touch ID prompt and previews
+        // take key on purpose.
+        if itemEditor != nil || vaultEditor != nil { return false }
+        if vaultManager.isAuthenticating || isPreviewVisible() || vaultPreview.isVisible() { return false }
+        return !isWindowKey || !isSearchFocused
+    }
+
+    private func refocusSearch() {
+        if !isWindowKey {
+            NSApp.windows.first { $0 is KeyCapturingPanel && $0.isVisible }?.makeKey()
+        }
+        isSearchFocused = false
+        DispatchQueue.main.async {
+            isSearchFocused = true
+            isInputLost = false
+        }
+    }
+
+    // MARK: - ⌃1…⌃9
+
+    private func pasteRow(number: Int) {
+        if isPasswordsTab {
+            vaultManager.checkExpiry()
+            let entries = vaultEntries
+            guard vaultManager.isUnlocked,
+                  let index = activeTab.row(forPasteNumber: number, count: entries.count),
+                  vaultManager.copyToPasteboard(entries[index].id) else { return }
+            vaultIndex = index
+            onClose()
+            PasteSimulator.paste()
+            return
+        }
+        let items = filteredItems
+        guard let index = activeTab.row(forPasteNumber: number, count: items.count) else { return }
+        vaultHitIndex = nil
+        selectionAnchor = nil
+        selectedIndex = index
+        guard viewModel.copyAndUpdateItem(items[index]) else { return }
+        onClose()
+        PasteSimulator.paste()
     }
 
     @ViewBuilder
@@ -848,6 +1042,7 @@ struct QuickPickerView: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .overlay(alignment: .topTrailing) { tabNumberBadge(tab) }
         .help(tabHelp(tab))
     }
 
@@ -1000,7 +1195,7 @@ struct QuickPickerView: View {
                 .font(.system(size: 9))
         }
         .foregroundStyle(.tertiary)
-        .help("Type the selected text character by character (⌘⇧Return)")
+        .help("Type the selected text character by character (⌘⇧Return); ⌘⌥⇧Return types what is on the clipboard now")
     }
 
     private func favoriteToggleBadge() -> some View {
@@ -1300,7 +1495,12 @@ struct QuickPickerView: View {
     }
 
     private func moveSelection(by delta: Int, extendingWith extending: Bool) {
-        let newIndex = selectedIndex + delta
+        var newIndex = selectedIndex + delta
+        // Favs go round: ↑ on the first row to the last, ↓ on the last to the first.
+        if !extending, activeTab.isShortList, filteredItems.count > 1 {
+            if newIndex < 0 { newIndex = filteredItems.count - 1 }
+            if newIndex >= filteredItems.count { newIndex = 0 }
+        }
         guard newIndex >= 0, newIndex < filteredItems.count else { return }
 
         if extending {
@@ -1594,26 +1794,44 @@ struct QuickPickerView: View {
     // desktops, terminals). Text-only — images/files have nothing to type.
     private func performTypePaste() {
         let targetText: String?
+        let typedItems: [CBItem]
 
         if let range = selectedRange(), range.count > 1 {
             let items = range.compactMap { filteredItems[safe: $0] }
             guard !items.isEmpty, items.allSatisfy({ isTextLikeWithContent($0) }) else { return }
-            items.forEach { viewModel.markItemAccessed($0) }
+            typedItems = items
             targetText = items.compactMap { $0.content }.joined(separator: "\n")
         } else {
             guard let item = filteredItems[safe: selectedIndex],
                   isTextLikeWithContent(item),
                   let content = item.content else { return }
-            viewModel.markItemAccessed(item)
+            typedItems = [item]
             targetText = content
         }
 
         guard let text = targetText, !text.isEmpty else { return }
 
         guard PasteSimulator.ensureAccessibility() else { return }
+        // Typed out counts as used: up to the top like a paste, but the
+        // pasteboard stays as it was.
+        viewModel.moveToTop(typedItems)
 
         onClose()
         // Let focus return to the previously-active window before typing.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            onTypePaste(text)
+        }
+    }
+
+    /// ⌘⌥⇧⏎: types out the text on the pasteboard now, once. It doesn't
+    /// become a history item and isn't kept anywhere by this path.
+    private func typeOutPasteboard() {
+        guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        guard PasteSimulator.ensureAccessibility() else { return }
+        onClose()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             onTypePaste(text)
         }
@@ -1764,8 +1982,12 @@ struct QuickPickerView: View {
         vaultManager.entries.filter { $0.matches(searchText) }
     }
 
-    private func moveVaultSelection(by delta: Int) {
-        let newIndex = vaultIndex + delta
+    private func moveVaultSelection(by delta: Int, wrapping: Bool = false) {
+        var newIndex = vaultIndex + delta
+        if wrapping, vaultEntries.count > 1 {
+            if newIndex < 0 { newIndex = vaultEntries.count - 1 }
+            if newIndex >= vaultEntries.count { newIndex = 0 }
+        }
         guard vaultEntries.indices.contains(newIndex) else { return }
         vaultIndex = newIndex
         revealedVaultID = nil
@@ -2004,6 +2226,10 @@ final class TabKeyInterceptor: ObservableObject {
     var onDeleteEntry: (() -> Void)?
     /// ⌘1…⌘9 with the number.
     var onCommandDigit: ((Int) -> Void)?
+    /// ⌃1…⌃9 with the number: paste that row.
+    var onControlDigit: ((Int) -> Void)?
+    /// Every modifier change (⌘ / ⌃ held shows number hints).
+    var onModifiersChanged: ((NSEvent.ModifierFlags) -> Void)?
     /// Key codes of 1…9 on the main row (ANSI positions, any layout).
     private static let digitKeyCodes: [UInt16: Int] = [18: 1, 19: 2, 20: 3, 21: 4, 23: 5, 22: 6, 26: 7, 28: 8, 25: 9]
     var isPasswordsTab: (() -> Bool)?
@@ -2032,7 +2258,7 @@ final class TabKeyInterceptor: ObservableObject {
 
     func start() {
         guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             // NOTE: must NOT use `intercept(event) ?? event` — that turns a
             // deliberate nil (swallow) back into the event, so the keystroke
             // (e.g. the "p" in ⌥P) would leak into the search field.
@@ -2059,11 +2285,20 @@ final class TabKeyInterceptor: ObservableObject {
         isPasswordsTab = nil
         passesOptionKeys = nil
         onCommandDigit = nil
+        onControlDigit = nil
+        onModifiersChanged = nil
         onDeleteEntry = nil
     }
 
     private func intercept(_ event: NSEvent) -> NSEvent? {
         let flags = event.modifierFlags
+
+        if event.type == .flagsChanged {
+            DispatchQueue.main.async { [weak self] in
+                self?.onModifiersChanged?(flags)
+            }
+            return event
+        }
 
         if let onEditorKey {
             return interceptForEditor(event, flags: flags, handler: onEditorKey)
@@ -2074,6 +2309,15 @@ final class TabKeyInterceptor: ObservableObject {
            flags.intersection([.command, .option, .control, .shift]) == .command {
             DispatchQueue.main.async { [weak self] in
                 self?.onCommandDigit?(number)
+            }
+            return nil
+        }
+
+        // ⌃1…⌃9 (no other modifier) paste a row.
+        if let number = Self.digitKeyCodes[event.keyCode],
+           flags.intersection([.command, .option, .control, .shift]) == .control {
+            DispatchQueue.main.async { [weak self] in
+                self?.onControlDigit?(number)
             }
             return nil
         }

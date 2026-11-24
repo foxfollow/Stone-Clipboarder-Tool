@@ -69,7 +69,18 @@ all pins.
 - [ ] Opens centered on first use, then where you left it (until relaunch);
       also over a full-screen app without switching Spaces.
 - [ ] ↑/↓ select, ⏎ pastes into the previous app, Esc closes, clicking
-      outside closes.
+      outside closes. On Favs and Passwords the list goes round: ↑ on the
+      first row jumps to the last, ↓ on the last to the first.
+- [ ] Holding ⌘ alone fades in ⌘1…⌘9 over the tab pills, holding ⌃ alone
+      fades in ⌃1…⌃9 on the rows (after ~0.15 s; a quick ⌘⇧⏎ or ⌃⌥⌫
+      doesn't flash them); releasing hides them.
+- [ ] ⌃1…⌃9 paste that row at once; on
+      Favs and Passwords ⌃9 pastes the last row. Also on a Ukrainian
+      layout; ⌃⇧1…0 still paste favorites globally.
+- [ ] When typing stops reaching the search (focus moved, the panel lost
+      key), an orange frame and hint appear after a moment; ⇥ (without
+      switching tabs) or a click brings the cursor back and clears it. No
+      flash on tab switches, Quick Look, the ⌥E editors or Touch ID.
 - [ ] Tab / ⇧Tab cycle All, Favs, Text, Images, Files, Passwords; counts
       are right (Passwords shows no count while locked). No pill is cut
       off; with six tabs they get tighter and an inactive Passwords pill
@@ -85,7 +96,11 @@ all pins.
 - [ ] ⌥⏎ on an image pastes its recognized text (OCR).
 - [ ] ⌘⇧⏎ types text out key by key; Esc stops it. Try a terminal, a
       remote desktop, and a Ukrainian keyboard layout: Latin letters,
-      capitals and !@# arrive correctly.
+      capitals and !@# arrive correctly. The typed item moves to the top of
+      the history, but the pasteboard keeps what it had.
+- [ ] ⌘⌥⇧⏎ types out the text on the clipboard now (e.g. copied from a
+      password manager or an excluded app), whatever row is selected; with
+      no text on the clipboard it beeps and the picker stays open.
 - [ ] Space (or →, per settings) toggles Quick Look / the custom preview;
       "Open with…" from Quick Look works. `Previews/Session_…` is gone about
       10 minutes later without another preview; `$TMPDIR/StoneClipboarderTool/Open/`
@@ -258,7 +273,20 @@ all pins.
       dragging the image); a locked pin doesn't move or resize.
 - [ ] Image pin: the image is centered and grows/shrinks with the window;
       pinch (also with another app active) and ⌘-scroll zoom toward the
-      cursor, a zoomed image pans on drag, double-click fits it again.
+      cursor, a zoomed image pans on drag (the image follows the pointer),
+      double-click fits it again. ⌘+ / ⌘− / ⌘0 zoom and fit (also on a
+      German or Ukrainian layout, and quick repeats step evenly), a
+      two-finger double-tap toggles fit / 2×, a badge shows the zoom, and
+      the first hover shows a zoom hint.
+- [ ] Image pin with text: after the first hover a Live Text button shows
+      at the bottom right (none on an image without text). On: text is
+      highlighted, dragging selects it, ⌘C copies only the selection, right
+      click offers Translate / Look Up; it stays aligned after zooming and
+      scrolling. Off: dragging moves or pans the pin again, ⌘C copies the
+      image.
+- [ ] Text pin with editing off: ⌘C with a selection copies only the
+      selection; ⌘C without one copies the whole pin (also on a Ukrainian
+      layout).
 - [ ] Copying a pinned file and pasting it in Finder a minute later works.
 - [ ] Settings → Pins → Active Pins lists every open pin, including pins of
       items no longer in the history, and updates immediately.
