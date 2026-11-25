@@ -1,0 +1,94 @@
+# =============================================================================
+# Bump the Homebrew cask (foxfollow/homebrew-stone) to a published release.
+#
+# release.yml calls it after a release is published. It can also be run on
+# its own (Actions → Update Homebrew Tap → Run workflow, or
+# `gh workflow run homebrew-tap.yml -f version=X.Y.Z`) when that call failed,
+# e.g. after renewing an expired HOMEBREW_TAP_TOKEN, without building or
+# releasing again.
+#
+# The sha256 comes from the zip attached to the GitHub release, the same
+# file `brew install` downloads.
+# =============================================================================
+
+name: Update Homebrew Tap
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Released version (without v prefix)"
+        required: true
+        type: string
+    secrets:
+      HOMEBREW_TAP_TOKEN:
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Released version (without v prefix), e.g. 1.11.1"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    name: Bump cask
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bump stone-clipboarder-tool cask
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          SOURCE_REPO: ${{ github.repository }}
+          TAP_REPO: foxfollow/homebrew-stone
+          CASK_PATH: Casks/stone-clipboarder-tool.rb
+        run: |
+          set -euo pipefail
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::HOMEBREW_TAP_TOKEN secret is not set."
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' is not X.Y.Z."
+            exit 1
+          fi
+
+          # 1. sha256 of the zip on the GitHub release
+          ZIP_URL="https://github.com/${SOURCE_REPO}/releases/download/v${VERSION}/StoneClipboarderTool.zip"
+          curl -fsSL --retry 3 -o release.zip "$ZIP_URL"
+          NEW_SHA256=$(sha256sum release.zip | awk '{print $1}')
+          echo "Version: $VERSION"
+          echo "SHA256:  $NEW_SHA256"
+
+          # 2. Current cask (fails loudly on a bad or expired token)
+          if ! gh api "repos/${TAP_REPO}/contents/${CASK_PATH}" > cask.json 2> api-error.txt; then
+            echo "::error::Could not read ${CASK_PATH} from ${TAP_REPO}: $(cat api-error.txt). Is HOMEBREW_TAP_TOKEN expired, or missing Contents read/write on ${TAP_REPO}?"
+            exit 1
+          fi
+          FILE_SHA=$(jq -r '.sha' cask.json)
+          jq -r '.content' cask.json | base64 -d > cask.rb
+
+          # 3. New version and sha256
+          sed -i -E \
+            -e "s/^([[:space:]]*version )\"[^\"]*\"/\1\"${VERSION}\"/" \
+            -e "s/^([[:space:]]*sha256 )\"[^\"]*\"/\1\"${NEW_SHA256}\"/" \
+            cask.rb
+          if ! grep -q "version \"${VERSION}\"" cask.rb || ! grep -q "sha256 \"${NEW_SHA256}\"" cask.rb; then
+            echo "::error::The cask's version or sha256 line was not found."
+            exit 1
+          fi
+          if gh api "repos/${TAP_REPO}/contents/${CASK_PATH}" --jq '.content' | base64 -d | cmp -s - cask.rb; then
+            echo "Cask already at ${VERSION} with this sha256; nothing to do."
+            exit 0
+          fi
+
+          # 4. Commit it to the tap
+          gh api -X PUT "repos/${TAP_REPO}/contents/${CASK_PATH}" \
+            -f message="ciflow: bump stone-clipboarder-tool to v${VERSION}" \
+            -f content="$(base64 -w0 cask.rb)" \
+            -f sha="$FILE_SHA" \
+            --jq '.commit.html_url'
+          echo "✅ Homebrew tap updated to ${VERSION}"

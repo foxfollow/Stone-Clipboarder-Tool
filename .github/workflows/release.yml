@@ -37,6 +37,8 @@ jobs:
   build:
     name: Build and Release
     runs-on: macos-26 # macOS 26 Tahoe with Xcode 26.1.1
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       # =========================================================================
@@ -623,78 +625,6 @@ jobs:
           echo "❌ Failed to push appcast changes after 3 attempts"
           exit 1
 
-      - name: Update Homebrew Tap
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          if [[ -z "$HOMEBREW_TAP_TOKEN" ]]; then
-            echo "⚠️ HOMEBREW_TAP_TOKEN secret not set. Skipping Homebrew tap update."
-            exit 0
-          fi
-          echo "🍺 Updating Homebrew tap..."
-
-          # 1. Compute SHA256 of the release ZIP
-          ZIP_PATH="release/${{ env.APP_NAME }}.zip"
-          NEW_SHA256=$(shasum -a 256 "$ZIP_PATH" | awk '{print $1}')
-          echo "  SHA256: $NEW_SHA256"
-          echo "  Version: ${{ env.VERSION }}"
-
-          # 2. Fetch current cask file from foxfollow/homebrew-stone
-          TAP_REPO="foxfollow/homebrew-stone"
-          CASK_PATH="Casks/stone-clipboarder-tool.rb"
-          API_URL="https://api.github.com/repos/${TAP_REPO}/contents/${CASK_PATH}"
-
-          RESPONSE=$(curl -s -H "Authorization: token ${HOMEBREW_TAP_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "$API_URL")
-
-          # Extract current file SHA (required for update)
-          FILE_SHA=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['sha'])" 2>/dev/null)
-          if [[ -z "$FILE_SHA" ]]; then
-            echo "⚠️ Could not fetch cask file from $TAP_REPO. Skipping Homebrew update."
-            echo "  Response: $RESPONSE"
-            exit 0
-          fi
-          echo "  Current file SHA: $FILE_SHA"
-
-          # 3. Decode current content and update version + sha256
-          CURRENT_CONTENT=$(echo "$RESPONSE" | python3 -c "
-          import sys, json, base64
-          data = json.load(sys.stdin)
-          print(base64.b64decode(data['content']).decode('utf-8'))
-          ")
-
-          NEW_CONTENT=$(echo "$CURRENT_CONTENT" | \
-            sed "s/version \"[^\"]*\"/version \"${{ env.VERSION }}\"/" | \
-            sed "s/sha256 \"[^\"]*\"/sha256 \"${NEW_SHA256}\"/")
-
-          # 4. Base64 encode the new content
-          ENCODED_CONTENT=$(echo "$NEW_CONTENT" | base64)
-
-          # 5. Commit updated cask file via GitHub API
-          COMMIT_MSG="ciflow: bump stone-clipboarder-tool to v${{ env.VERSION }}"
-
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X PUT \
-            -H "Authorization: token ${HOMEBREW_TAP_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "$API_URL" \
-            -d "$(python3 -c "
-          import json, sys
-          payload = {
-              'message': '${COMMIT_MSG}',
-              'content': '''${ENCODED_CONTENT}'''.strip(),
-              'sha': '${FILE_SHA}'
-          }
-          print(json.dumps(payload))
-          ")")
-
-          if [[ "$HTTP_STATUS" == "200" ]]; then
-            echo "✅ Homebrew tap updated successfully"
-          else
-            echo "⚠️ Homebrew tap update failed (HTTP $HTTP_STATUS). You may need to update manually."
-          fi
-
       # =========================================================================
       # SUMMARY
       # =========================================================================
@@ -713,3 +643,16 @@ jobs:
           echo "║ Release:    https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION }}"
           echo "║ Appcast:    https://raw.githubusercontent.com/${{ github.repository }}/main/docs/appcast.xml"
           echo "╚════════════════════════════════════════════════════════════════════════════╝"
+
+  # The Homebrew cask is bumped in its own workflow, so a failed bump (an
+  # expired HOMEBREW_TAP_TOKEN) can be re-run alone, by GitHub Actions,
+  # without building or releasing again.
+  homebrew:
+    name: Update Homebrew Tap
+    needs: build
+    if: ${{ needs.build.outputs.version != '0.0.0-dev' }}
+    uses: ./.github/workflows/homebrew-tap.yml
+    with:
+      version: ${{ needs.build.outputs.version }}
+    secrets:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
