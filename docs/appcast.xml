@@ -10,6 +10,18 @@
         <description>Updates for StoneClipboarderTool</description>
         <language>en</language>
 
+        <new>
+            <li>🪟 NEW: Live Text in image pins: the button at the bottom right lets you select the text in a pinned image, copy it with ⌘C or translate it</li>
+            <li>⌨️ NEW: ⌃1…⌃9 in the Quick Picker paste that row at once; on Favs and Passwords ⌃9 pastes the last one. Hold ⌘ or ⌃ to see the numbers</li>
+            <li>✨ NEW: ⌘⌥⇧↩ types out whatever is on the clipboard right now, such as a password from your password manager, without saving it</li>
+            <li>⌨️ IMPROVED: ⌘⇧↩ moves the typed item to the top of the history and leaves the clipboard as it was</li>
+            <li>⌨️ IMPROVED: ↑ and ↓ go round the Favs and Passwords lists</li>
+            <li>🎨 IMPROVED: When typing stops reaching the Quick Picker search, an orange frame says so; ⇥ or a click brings the cursor back</li>
+            <li>🎨 IMPROVED: Image pins zoom smoothly, with ⌘+ / ⌘− / ⌘0, a two-finger double-tap and a zoom badge</li>
+            <li>🛠️ FIXED: ⌘C in a text pin copies the selected text instead of the whole pin</li>
+            <li>🐛 FIXED: Closed pins no longer stay in memory</li>
+        </new>
+
     <item>
         <title>Version 1.11.0</title>
         <link>https://foxfollow.github.io/Stone-Clipboarder-Tool/</link>
